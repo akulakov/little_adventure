@@ -8,6 +8,7 @@ blank = ' '
 HEIGHT = 16
 GROUND = HEIGHT-2   # ground level
 BLOCKING = [rock]
+LOAD_BOARD = 999
 SLP = 0.01
 debug_log = open('debug', 'w')
 triggered_events = []
@@ -18,10 +19,12 @@ class Blocks:
     platform = '▁'
     bell = '🔔'
     door = '▕'
+    grill = '▒'
 
 class Stance:
     normal = 1
     fight = 2
+    sneaky = 3
 
 def mkcell():
     return [blank]
@@ -62,15 +65,20 @@ class Board:
         bottom = B[-1]
         for cell in bottom:
             cell.append(rock)
+        self.guards = []
 
     def board_2(self):
         for x in range(5):
             row = self.B[-2-x]
-            for cell in bottom[10+x:]:
+            for cell in row[10+x:]:
                 cell.append(rock)
-        tech = Technician(self, Loc(15, GROUND-5))
-        alarm = Item(self, Blocks.bell, Loc(15, GROUND-5))
-        return tech, alarm
+        tech = Technician(self, Loc(20, GROUND-5))
+        alarm = Item(self, Blocks.bell, 'alarm bell', Loc(25, GROUND-5))
+        door = Item(self, Blocks.door, 'door', Loc(15, GROUND-5))
+        self.put(tech)
+        self.put(alarm)
+        self.put(door)
+        return tech, alarm, door
 
     def __getitem__(self, loc):
         return self.B[loc.y][loc.x][-1]
@@ -122,8 +130,10 @@ class Mixin1:
 
 
 class Item(Mixin1):
-    def __init__(self, B, char, loc=None):
-        self.B, self.char, self.loc = B, char, loc
+    def __init__(self, B, char, name, loc=None, put=True):
+        self.B, self.char, self.name, self.loc = B, char, name, loc
+        if put:
+            B.put(self)
 
     def __str__(self):
         return self.char
@@ -135,7 +145,6 @@ class Item(Mixin1):
         self.loc = new
         B.put(self)
 
-LOAD_BOARD = 999
 
 class Being(Mixin1):
     stance = Stance.normal
@@ -144,11 +153,13 @@ class Being(Mixin1):
     is_player = 0
     hostile = 0
 
-    def __init__(self, B, loc=None, win=None, win2=None):
+    def __init__(self, B, loc=None, win=None, win2=None, put=True):
         self.B = B
         self.loc = loc
         self.win = win
         self.win2 = win2
+        if put:
+            B.put(self)
 
     def __str__(self):
         return self.char
@@ -157,15 +168,19 @@ class Being(Mixin1):
     def fight_stance(self):
         return self.stance==Stance.fight
 
+    @property
+    def sneaky_stance(self):
+        return self.stance==Stance.sneaky
+
     def _move(self, dir, fly=False):
         if dir == 'j' and not fly: return
         if dir == 'k' and not fly: return
         m = dict(h=(0,-1), l=(0,1), j=(1,0), k=(-1,0))[dir]
         if chk_oob(self.loc, *m):
-            if chk_b_oob(self.B.brd_index, *m):
-                return LOAD_BOARD, self.B.brd_index.mod(*m)
-
             return self.loc.mod(*m)
+        else:
+            if self.is_player and chk_b_oob(self.B.brd_index, *m):
+                return LOAD_BOARD, self.B.brd_index.mod(*m)
 
 
     def move(self, dir, fly=False):
@@ -202,14 +217,19 @@ class Being(Mixin1):
 
             B.remove(self)
             self.loc = new
+            if self.is_player and B[new] != blank:
+                self.win2.addstr(2,0, f'You see a {B[new].name}')
             self.put(new)
             if door1 in B.get_all(self.loc):
                 triggered_events.append(AlarmEvent1)
+            if self.sneaky_stance and SpecialItems.grill1 in B.get_all(self.loc):
+                triggered_events.append(ClimbThroughGrillEvent1)
 
             if self.win2:
                 # self.win2.addstr(2,0,f'moving {self} to {new}')
                 self.win2.refresh()
-            return True
+            return True, True
+        return None, None
 
     def attack(self, obj):
         if abs(self.loc.x - obj.loc.x) <= 1 and \
@@ -332,6 +352,10 @@ class PlatformEvent1(Event):
             sleep(SLP)
         self.done = True
 
+class ClimbThroughGrillEvent1(Event):
+    def go(self, player):
+        self.B.remove(player)
+
 class AlarmEvent1(Event):
     def go(self, win2, guard, tech, player):
         if self.done: return
@@ -343,9 +367,12 @@ class AlarmEvent1(Event):
             tech.move('l')
             if alarm1 in B.get_all(tech.loc):
                 win2.addstr(2,0, '!ALARM!')
-                player.tele(Loc(0, GROUND))
-                guard.tele(Loc(15, GROUND))
+                B.remove(player)
+                B = boards[0][0]
+                player.B = B
+                player.put(Loc(0, GROUND))
                 platform.tele(Loc(15, GROUND))
+                guard.tele(Loc(15, GROUND))
 
                 ok = 1
             B.draw(self.win)
@@ -353,6 +380,7 @@ class AlarmEvent1(Event):
             if ok: break
             sleep(0.1)
         self.done = True
+        return B
 
 class Player(Being):
     char = '@'
@@ -365,6 +393,9 @@ class Guard(Being):
 class Technician(Being):
     char = 't'
 
+class SpecialItems:
+    pass
+
 def main(stdscr):
     begin_x = 0; begin_y = 0; width = 80
     win = newwin(HEIGHT, width, begin_y, begin_x)
@@ -373,26 +404,19 @@ def main(stdscr):
     win2 = newwin(height, width, begin_y, begin_x)
     B = Board()
     b2 = Board()
-    b2.board_2()
+    technician1, alarm1, door1 = b2.board_2()
     boards.append([B, b2])
 
-    loc = Loc(0, GROUND)
-    player = Player(B, loc, win, win2)
-    B.put(player)
+    player = Player(B, Loc(70, GROUND), win, win2)
+    platform = Item(B, Blocks.platform, 'mobile platform', Loc(15, GROUND))
     guard1 = Guard(B, Loc(15, GROUND), win, win2)
-    technician1 = Technician(B, Loc(25, GROUND), win, win2)
-    B.put(guard1)
-    B.put(technician1)
-    guards = [guard1, technician1]
+    B.guards = [guard1]
 
     B.put(rock, Loc(5, GROUND))
     B.put(rock, Loc(5, GROUND-1))
-    platform = Item(B, Blocks.platform, Loc(15, GROUND))
-    alarm1 = Item(B, Blocks.bell, Loc(30, GROUND))
-    door1 = Item(B, Blocks.door, Loc(20, GROUND))
-    B.put(platform)
-    B.put(alarm1)
-    B.put(door1)
+    for x in range(4):
+        g = Item(B, Blocks.grill, 'grill', Loc(20+(x*4), GROUND))
+    SpecialItems.grill1 = Item(B, Blocks.grill, 'grill', Loc(20+16, GROUND))
 
     stdscr.clear()
     B.draw(win)
@@ -414,13 +438,24 @@ def main(stdscr):
             player.stance = Stance.normal
             win2.addstr(1, 0, 'stance: normal')
         elif k in 'hl':
-            player.move(k)
+            rv = player.move(k)
+            if rv[0] == LOAD_BOARD:
+                loc = rv[1]
+                B.remove(player)
+                B = boards[loc.y][loc.x]
+                player.loc.x = 0 if k=='l' else 79
+                B.put(player)
+                player.B = B
+
         elif k == '.':
             debug(str(triggered_events))
         elif k == 's':
             player.switch_places()
+        elif k == 'S':
+            player.stance = Stance.sneaky
+            win2.addstr(1, 0, 'stance: sneaky')
 
-        for g in guards:
+        for g in B.guards:
             if g.hostile:
                 g.attack(player)
         B.draw(win)
@@ -437,7 +472,7 @@ def main(stdscr):
             elif isinstance(e, PlatformEvent1):
                 e.go(platform, player)
             elif isinstance(e, AlarmEvent1):
-                e.go(win2, guard1, technician1, player)
+                B = e.go(win2, guard1, technician1, player)
             done_events.add(evt)
 
         triggered_events.clear()
