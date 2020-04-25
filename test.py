@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 from curses import wrapper, newwin
-from copy import copy
+from copy import copy, deepcopy
 from time import sleep
 
 rock = '▓'
@@ -14,6 +14,14 @@ debug_log = open('debug', 'w')
 triggered_events = []
 done_events = set()
 boards = []
+objects = {}
+
+class Objects:
+    obj = {}
+    def __getitem__(self, id):
+        return self.obj.get(id)
+    def __setitem__(self, id, obj):
+        self.obj[id] = obj
 
 class Blocks:
     platform = '▁'
@@ -25,6 +33,17 @@ class Stance:
     normal = 1
     fight = 2
     sneaky = 3
+
+class IDs:
+    platform1 = 1
+    guard1 = 2
+    technician1 = 3
+    grill1 = 4
+    player = 5
+    alarm1 = 6
+    door1 = 7
+    grill2 = 8
+    soldier1 = 9
 
 def mkcell():
     return [blank]
@@ -64,6 +83,7 @@ class Board:
         for cell in bottom:
             cell.append(rock)
         self.guards = []
+        self.soldiers = []
         self.loc = loc
 
     def board_2(self):
@@ -71,24 +91,26 @@ class Board:
             row = self.B[-2-x]
             for cell in row[10+x:]:
                 cell.append(rock)
-        tech = Technician(self, Loc(20, GROUND-5))
-        alarm = Item(self, Blocks.bell, 'alarm bell', Loc(25, GROUND-5))
-        door = Item(self, Blocks.door, 'door', Loc(15, GROUND-5))
-        self.put(tech)
-        self.put(alarm)
-        self.put(door)
-        return tech, alarm, door
+        Technician(self, Loc(20, GROUND-5), id=IDs.technician1)
+        Item(self, Blocks.bell, 'alarm bell', Loc(25, GROUND-5), id=IDs.alarm1)
+        Item(self, Blocks.door, 'door', Loc(15, GROUND-5), id=IDs.door1)
 
     def board_3(self):
         for x in range(5):
             row = self.B[-2-x]
             for cell in row[:5-x]:
                 cell.append(rock)
-        SpecialItems.grill2 = Item(self, Blocks.grill, 'grill', Loc(25, GROUND))
-        OtherBeings.soldier = Soldier(self, Loc(70, GROUND))
+        Item(self, Blocks.grill, 'grill', Loc(25, GROUND), id=IDs.grill2)
+        s = Soldier(self, Loc(70, GROUND), id=IDs.soldier1)
+        self.soldiers.append(s)
 
     def __getitem__(self, loc):
         return self.B[loc.y][loc.x][-1]
+
+    def __iter__(self):
+        for y, row in enumerate(self.B):
+            for x, cell in enumerate(row):
+                yield Loc(x,y), cell
 
     def get_all(self, loc):
         return self.B[loc.y][loc.x]
@@ -97,6 +119,7 @@ class Board:
         for y, row in enumerate(self.B):
             for x, cell in enumerate(row):
                 win.addstr(y,x, str(cell[-1]))
+        # debug(self.B[-2])
         win.refresh()
 
     def put(self, obj, loc=None):
@@ -134,13 +157,15 @@ class Mixin1:
     def put(self, loc):
         self.loc = loc
         self.B.put(self)
-        if self.is_player and platform in self.B.get_all(loc):
+        if self.is_player and objects[IDs.platform1] in self.B.get_all(loc):
             triggered_events.append(PlatformEvent1)
 
 
 class Item(Mixin1):
-    def __init__(self, B, char, name, loc=None, put=True):
-        self.B, self.char, self.name, self.loc = B, char, name, loc
+    def __init__(self, B, char, name, loc=None, put=True, id=None):
+        self.B, self.char, self.name, self.loc, self.id = B, char, name, loc, id
+        if id:
+            objects[id] = self
         if put:
             B.put(self)
 
@@ -162,11 +187,12 @@ class Being(Mixin1):
     is_player = 0
     hostile = 0
 
-    def __init__(self, B, loc=None, win=None, win2=None, put=True):
+    def __init__(self, B, loc=None, put=True, id=None):
         self.B = B
+        self.id = id
         self.loc = loc
-        self.win = win
-        self.win2 = win2
+        if id:
+            objects[id] = self
         if put:
             B.put(self)
 
@@ -195,7 +221,6 @@ class Being(Mixin1):
 
     def move(self, dir, fly=False):
         B = self.B
-        old = copy(self.loc)
         rv = self._move(dir, fly)
         if rv and rv[0] == LOAD_BOARD:
             return rv
@@ -211,7 +236,7 @@ class Being(Mixin1):
             if B.is_blocked(new):
                 new = None
                 if self.fight_stance:
-                    self.win2.addstr(1, 0, 'BANG')
+                    Windows.win2.addstr(1, 0, 'BANG')
                     triggered_events.append(GuardAttackEvent1)
 
         if new:
@@ -228,17 +253,15 @@ class Being(Mixin1):
             B.remove(self)
             self.loc = new
             if self.is_player and B[new] != blank:
-                self.win2.addstr(2,0, f'You see a {B[new].name}')
+                Windows.win2.addstr(2,0, f'You see a {B[new].name}')
             self.put(new)
-            if door1 in B.get_all(self.loc):
+            if objects[IDs.door1] in B.get_all(self.loc):
                 triggered_events.append(AlarmEvent1)
-            I = SpecialItems
-            print('##', set((id(I.grill1), id(I.grill2))) , set((id(x) for x in B.get_all(self.loc))))
-            if self.sneaky_stance and (set((I.grill1, I.grill2)) & set(B.get_all(self.loc))):
+            grills = set((objects[IDs.grill1], objects[IDs.grill2]))
+            if self.sneaky_stance and (grills & set(B.get_all(self.loc))):
                 triggered_events.append(ClimbThroughGrillEvent1)
 
-            if self.win2:
-                self.win2.refresh()
+            Windows.win2.refresh()
             return True, True
         return None, None
 
@@ -255,7 +278,7 @@ class Being(Mixin1):
     def hit(self, obj):
         if obj.health:
             obj.health -= 1
-            self.win2.addstr(1, 0, f'{self} hits {obj} for 1pt')
+            Windows.win2.addstr(1, 0, f'{self} hits {obj} for 1pt')
 
     def switch_places(self):
         B = self.B
@@ -282,16 +305,18 @@ class Being(Mixin1):
 class Event:
     done = False
     once = 1
-    def __init__(self, B, win):
-        self.B, self.win = B, win
+    def __init__(self, B):
+        self.B = B
 
 class GuardAttackEvent1(Event):
-    def go(self, platform, guard):
+    def go(self):
+        guard = OtherBeings.guard1
         if self.done: return
         guard.hostile = 1
         B = self.B
         mode = 1
         x, y = guard.loc
+        platform = objects[IDs.platform1]
 
         for _ in range(35):
             if mode==1:
@@ -317,17 +342,19 @@ class GuardAttackEvent1(Event):
                     mode = 4
             elif mode==4:
                 break
-            B.draw(self.win)
+            B.draw(Windows.win)
             sleep(SLP)
         self.done = True
 
 class PlatformEvent1(Event):
-    def go(self, platform, player):
+    def go(self):
         debug('PlatformEvent1 start')
         if self.done: return
+        player = OtherBeings.player
         B = self.B
         mode = 1
         x, y = player.loc
+        platform = objects[IDs.platform1]
 
         debug('y', y)
         for _ in range(35):
@@ -357,43 +384,49 @@ class PlatformEvent1(Event):
 
             elif mode==4:
                 break
-            B.draw(self.win)
+            B.draw(Windows.win)
             sleep(SLP)
         self.done = True
 
 class ClimbThroughGrillEvent1(Event):
     once = False
-    def go(self, player):
+    def go(self):
+        player = OtherBeings.player
         B = self.B
         B.remove(player)
         bi = B.loc.x
         B = boards[0][2 if bi==0 else 0]
         player.loc = Loc(25 if bi==0 else 36, GROUND)
         B.put(player)
-        B.draw(self.win)
+        B.draw(Windows.win)
         player.B = B
         return B
 
 class AlarmEvent1(Event):
-    def go(self, win2, guard, tech, player):
+    def go(self, guard):
         if self.done: return
         B = self.B
+        tech = OtherBeings.technician1
         x, y = tech.loc
         ok = 0
+        player = OtherBeings.player
 
         for _ in range(35):
             tech.move('l')
+            alarm1 = objects[IDs.alarm1]
+            platform1 = objects[IDs.platform1]
+
             if alarm1 in B.get_all(tech.loc):
-                win2.addstr(2,0, '!ALARM!')
+                Windows.win2.addstr(2,0, '!ALARM!')
                 B.remove(player)
                 B = boards[0][0]
                 player.B = B
                 player.put(Loc(0, GROUND))
-                platform.tele(Loc(15, GROUND))
+                platform1.tele(Loc(15, GROUND))
                 guard.tele(Loc(15, GROUND))
 
                 ok = 1
-            B.draw(self.win)
+            B.draw(Windows.win)
             if ok: break
             sleep(0.1)
         self.done = True
@@ -414,36 +447,64 @@ class Soldier(Being):
 class Technician(Being):
     char = 't'
 
-class SpecialItems:
-    pass
 class NPCs:
     pass
 class OtherBeings:
     pass
 
+class Saves:
+    saves = {}
+    def save(self, name, cur_brd):
+        s = {}
+        s['boards'] = deepcopy(boards)
+        s['beings'] = deepcopy(OtherBeings)
+        s['cur_brd'] = cur_brd
+        self.saves[name] = s
+
+    def load(self, name):
+        s = self.saves[name]
+        boards[:] = s['boards']
+        for k,v in beings.__dict__.items():
+            if not k.startswith('__'):
+                setattr(OtherBeings, k, v)
+        bl = s['cur_brd']
+        B = boards[bl.y][bl.x]
+
+        for cell in B:
+            for x in cell:
+                if isinstance(x, Player):
+                    OtherBeings.player = x
+        return boards[bl.y][bl.x]
+
+class Windows:
+    pass
+
+def dist(a,b):
+    return max(abs(a.loc.x - b.loc.x),
+               abs(a.loc.y - b.loc.y))
+
 def main(stdscr):
     begin_x = 0; begin_y = 0; width = 80
-    win = newwin(HEIGHT, width, begin_y, begin_x)
+    win = Windows.win = newwin(HEIGHT, width, begin_y, begin_x)
     begin_x = 0; begin_y = 16; height = 6; width = 80
-    global platform, door1, alarm1
-    win2 = newwin(height, width, begin_y, begin_x)
+    win2 = Windows.win2 = newwin(height, width, begin_y, begin_x)
     B = Board(Loc(0,0))
     b2 = Board(Loc(1,0))
     b3 = Board(Loc(2,0))
-    technician1, alarm1, door1 = b2.board_2()
+    b2.board_2()
     b3.board_3()
     boards.append([B, b2, b3])
 
-    player = Player(B, Loc(50, GROUND), win, win2)
-    platform = Item(B, Blocks.platform, 'mobile platform', Loc(15, GROUND))
-    guard1 = Guard(B, Loc(15, GROUND), win, win2)
-    B.guards = [guard1]
+    player = Player(B, Loc(50, GROUND), id=IDs.player)
+    Item(B, Blocks.platform, 'mobile platform', Loc(15, GROUND), id=IDs.platform1)
+    g = Guard(B, Loc(15, GROUND), id=IDs.guard1)
+    B.guards = [g]
 
     B.put(rock, Loc(5, GROUND))
     B.put(rock, Loc(5, GROUND-1))
     for x in range(4):
         g = Item(B, Blocks.grill, 'grill', Loc(20+(x*4), GROUND))
-    SpecialItems.grill1 = Item(B, Blocks.grill, 'grill', Loc(20+16, GROUND))
+    Item(B, Blocks.grill, 'grill', Loc(20+16, GROUND), id=IDs.grill1)
 
     stdscr.clear()
     B.draw(win)
@@ -451,7 +512,10 @@ def main(stdscr):
     win2.addstr(0, 0, '-'*80)
     win2.refresh()
 
+    Saves().save('start', B.loc)
+
     while 1:
+        player = OtherBeings.player
         k = win.getkey()
         win2.clear()
         win2.addstr(2,0,k)
@@ -480,10 +544,18 @@ def main(stdscr):
         elif k == 'S':
             player.stance = Stance.sneaky
             win2.addstr(1, 0, 'stance: sneaky')
+        elif k == 'L':
+            B = Saves().load('start')
+            player = OtherBeings.player
+            # B.draw(Windows.win)
 
         for g in B.guards:
             if g.hostile:
                 g.attack(player)
+        for s in B.soldiers:
+            if s.hostile or dist(s, player) <= 5:
+                s.hostile = 1
+                s.attack(player)
         B.draw(win)
         win2.refresh()
 
@@ -491,23 +563,23 @@ def main(stdscr):
             debug(evt)
             if evt in done_events and evt.once:
                 continue
-            e = evt(B, win)
+            e = evt(B)
             if isinstance(e, GuardAttackEvent1):
-                e.go(platform, guard1)
+                e.go()
             elif isinstance(e, PlatformEvent1):
-                e.go(platform, player)
+                e.go()
             elif isinstance(e, AlarmEvent1):
-                B = e.go(win2, guard1, technician1, player)
+                B = e.go()
             elif isinstance(e, ClimbThroughGrillEvent1):
-                B = e.go(player)
+                B = e.go()
             done_events.add(evt)
 
         triggered_events.clear()
+        print("player.loc", player.loc)
 
 def debug(*args):
     debug_log.write(str(args) + '\n')
     debug_log.flush()
-    # win2.addstr(2,0, str(args))
 print=debug
 
 if __name__ == "__main__":
