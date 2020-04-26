@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from curses import wrapper, newwin
+import curses
 from copy import copy, deepcopy
 from time import sleep
 
@@ -15,6 +16,7 @@ triggered_events = []
 done_events = set()
 boards = []
 objects = {}
+
 
 class Objects:
     obj = {}
@@ -34,7 +36,7 @@ class Stance:
     fight = 2
     sneaky = 3
 
-class IDs:
+class ID:
     platform1 = 1
     guard1 = 2
     technician1 = 3
@@ -91,17 +93,17 @@ class Board:
             row = self.B[-2-x]
             for cell in row[10+x:]:
                 cell.append(rock)
-        Technician(self, Loc(20, GROUND-5), id=IDs.technician1)
-        Item(self, Blocks.bell, 'alarm bell', Loc(25, GROUND-5), id=IDs.alarm1)
-        Item(self, Blocks.door, 'door', Loc(15, GROUND-5), id=IDs.door1)
+        Technician(self, Loc(20, GROUND-5), id=ID.technician1)
+        Item(self, Blocks.bell, 'alarm bell', Loc(25, GROUND-5), id=ID.alarm1)
+        Item(self, Blocks.door, 'door', Loc(15, GROUND-5), id=ID.door1)
 
     def board_3(self):
         for x in range(5):
             row = self.B[-2-x]
             for cell in row[:5-x]:
                 cell.append(rock)
-        Item(self, Blocks.grill, 'grill', Loc(25, GROUND), id=IDs.grill2)
-        s = Soldier(self, Loc(70, GROUND), id=IDs.soldier1)
+        Item(self, Blocks.grill, 'grill', Loc(25, GROUND), id=ID.grill2)
+        s = Soldier(self, Loc(70, GROUND), id=ID.soldier1)
         self.soldiers.append(s)
 
     def __getitem__(self, loc):
@@ -114,6 +116,9 @@ class Board:
 
     def get_all(self, loc):
         return self.B[loc.y][loc.x]
+
+    def get_ids(self, loc):
+        return ids(self.get_all(loc))
 
     def draw(self, win):
         for y, row in enumerate(self.B):
@@ -147,6 +152,9 @@ def chk_b_oob(loc, y=0, x=0):
     debug('chk_b_oob', loc.x, x)
     return 0 <= loc.y+y <= h-1 and 0 <= loc.x+x <= w-1
 
+def ids(lst):
+    return [x.id for x in lst if not isinstance(x, str)]
+
 class Mixin1:
     is_player = 0
 
@@ -157,7 +165,7 @@ class Mixin1:
     def put(self, loc):
         self.loc = loc
         self.B.put(self)
-        if self.is_player and objects[IDs.platform1] in self.B.get_all(loc):
+        if self.is_player and ID.platform1 in self.B.get_ids(loc):
             triggered_events.append(PlatformEvent1)
 
 
@@ -255,10 +263,10 @@ class Being(Mixin1):
             if self.is_player and B[new] != blank:
                 Windows.win2.addstr(2,0, f'You see a {B[new].name}')
             self.put(new)
-            if objects[IDs.door1] in B.get_all(self.loc):
+            if ID.door1 in B.get_ids(self.loc):
                 triggered_events.append(AlarmEvent1)
-            grills = set((objects[IDs.grill1], objects[IDs.grill2]))
-            if self.sneaky_stance and (grills & set(B.get_all(self.loc))):
+            grills = set((ID.grill1, ID.grill2))
+            if self.sneaky_stance and (grills & set(B.get_ids(self.loc))):
                 triggered_events.append(ClimbThroughGrillEvent1)
 
             Windows.win2.refresh()
@@ -301,6 +309,12 @@ class Being(Mixin1):
             self.put(l)
             lo.put(loc)
 
+def pdb(stdscr):
+    curses.nocbreak()
+    stdscr.keypad(0)
+    curses.echo()
+    curses.endwin()
+    import pdb; pdb.set_trace()
 
 class Event:
     done = False
@@ -310,13 +324,13 @@ class Event:
 
 class GuardAttackEvent1(Event):
     def go(self):
-        guard = OtherBeings.guard1
+        guard = objects[ID.guard1]
         if self.done: return
         guard.hostile = 1
         B = self.B
         mode = 1
         x, y = guard.loc
-        platform = objects[IDs.platform1]
+        platform = objects[ID.platform1]
 
         for _ in range(35):
             if mode==1:
@@ -350,11 +364,11 @@ class PlatformEvent1(Event):
     def go(self):
         debug('PlatformEvent1 start')
         if self.done: return
-        player = OtherBeings.player
+        player = objects[ID.player]
         B = self.B
         mode = 1
         x, y = player.loc
-        platform = objects[IDs.platform1]
+        platform = objects[ID.platform1]
 
         debug('y', y)
         for _ in range(35):
@@ -391,7 +405,7 @@ class PlatformEvent1(Event):
 class ClimbThroughGrillEvent1(Event):
     once = False
     def go(self):
-        player = OtherBeings.player
+        player = objects[ID.player]
         B = self.B
         B.remove(player)
         bi = B.loc.x
@@ -406,17 +420,16 @@ class AlarmEvent1(Event):
     def go(self, guard):
         if self.done: return
         B = self.B
-        tech = OtherBeings.technician1
+        tech = objects[ID.technician1]
         x, y = tech.loc
         ok = 0
-        player = OtherBeings.player
+        player = objects[ID.player]
 
         for _ in range(35):
             tech.move('l')
-            alarm1 = objects[IDs.alarm1]
-            platform1 = objects[IDs.platform1]
+            platform1 = objects[ID.platform1]
 
-            if alarm1 in B.get_all(tech.loc):
+            if ID.alarm1 in B.get_ids(tech.loc):
                 Windows.win2.addstr(2,0, '!ALARM!')
                 B.remove(player)
                 B = boards[0][0]
@@ -454,27 +467,28 @@ class OtherBeings:
 
 class Saves:
     saves = {}
+    loaded = 0
+
     def save(self, name, cur_brd):
         s = {}
         s['boards'] = deepcopy(boards)
         s['beings'] = deepcopy(OtherBeings)
         s['cur_brd'] = cur_brd
+        pl = s['player'] = deepcopy(objects[ID.player])
+        bl = s['cur_brd']
+        B = boards[bl.y][bl.x]
         self.saves[name] = s
+
 
     def load(self, name):
         s = self.saves[name]
         boards[:] = s['boards']
-        for k,v in beings.__dict__.items():
-            if not k.startswith('__'):
-                setattr(OtherBeings, k, v)
+        loc = s['player'].loc
         bl = s['cur_brd']
         B = boards[bl.y][bl.x]
-
-        for cell in B:
-            for x in cell:
-                if isinstance(x, Player):
-                    OtherBeings.player = x
-        return boards[bl.y][bl.x]
+        player = B[loc]
+        player.B = B
+        return player, B
 
 class Windows:
     pass
@@ -495,16 +509,16 @@ def main(stdscr):
     b3.board_3()
     boards.append([B, b2, b3])
 
-    player = Player(B, Loc(50, GROUND), id=IDs.player)
-    Item(B, Blocks.platform, 'mobile platform', Loc(15, GROUND), id=IDs.platform1)
-    g = Guard(B, Loc(15, GROUND), id=IDs.guard1)
+    player = objects[ID.player] = Player(B, Loc(50, GROUND), id=ID.player)
+    Item(B, Blocks.platform, 'mobile platform', Loc(15, GROUND), id=ID.platform1)
+    g = Guard(B, Loc(15, GROUND), id=ID.guard1)
     B.guards = [g]
 
     B.put(rock, Loc(5, GROUND))
     B.put(rock, Loc(5, GROUND-1))
     for x in range(4):
         g = Item(B, Blocks.grill, 'grill', Loc(20+(x*4), GROUND))
-    Item(B, Blocks.grill, 'grill', Loc(20+16, GROUND), id=IDs.grill1)
+    Item(B, Blocks.grill, 'grill', Loc(20+16, GROUND), id=ID.grill1)
 
     stdscr.clear()
     B.draw(win)
@@ -515,7 +529,6 @@ def main(stdscr):
     Saves().save('start', B.loc)
 
     while 1:
-        player = OtherBeings.player
         k = win.getkey()
         win2.clear()
         win2.addstr(2,0,k)
@@ -545,9 +558,8 @@ def main(stdscr):
             player.stance = Stance.sneaky
             win2.addstr(1, 0, 'stance: sneaky')
         elif k == 'L':
-            B = Saves().load('start')
-            player = OtherBeings.player
-            # B.draw(Windows.win)
+            player, B = Saves().load('start')
+            objects[ID.player] = player
 
         for g in B.guards:
             if g.hostile:
