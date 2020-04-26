@@ -3,6 +3,7 @@ from curses import wrapper, newwin
 import curses
 from copy import copy, deepcopy
 from time import sleep
+from random import random
 
 rock = '▓'
 blank = ' '
@@ -115,9 +116,9 @@ class Board:
             Item(self, Blocks.grill, 'grill', Loc(20+(x*4), GROUND))
         Item(self, Blocks.grill, 'grill', Loc(20+16, GROUND), id=ID.grill1)
 
-        Item(self, Blocks.coin, 'coin', Loc(37,GROUND))
-        Item(self, Blocks.cabinet, 'cabinet', Loc(40,GROUND))
-        Item(self, Blocks.grn_heart, 'grn_heart', Loc(42,GROUND))
+        Item(self, Blocks.coin, 'coin', Loc(37,GROUND), id=ID.coin)
+        Item(self, Blocks.cabinet, 'cabinet', Loc(40,GROUND), id=ID.cabinet)
+        Item(self, Blocks.grn_heart, 'grn_heart', Loc(42,GROUND), id=ID.grn_heart)
 
         p = Player(self, Loc(40, GROUND), id=ID.player)
         objects[ID.player] = p
@@ -158,7 +159,7 @@ class Board:
                 yield Loc(x,y), cell
 
     def get_all(self, loc):
-        return self.B[loc.y][loc.x]
+        return [n for n in self.B[loc.y][loc.x] if n!=blank]
 
     def get_ids(self, loc):
         return ids(self.get_all(loc))
@@ -305,10 +306,24 @@ class Being(Mixin1):
                     else:
                         break
 
+            pick_up = [ID.coin]
             B.remove(self)
             self.loc = new
-            if self.is_player and B[new] != blank:
-                Windows.win2.addstr(2,0, f'You see a {B[new].name}')
+
+            if self.is_player:
+                items = B.get_all(new)
+                for x in reversed(items):
+                    print("x", x)
+                    if x.id == ID.grn_heart:
+                        self.health = min(10, self.health+1)
+                        B.remove(x)
+                    elif x.id in pick_up:
+                        self.inv[x.id] += 1
+                        B.remove(x)
+                names = [i.name for i in B.get_all(new)]
+                names = ', '.join(names)
+                if names:
+                    Windows.win2.addstr(2,0, f'You see: {names}')
             self.put(new)
             if ID.door1 in B.get_ids(self.loc):
                 triggered_events.append(AlarmEvent1)
@@ -334,6 +349,8 @@ class Being(Mixin1):
         if obj.health:
             obj.health -= 1
             Windows.win2.addstr(1, 0, f'{self} hits {obj} for 1pt')
+            if obj.is_being:
+                obj.hostile = 1
             if obj.health <=0:
                 self.B.remove(obj)
                 if random()>0.6:
@@ -362,7 +379,6 @@ class Being(Mixin1):
             self.put(l)
             lo.put(loc)
 
-from random import random
 def pdb(stdscr):
     curses.nocbreak()
     stdscr.keypad(0)
@@ -630,6 +646,10 @@ def main(stdscr):
         elif k == 'L':
             player, B = Saves().load('start')
             objects[ID.player] = player
+        elif k == 'i':
+            pass
+        elif k == ' ':
+            pass
 
         if k != '.':
             wait_count = 0
@@ -651,6 +671,7 @@ def main(stdscr):
             objects[ID.player] = player
 
         B.draw(win)
+        win2.addstr(0,0, f'[H{player.health}] [${player.inv[ID.coin]}]')
         win2.refresh()
 
         for evt in triggered_events:
@@ -664,6 +685,7 @@ def main(stdscr):
 
         triggered_events.clear()
         print("player.loc", player.loc)
+
 
 def debug(*args):
     debug_log.write(str(args) + '\n')
