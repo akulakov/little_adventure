@@ -68,6 +68,11 @@ class ID:
     technician1 = 101
     player = 102
     soldier1 = 103
+    robobunny1 = 104
+
+conversations = {
+    ID.robobunny1: 'I like to rummage through the rubbish pile.. this area is not closely watched! I hide in the garbage truck and come here when I can. You just have to be very DISCREET!',
+}
 
 def mkcell():
     return [blank]
@@ -134,7 +139,7 @@ class Board:
         Item(self, Blocks.door, 'door', Loc(48,GROUND), id=ID.door1, type=Type.door)
         self.put(Blocks.block1, Loc(48, GROUND-1))
 
-        p = Player(self, Loc(45, GROUND), id=ID.player)
+        p = Player(self, Loc(30, GROUND), id=ID.player)
         objects[ID.player] = p
         return p
 
@@ -155,6 +160,7 @@ class Board:
             for cell in row[:5-x]:
                 cell.append(rock)
         Item(self, Blocks.grill, 'grill', Loc(25, GROUND), id=ID.grill2)
+        RoboBunny(self, Loc(50, GROUND), id=ID.robobunny1)
         Item(self, Blocks.rubbish, 'rubbish', Loc(55, GROUND), id=ID.rubbish1)
         Item(self, Blocks.rubbish, 'rubbish', Loc(56, GROUND), id=ID.rubbish1)
         Item(self, Blocks.rubbish, 'rubbish', Loc(57, GROUND), id=ID.rubbish1)
@@ -300,10 +306,24 @@ class Being(Mixin1):
             return rv
         new = rv[1]
         if new and isinstance(B[new], Being):
+            being = B[new]
             if self.fight_stance or self.hostile:
-                self.attack(B[new])
+                self.attack(being)
+            elif being.id == ID.robobunny1:
+                txt = conversations[being.id]
+                ln = len(txt)
+                w = 78 - new.x
+                lines = (ln // w) + 4
+                debug(lines, w, new.y-lines, new.x)
+                from textwrap import wrap
+                txt = wrap(txt, w)
+                txt = '\n'.join(txt)
+                w = newwin(lines, w, new.y-lines, new.x)
+                w.addstr(0,0, txt)
+                w.getkey()
+                del w
             else:
-                self.switch_places()
+                self.switch_places()    # TODO support direction
             return True, True
         if new and ID.door1 in B.get_ids(new) and self.inv[ID.key1]:
             B.remove(B[new])    # TODO will not work if something is on top of door
@@ -336,7 +356,6 @@ class Being(Mixin1):
             if self.is_player:
                 items = B.get_all(new)
                 for x in reversed(items):
-                    print("x", x)
                     if x.id == ID.grn_heart:
                         self.health = min(10, self.health+1)
                         B.remove(x)
@@ -571,7 +590,7 @@ class GarbageTruckEvent(Event):
             sleep(SLP)
 
 class Player(Being):
-    char = '@'
+    char = '🙍'
     health = 10
     is_player = 1
     stance = Stance.sneaky
@@ -586,6 +605,9 @@ class Soldier(Being):
 
 class Technician(Being):
     char = 't'
+
+class RoboBunny(Being):
+    char = 'r'
 
 class NPCs:
     pass
