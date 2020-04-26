@@ -32,6 +32,9 @@ class Blocks:
     grill = '▒'
     rubbish = '♽'
     truck = '🚚'
+    cabinet = '🔲'
+    grn_heart = '💚'
+    coin = '🌕'
 
 class Stance:
     normal = 1
@@ -46,6 +49,9 @@ class ID:
     grill2 = 5
     rubbish1 = 6
     truck1 = 7
+    cabinet = 8
+    coin = 9
+    grn_heart = 10
 
     guard1 = 100
     technician1 = 101
@@ -63,7 +69,9 @@ class Loc:
         self.y, self.x = y, x
 
     def __iter__(self):
-        return iter((self.x, self.y))
+        yield self.x
+        yield self.y
+        # return iter((self.x, self.y))
 
     def __getitem__(self, i):
         return (self.x, self.y)[i]
@@ -107,6 +115,10 @@ class Board:
             Item(self, Blocks.grill, 'grill', Loc(20+(x*4), GROUND))
         Item(self, Blocks.grill, 'grill', Loc(20+16, GROUND), id=ID.grill1)
 
+        Item(self, Blocks.coin, 'coin', Loc(37,GROUND))
+        Item(self, Blocks.cabinet, 'cabinet', Loc(40,GROUND))
+        Item(self, Blocks.grn_heart, 'grn_heart', Loc(42,GROUND))
+
         p = Player(self, Loc(40, GROUND), id=ID.player)
         objects[ID.player] = p
         return p
@@ -133,6 +145,9 @@ class Board:
         Item(self, Blocks.rubbish, 'rubbish', Loc(57, GROUND), id=ID.rubbish1)
         s = Soldier(self, Loc(70, GROUND), id=ID.soldier1)
         self.soldiers.append(s)
+
+    def board_4(self):
+        pass
 
     def __getitem__(self, loc):
         return self.B[loc.y][loc.x][-1]
@@ -222,11 +237,14 @@ class Being(Mixin1):
     is_being = 1
     is_player = 0
     hostile = 0
+    kash = 0
 
     def __init__(self, B, loc=None, put=True, id=None):
         self.B = B
         self.id = id
         self.loc = loc
+        from collections import defaultdict
+        self.inv = defaultdict(int)
         if id:
             objects[id] = self
         if put:
@@ -248,25 +266,26 @@ class Being(Mixin1):
         if dir == 'k' and not fly: return
         m = dict(h=(0,-1), l=(0,1), j=(1,0), k=(-1,0))[dir]
         if chk_oob(self.loc, *m):
-            return self.loc.mod(*m)
+            return True, self.loc.mod(*m)
         else:
             print("in _move self.B.loc", self.B.loc)
             if self.is_player and chk_b_oob(self.B.loc, *m):
                 return LOAD_BOARD, self.B.loc.mod(*m)
+        return 0, 0
 
 
     def move(self, dir, fly=False):
         B = self.B
         rv = self._move(dir, fly)
-        if rv and rv[0] == LOAD_BOARD:
+        if rv and (rv[0] == LOAD_BOARD):
             return rv
-        new = rv
+        new = rv[1]
         if new and isinstance(B[new], Being):
             if self.fight_stance or self.hostile:
                 self.attack(B[new])
             else:
                 self.switch_places()
-            return True
+            return True, True
         if new and B.is_blocked(new):
             new = new.mod(-1,0)
             if B.is_blocked(new):
@@ -315,6 +334,12 @@ class Being(Mixin1):
         if obj.health:
             obj.health -= 1
             Windows.win2.addstr(1, 0, f'{self} hits {obj} for 1pt')
+            if obj.health <=0:
+                self.B.remove(obj)
+                if random()>0.6:
+                    Item(self.B, Blocks.coin, 'one kash', obj.loc, id=ID.coin)
+                elif random()>0.6:
+                    Item(self.B, Blocks.grn_heart, 'heart', obj.loc, id=ID.grn_heart)
 
     def switch_places(self):
         B = self.B
@@ -337,6 +362,7 @@ class Being(Mixin1):
             self.put(l)
             lo.put(loc)
 
+from random import random
 def pdb(stdscr):
     curses.nocbreak()
     stdscr.keypad(0)
@@ -501,6 +527,7 @@ class Player(Being):
 
 class Guard(Being):
     char = 'g'
+    health = 3
 
 class Soldier(Being):
     health = 20
@@ -608,6 +635,8 @@ def main(stdscr):
             wait_count = 0
         last_cmd = k
 
+        B.guards = [g for g in B.guards if g.health>0]
+        B.soldiers = [g for g in B.soldiers if g.health>0]
         for g in B.guards:
             if g.hostile:
                 g.attack(player)
