@@ -4,6 +4,7 @@ import curses
 from copy import copy, deepcopy
 from time import sleep
 from random import random
+from collections import defaultdict
 
 rock = '▓'
 blank = ' '
@@ -33,7 +34,7 @@ class Blocks:
     grill = '▒'
     rubbish = '♽'
     truck = '🚚'
-    cabinet = '🔲'
+    locker = '🔲'
     grn_heart = '💚'
     coin = '🌕'
 
@@ -50,7 +51,7 @@ class ID:
     grill2 = 5
     rubbish1 = 6
     truck1 = 7
-    cabinet = 8
+    locker = 8
     coin = 9
     grn_heart = 10
 
@@ -117,10 +118,11 @@ class Board:
         Item(self, Blocks.grill, 'grill', Loc(20+16, GROUND), id=ID.grill1)
 
         Item(self, Blocks.coin, 'coin', Loc(37,GROUND), id=ID.coin)
-        Item(self, Blocks.cabinet, 'cabinet', Loc(40,GROUND), id=ID.cabinet)
+        c = Item(self, Blocks.locker, 'locker', Loc(40,GROUND), id=ID.locker)
+        c.inv[ID.coin] += 1
         Item(self, Blocks.grn_heart, 'grn_heart', Loc(42,GROUND), id=ID.grn_heart)
 
-        p = Player(self, Loc(40, GROUND), id=ID.player)
+        p = Player(self, Loc(45, GROUND), id=ID.player)
         objects[ID.player] = p
         return p
 
@@ -216,6 +218,7 @@ class Mixin1:
 class Item(Mixin1):
     def __init__(self, B, char, name, loc=None, put=True, id=None):
         self.B, self.char, self.name, self.loc, self.id = B, char, name, loc, id
+        self.inv = defaultdict(int)
         if id:
             objects[id] = self
         if put:
@@ -244,7 +247,6 @@ class Being(Mixin1):
         self.B = B
         self.id = id
         self.loc = loc
-        from collections import defaultdict
         self.inv = defaultdict(int)
         if id:
             objects[id] = self
@@ -378,6 +380,18 @@ class Being(Mixin1):
             loc = self.loc
             self.put(l)
             lo.put(loc)
+
+    def action(self):
+        c = last( [x for x in self.B.get_all(self.loc) if x.id==ID.locker] )
+        if c:
+            for x in c.inv:
+                self.inv[x] += c.inv[x]
+                c.inv[x] = 0
+
+def first(x):
+    return x[0] if x else None
+def last(x):
+    return x[-1] if x else None
 
 def pdb(stdscr):
     curses.nocbreak()
@@ -649,7 +663,7 @@ def main(stdscr):
         elif k == 'i':
             pass
         elif k == ' ':
-            pass
+            player.action()
 
         if k != '.':
             wait_count = 0
