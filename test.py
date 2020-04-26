@@ -10,7 +10,6 @@ rock = '▓'
 blank = ' '
 HEIGHT = 16
 GROUND = HEIGHT-2   # ground level
-BLOCKING = [rock]
 LOAD_BOARD = 999
 SLP = 0.01
 debug_log = open('debug', 'w')
@@ -37,11 +36,19 @@ class Blocks:
     locker = '🔲'
     grn_heart = '💚'
     coin = '🌕'
+    key = '🔑'
+    door = '🚪'
+    block1 = '▐'
+    block2 = '▟'
 
 class Stance:
     normal = 1
     fight = 2
     sneaky = 3
+
+class Type:
+    door = 1
+BLOCKING = [rock, Type.door, Blocks.block1]
 
 class ID:
     platform1 = 1
@@ -54,6 +61,8 @@ class ID:
     locker = 8
     coin = 9
     grn_heart = 10
+    key1 = 11
+    door1 = 12
 
     guard1 = 100
     technician1 = 101
@@ -66,6 +75,7 @@ def mkcell():
 def mkrow():
     return [mkcell() for _ in range(79)]
 
+
 class Loc:
     def __init__(self, x, y):
         self.y, self.x = y, x
@@ -73,7 +83,6 @@ class Loc:
     def __iter__(self):
         yield self.x
         yield self.y
-        # return iter((self.x, self.y))
 
     def __getitem__(self, i):
         return (self.x, self.y)[i]
@@ -96,6 +105,7 @@ class Loc:
     def mod_l(self):
         return self.mod(0, -1)
 
+
 class Board:
     def __init__(self, loc):
         self.B = B = [mkrow() for _ in range(HEIGHT)]
@@ -117,10 +127,12 @@ class Board:
             Item(self, Blocks.grill, 'grill', Loc(20+(x*4), GROUND))
         Item(self, Blocks.grill, 'grill', Loc(20+16, GROUND), id=ID.grill1)
 
-        Item(self, Blocks.coin, 'coin', Loc(37,GROUND), id=ID.coin)
+        Item(self, Blocks.key, 'key', Loc(37,GROUND), id=ID.key1)
         c = Item(self, Blocks.locker, 'locker', Loc(40,GROUND), id=ID.locker)
         c.inv[ID.coin] += 1
         Item(self, Blocks.grn_heart, 'grn_heart', Loc(42,GROUND), id=ID.grn_heart)
+        Item(self, Blocks.door, 'door', Loc(48,GROUND), id=ID.door1, type=Type.door)
+        self.put(Blocks.block1, Loc(48, GROUND-1))
 
         p = Player(self, Loc(45, GROUND), id=ID.player)
         objects[ID.player] = p
@@ -182,7 +194,11 @@ class Board:
         self.B[loc.y][loc.x].remove(obj)
 
     def is_blocked(self, loc):
-        return self[loc] in BLOCKING
+        items = self.get_all(loc)
+        for x in items:
+            if x in BLOCKING or getattr(x, 'type', None) in BLOCKING:
+                return True
+        return False
 
     def avail(self, loc):
         return not self.is_blocked(loc)
@@ -216,8 +232,8 @@ class Mixin1:
 
 
 class Item(Mixin1):
-    def __init__(self, B, char, name, loc=None, put=True, id=None):
-        self.B, self.char, self.name, self.loc, self.id = B, char, name, loc, id
+    def __init__(self, B, char, name, loc=None, put=True, id=None, type=None):
+        self.B, self.char, self.name, self.loc, self.id, self.type = B, char, name, loc, id, type
         self.inv = defaultdict(int)
         if id:
             objects[id] = self
@@ -289,6 +305,11 @@ class Being(Mixin1):
             else:
                 self.switch_places()
             return True, True
+        if new and ID.door1 in B.get_ids(new) and self.inv[ID.key1]:
+            B.remove(B[new])    # TODO will not work if something is on top of door
+            del self.inv[ID.key1]
+            Windows.win2.addstr(2,0, 'You open the door with your key')
+            return None, None
         if new and B.is_blocked(new):
             new = new.mod(-1,0)
             if B.is_blocked(new):
@@ -308,7 +329,7 @@ class Being(Mixin1):
                     else:
                         break
 
-            pick_up = [ID.coin]
+            pick_up = [ID.coin, ID.key1]
             B.remove(self)
             self.loc = new
 
@@ -685,7 +706,8 @@ def main(stdscr):
             objects[ID.player] = player
 
         B.draw(win)
-        win2.addstr(0,0, f'[H{player.health}] [${player.inv[ID.coin]}]')
+        key = '[key]' if player.inv[ID.key1] else ''
+        win2.addstr(0,0, f'[H{player.health}] [${player.inv[ID.coin]}] {key}')
         win2.refresh()
 
         for evt in triggered_events:
