@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+"""
+Bugs:
+    - player doesn't move after shopkeeper1 alarm evt
+"""
 from curses import wrapper, newwin
 import curses
 from copy import copy, deepcopy
@@ -19,6 +23,7 @@ triggered_events = []
 done_events = set()
 boards = []
 objects = {}
+timers = []
 
 
 class Objects:
@@ -81,7 +86,7 @@ class ID:
 
 conversations = {
     ID.robobunny1: ['I like to rummage through the rubbish pile.. this area is not closely watched! I hide in the garbage truck and come here when I can. You just have to be very DISCREET!'],
-    ID.shopkeeper1: ['Twinsen!? I thought you were arrested?', 'They let me out early for good behaviour!', 'But.. nobody gets out of Citadel alive!'],
+    ID.shopkeeper1: ['Twinsen!? I thought you were arrested?', 'They let me out early for good behaviour!', 'But.. nobody gets out of Citadel alive! I.. I.. have to call the guards.'],
 }
 
 def mkcell():
@@ -357,7 +362,8 @@ class Being(Mixin1):
             lines = (len(txt) // w) + 4
             txt = wrap(txt, w)
             txt = '\n'.join(txt)
-            win = newwin(lines, w, loc.y-lines, loc.x)
+            offset_y = lines if loc.y<8 else -lines
+            win = newwin(lines, w, loc.y+offset_y, loc.x)
             win.addstr(0,0, txt)
             win.getkey()
             del win
@@ -671,6 +677,19 @@ class ShopKeeperEvent1(Event):
         pl = objects[ID.player]
         shk = objects[ID.shopkeeper1]
         pl.talk(shk.loc, shk)
+        timers.append(Timer(5, ShopKeeperAlarmEvent))
+
+class ShopKeeperAlarmEvent(Event):
+    def go(self):
+        shk = objects[ID.shopkeeper1]
+        if shk.health > 0:
+            player, B = Saves().load('start')
+            objects[ID.player] = player
+            return B
+
+class Timer:
+    def __init__(self, turns, evt):
+        self.turns, self.evt = turns, evt
 
 class Player(Being):
     char = '🙍'
@@ -825,6 +844,11 @@ def main(stdscr):
             done_events.add(evt)
 
         triggered_events.clear()
+        for t in timers:
+            t.turns -= 1
+            if not t.turns:
+                triggered_events.append(t.evt)
+        timers[:] = [t for t in timers if t.turns>0]
         B.draw(win)
         key = '[key]' if player.inv[ID.key1] else ''
         win2.addstr(0,0, f'[{STANCES[player.stance]}] [H{player.health}] [${player.inv[ID.coin]}] {key}')
