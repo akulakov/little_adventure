@@ -73,7 +73,8 @@ class Type:
     ladder = 3
     fountain = 4
     chair = 5
-BLOCKING = [rock, Type.door, Blocks.block1, Blocks.steps_r, Blocks.steps_l, Type.platform_top]
+    door_top_block = 6
+BLOCKING = [rock, Type.door, Blocks.block1, Blocks.steps_r, Blocks.steps_l, Type.platform_top, Type.door_top_block]
 
 class ID:
     platform1 = 1
@@ -145,11 +146,12 @@ class Loc:
 
 
 class Board:
-    def __init__(self, loc):
+    def __init__(self, loc, init_rocks=True):
         self.B = B = [mkrow() for _ in range(HEIGHT)]
         bottom = B[-1]
-        for cell in bottom:
-            cell.append(rock)
+        if init_rocks:
+            for cell in bottom:
+                cell.append(rock)
         self.guards = []
         self.soldiers = []
         self.labels = []
@@ -167,14 +169,10 @@ class Board:
         Item(self, Blocks.grill, 'grill', Loc(20+16, GROUND), id=ID.grill1)
 
         Item(self, Blocks.key, 'key', Loc(37,GROUND), id=ID.key1)
-        # c = Locker(self, Blocks.locker, 'locker', Loc(40,GROUND), id=ID.locker)
         c = Locker(self, Loc(40,GROUND))
         c.inv[ID.coin] += 1
         c = Locker(self, Loc(42,GROUND))
         c = Locker(self, Loc(44,GROUND))
-        # c = Item(self, Blocks.locker, 'locker', Loc(41,GROUND), id=ID.locker)
-        # c = Item(self, Blocks.locker, 'locker', Loc(42,GROUND), id=ID.locker)
-        # Item(self, Blocks.grn_heart, 'grn_heart', Loc(42,GROUND), id=ID.grn_heart)
         Item(self, Blocks.door, 'door', Loc(48,GROUND), id=ID.door1, type=Type.door)
         Item(self, Blocks.block1, 'block', Loc(48,GROUND-1))
 
@@ -206,27 +204,20 @@ class Board:
         s = Soldier(self, Loc(70, GROUND), id=ID.soldier1)
         self.soldiers.append(s)
 
-    def make_steps(self, start, mod, to_height, char=Blocks.steps_r):
-        n = start.y - to_height
-        newx = None
-        for x in range(n):
-            row = self.B[start.y-x]
-            newx = start.x+(mod*x)
-            row[newx].append(char)
-        return newx
-
     def board_4(self):
         B = self.B
         lev2 = 10
-        self.make_steps(Loc(2,GROUND), +1, 9)
-        self.make_steps(Loc(77,GROUND), -1, 9, Blocks.steps_l)
+        loc1 = self.make_steps(Loc(2,GROUND), +1, 9)
+        loc2 = self.make_steps(Loc(77,GROUND), -1, 9, Blocks.steps_l)
 
         row = B[lev2]
-        for cell in row[7:-6]:
+        for cell in row[loc1.x+1:loc2.x]:
             cell.append(rock)
+
         self.labels.append((0,20, "𝓪𝓫𝓮 𝓸𝓵𝓭 𝓼𝓱𝓸𝓹𝓹𝓮"))    # Abe old shoppe
         self.rectangle(Loc(20,1), Loc(30,5), exc=(Loc(20,3), Loc(25,5)) )
         ShopKeeper(self, Loc(21,4), id=ID.shopkeeper1)
+
         for x in (23,26,27,28,29):
             Item(self, Blocks.shelves, 'shelves', Loc(x,4), id=ID.shelves)
         self[Loc(27,4)].inv[ID.jar_syrup] = 1
@@ -242,11 +233,44 @@ class Board:
         Item(self, Blocks.grn_heart, 'grn_heart', Loc(55,GROUND), id=ID.grn_heart)
 
     def board_5(self):
-        self.rectangle(Loc(20,1), Loc(60,10), exc=(Loc(20,7), Loc(30,10)) )
+        self.labels.append((0,20, "𝓐𝓷𝓽𝓱𝓸𝓷𝔂 𝓫𝓪𝓻"))
+        self.rectangle(Loc(20,1), Loc(60,10), exc=(Loc(20,7), Loc(30,10)))
         for x in range(22,30,2):
             Item(self, Blocks.stool, 'stool', Loc(x,9))
         for y in range(10, GROUND+1):
             Item(self, Blocks.ladder, 'ladder', Loc(30,y), type=Type.ladder)
+        loc1 = self.make_steps(Loc(35, 9), +1, 5)
+        for x in range(loc1.x+1, 60):
+            self.put(rock, Loc(x,loc1.y))
+        for x in range(loc1.x+2,loc1.x+12,2):
+            Item(self, Blocks.stool, 'stool', Loc(x, loc1.y-1))
+
+    def board_6(self):
+        mp = open('maps/6.map').readlines()
+        for y in range(16):
+            for x in range(79):
+                char = mp[y][x]
+                loc = Loc(x,y)
+                if char != blank:
+                    if char==rock:
+                        self.put(rock, loc)
+                    elif char==Blocks.ladder:
+                        Item(self, Blocks.ladder, 'ladder', loc, type=Type.ladder)
+                    elif char=='d':
+                        Item(self, Blocks.door, 'door', loc, type=Type.door)
+                    elif char=='g':
+                        Item(self, Blocks.grn_heart, 'grn_heart', loc, id=ID.grn_heart)
+                    elif char==Blocks.block1:
+                        Item(self, Blocks.block1, 'block', loc, type=Type.door_top_block)
+
+    def make_steps(self, start, mod, to_height, char=Blocks.steps_r):
+        n = start.y - to_height
+        newx = None
+        for x in range(n):
+            row = self.B[start.y-x]
+            newx = start.x+(mod*x)
+            row[newx].append(char)
+        return Loc(newx, n+2)
 
     def rectangle(self, a, b, exc=None):
         row = self.B[a.y]
@@ -483,9 +507,11 @@ class Being(Mixin1):
                         self.inv[x.id] += 1
                         B.remove(x)
                 names = [i.name for i in B.get_all(new)]
+                plural = len(names)>1
                 names = ', '.join(names)
                 if names:
-                    Windows.win2.addstr(2,0, f'You see: {names}')
+                    a = ':' if plural else ' a'
+                    Windows.win2.addstr(2,0, f'You see{a} {names}')
             self.put(new)
             if ID.door1 in B.get_ids(self.loc):
                 triggered_events.append(AlarmEvent1)
@@ -804,13 +830,15 @@ def main(stdscr):
     b3 = Board(Loc(2,0))
     b4 = Board(Loc(3,0))
     b5 = Board(Loc(4,0))
+    b6 = Board(Loc(5,0), init_rocks=0)
 
     player = b1.board_1()
     b2.board_2()
     b3.board_3()
     b4.board_4()
     b5.board_5()
-    boards.append([b1, b2, b3, b4, b5])
+    b6.board_6()
+    boards.append([b1, b2, b3, b4, b5, b6])
 
     stdscr.clear()
     B.draw(win)
@@ -865,6 +893,8 @@ def main(stdscr):
             B = player.move_to_board( Loc(3,0), Loc(35, GROUND-5) )
         elif k == '5':
             B = player.move_to_board( Loc(4,0), Loc(35, GROUND) )
+        elif k == '6':
+            B = player.move_to_board( Loc(5,0), Loc(35, GROUND) )
 
         if k != '.':
             wait_count = 0
