@@ -1,5 +1,10 @@
 #!/usr/bin/env python
 """
+bugs
+ - win2 should be cleared before redraw
+ - when getting item from a locker it should display description
+ - when getting a heart from a locker health should be updated instead of getting it to inv?? (or not?)
+
 TODO
     - update stairs on screen 2
 """
@@ -51,6 +56,8 @@ class Blocks:
     ladder = '☰'
     honey = '🍯'
     shelves = '☷'
+    chair = '⑁'
+    fountain = '⛲'
 
 class Stance:
     normal = 1
@@ -62,6 +69,8 @@ class Type:
     door = 1
     platform_top = 2
     ladder = 3
+    fountain = 4
+    chair = 5
 BLOCKING = [rock, Type.door, Blocks.block1, Blocks.steps_r, Type.platform_top]
 
 class ID:
@@ -141,6 +150,7 @@ class Board:
             cell.append(rock)
         self.guards = []
         self.soldiers = []
+        self.labels = []
         self.loc = loc
 
     def board_1(self):
@@ -155,9 +165,14 @@ class Board:
         Item(self, Blocks.grill, 'grill', Loc(20+16, GROUND), id=ID.grill1)
 
         Item(self, Blocks.key, 'key', Loc(37,GROUND), id=ID.key1)
-        c = Item(self, Blocks.locker, 'locker', Loc(40,GROUND), id=ID.locker)
+        # c = Locker(self, Blocks.locker, 'locker', Loc(40,GROUND), id=ID.locker)
+        c = Locker(self, Loc(40,GROUND))
         c.inv[ID.coin] += 1
-        Item(self, Blocks.grn_heart, 'grn_heart', Loc(42,GROUND), id=ID.grn_heart)
+        c = Locker(self, Loc(42,GROUND))
+        c = Locker(self, Loc(44,GROUND))
+        # c = Item(self, Blocks.locker, 'locker', Loc(41,GROUND), id=ID.locker)
+        # c = Item(self, Blocks.locker, 'locker', Loc(42,GROUND), id=ID.locker)
+        # Item(self, Blocks.grn_heart, 'grn_heart', Loc(42,GROUND), id=ID.grn_heart)
         Item(self, Blocks.door, 'door', Loc(48,GROUND), id=ID.door1, type=Type.door)
         Item(self, Blocks.block1, 'block', Loc(48,GROUND-1))
 
@@ -198,8 +213,9 @@ class Board:
         row = B[lev2]
         for cell in row[7:]:
             cell.append(rock)
+        self.labels.append((0,21, "𝓪𝓫𝓮 𝓸𝓵𝓭 𝓼𝓱𝓸𝓹𝓹𝓮"))    # Abe old shoppe
         self.rectangle(Loc(20,1), Loc(30,5), exc=(Loc(20,3), Loc(25,5)) )
-        ShopKeeper(self, Loc(22,4), id=ID.shopkeeper1)
+        ShopKeeper(self, Loc(21,4), id=ID.shopkeeper1)
         for x in (23,26,27,28,29):
             Item(self, Blocks.shelves, 'shelves', Loc(x,4), id=ID.shelves)
         self[Loc(27,4)].inv[ID.jar_syrup] = 1
@@ -213,6 +229,9 @@ class Board:
         Item(self, Blocks.coin, 'coin', Loc(45,GROUND), id=ID.coin)
         Item(self, Blocks.grn_heart, 'grn_heart', Loc(50,GROUND), id=ID.grn_heart)
         Item(self, Blocks.grn_heart, 'grn_heart', Loc(55,GROUND), id=ID.grn_heart)
+
+    def board_5(self):
+        pass
 
     def rectangle(self, a, b, exc=None):
         row = self.B[a.y]
@@ -250,6 +269,8 @@ class Board:
         for y, row in enumerate(self.B):
             for x, cell in enumerate(row):
                 win.addstr(y,x, str(cell[-1]))
+        for y,x,txt in self.labels:
+            win.addstr(y,x,txt)
         win.refresh()
 
     def put(self, obj, loc=None):
@@ -316,6 +337,14 @@ class Item(Mixin1):
         self.B.remove(self)
         self.loc = new
         self.B.put(self)
+
+class Locker(Item):
+    def __init__(self, B, loc):
+        super().__init__(B, Blocks.locker, 'locker', loc, id=ID.locker)
+        if random()>.6:
+            self.inv[ID.coin] += 1
+        elif random()>.6:
+            self.inv[ID.grn_heart] += 1
 
 
 class Being(Mixin1):
@@ -412,6 +441,7 @@ class Being(Mixin1):
         if new:
             if B.loc.x==3 and new==Loc(25,5):
                 triggered_events.append(ShopKeeperEvent1)
+
             objs = [o.type for o in B.get_all_obj(new)]
             if not fly and not Type.ladder in objs:
                 # fall
@@ -499,10 +529,13 @@ class Being(Mixin1):
     def action(self):
         c = last( [x for x in self.B.get_all(self.loc) if x.id in (ID.shelves, ID.locker)] )
         if c:
-            for x in c.inv:
+            items = {k:v for k,v in c.inv.items() if v}
+            for x in items:
                 self.inv[x] += c.inv[x]
                 c.inv[x] = 0
                 Windows.win2.addstr(2,0, f'You found {descr_by_id[x]}')
+            if not items:
+                Windows.win2.addstr(2,0, f'{c.name} is empty')
         else:
             loc = self.loc.mod(1,0)
             x = self.B[loc] # TODO won't work if something is in the platform tile
@@ -835,6 +868,8 @@ def main(stdscr):
             if evt in done_events and evt.once:
                 continue
             rv = evt(B).go()
+            if isinstance(rv, Board):
+                B = rv
             try:
                 player, B = rv
             except Exception as e:
