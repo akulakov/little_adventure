@@ -624,31 +624,16 @@ class ClimbThroughGrillEvent1(Event):
 class AlarmEvent1(Event):
     def go(self):
         if self.done: return
-        # B = self.B
         tech = objects[ID.technician1]
         x, y = tech.loc
-        # ok = 0
-        # player = objects[ID.player]
 
         for _ in range(35):
             tech.move('l')
-            # platform1 = objects[ID.platform1]
-
             if ID.alarm1 in self.B.get_ids(tech.loc):
                 Windows.win2.addstr(2,0, '!ALARM!')
                 return Saves().load('start')
-                # B.remove(player)
-                # B = boards[0][0]
-                # player.B = B
-                # player.put(Loc(0, GROUND))
-                # platform1.tele(Loc(15, GROUND))
-                # objects[ID.guard1].tele(Loc(15, GROUND))
-                # ok = 1
             self.B.draw(Windows.win)
-            # if ok: break
             sleep(0.1)
-        # self.done = True
-        # return B
 
 class GarbageTruckEvent(Event):
     def go(self):
@@ -697,9 +682,6 @@ class ShopKeeperAlarmEvent(Event):
         shk = objects[ID.shopkeeper1]
         if shk.health > 0:
             return Saves().load('start')
-            # player, B = Saves().load('start')
-            # objects[ID.player] = player
-            # return B
 
 class Timer:
     def __init__(self, turns, evt):
