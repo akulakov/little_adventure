@@ -43,6 +43,7 @@ class Blocks:
     block1 = '▐'
     steps_r = '▟'
     platform_top = '▔'
+    ladder = '☰'
 
 class Stance:
     normal = 1
@@ -53,6 +54,7 @@ STANCES = {v:k for k,v in Stance.__dict__.items()}
 class Type:
     door = 1
     platform_top = 2
+    ladder = 3
 BLOCKING = [rock, Type.door, Blocks.block1, Blocks.steps_r, Type.platform_top]
 
 class ID:
@@ -181,6 +183,8 @@ class Board:
         row = B[-6]
         for cell in row[7:]:
             cell.append(rock)
+        self.rectangle(Loc(20,1), Loc(30,5), exc=Loc(25,5))
+
         loc = Loc(40,GROUND-4)
         self.remove(rock, loc)
         Item(self, Blocks.platform_top, 'platform', loc, id=ID.platform_top1, type=Type.platform_top)
@@ -188,6 +192,19 @@ class Board:
         Item(self, Blocks.grn_heart, 'grn_heart', Loc(50,GROUND), id=ID.grn_heart)
         Item(self, Blocks.grn_heart, 'grn_heart', Loc(55,GROUND), id=ID.grn_heart)
 
+    def rectangle(self, a, b, exc=None):
+        row = self.B[a.y]
+        for cell in row[a.x:b.x+1]:
+            cell.append(rock)
+        row = self.B[b.y]
+        for cell in row[a.x:b.x+1]:
+            cell.append(rock)
+        for y in range(a.y+1, b.y):
+            self.put(rock, Loc(a.x, y))
+        for y in range(a.y+1, b.y):
+            self.put(rock, Loc(b.x, y))
+        if exc:
+            self.remove(rock, exc)
 
     def __getitem__(self, loc):
         return self.B[loc.y][loc.x][-1]
