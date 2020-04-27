@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 """
 bugs
- - win2 should be cleared before redraw
  - when getting item from a locker it should display description
  - when getting a heart from a locker health should be updated instead of getting it to inv?? (or not?)
 
@@ -530,10 +529,12 @@ class Being(Mixin1):
         c = last( [x for x in self.B.get_all(self.loc) if x.id in (ID.shelves, ID.locker)] )
         if c:
             items = {k:v for k,v in c.inv.items() if v}
+            lst = []
             for x in items:
                 self.inv[x] += c.inv[x]
                 c.inv[x] = 0
-                Windows.win2.addstr(2,0, f'You found {descr_by_id[x]}')
+                lst.append(descr_by_id[x])
+            Windows.win2.addstr(2,0, 'You found {}'.format(', '.join(lst)))
             if not items:
                 Windows.win2.addstr(2,0, f'{c.name} is empty')
         else:
@@ -806,6 +807,7 @@ def main(stdscr):
     while 1:
         k = win.getkey()
         win2.clear()
+        win2.addstr(1,0, ' '*78)
         win2.addstr(2,0,k)
         if k=='q':
             return
