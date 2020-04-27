@@ -177,13 +177,16 @@ class Board:
 
     def board_4(self):
         B = self.B
+        lev2 = 10
         for x in range(5):
             row = B[-2-x]
             row[x+2].append(Blocks.steps_r)
-        row = B[-6]
+        row = B[lev2]
         for cell in row[7:]:
             cell.append(rock)
         self.rectangle(Loc(20,1), Loc(30,5), exc=Loc(25,5))
+        for y in range(5, lev2):
+            Item(self, Blocks.ladder, 'ladder', Loc(25,y), type=Type.ladder)
 
         loc = Loc(40,GROUND-4)
         self.remove(rock, loc)
@@ -216,6 +219,9 @@ class Board:
 
     def get_all(self, loc):
         return [n for n in self.B[loc.y][loc.x] if n!=blank]
+
+    def get_all_obj(self, loc):
+        return [n for n in self.B[loc.y][loc.x] if not isinstance(n, str)]
 
     def get_ids(self, loc):
         return ids(self.get_all(loc))
@@ -299,6 +305,7 @@ class Being(Mixin1):
     is_player = 0
     hostile = 0
     kash = 0
+    type = None
 
     def __init__(self, B, loc=None, put=True, id=None):
         self.B = B
@@ -331,8 +338,8 @@ class Being(Mixin1):
         return self.stance==Stance.sneaky
 
     def _move(self, dir, fly=False):
-        if dir == 'j' and not fly: return
-        if dir == 'k' and not fly: return
+        # if dir == 'j': return
+        # if dir == 'k': return
         m = dict(h=(0,-1), l=(0,1), j=(1,0), k=(-1,0))[dir]
         if chk_oob(self.loc, *m):
             return True, self.loc.mod(*m)
@@ -379,12 +386,14 @@ class Being(Mixin1):
                     triggered_events.append(GuardAttackEvent1)
 
         if new:
-            if not fly:
+            objs = [o.type for o in B.get_all_obj(new)]
+            if not fly and not Type.ladder in objs:
                 # fall
                 new2 = new
                 while 1:
                     new2 = new2.mod(1,0)
-                    if chk_oob(new2) and B.avail(new2):
+                    objs = [o.type for o in B.get_all_obj(new2)]
+                    if chk_oob(new2) and B.avail(new2) and not Type.ladder in objs:
                         new = new2
                     else:
                         break
@@ -742,7 +751,7 @@ def main(stdscr):
         elif k=='n':
             player.stance = Stance.normal
             win2.addstr(1, 0, 'stance: normal')
-        elif k in 'hl':
+        elif k in 'hjkl':
             rv = player.move(k)
             if rv[0] == LOAD_BOARD:
                 loc = rv[1]
