@@ -49,6 +49,8 @@ class Blocks:
     steps_r = '▟'
     platform_top = '▔'
     ladder = '☰'
+    honey = '🍯'
+    shelves = '☷'
 
 class Stance:
     normal = 1
@@ -76,6 +78,8 @@ class ID:
     key1 = 11
     door1 = 12
     platform_top1 = 13
+    jar_syrup = 14
+    shelves = 15
 
     guard1 = 100
     technician1 = 101
@@ -83,6 +87,9 @@ class ID:
     soldier1 = 103
     robobunny1 = 104
     shopkeeper1 = 105
+items_by_id = {v:k for k,v in ID.__dict__.items()}
+descr_by_id = copy(items_by_id)
+descr_by_id.update({14: 'a jar of syrup'})
 
 conversations = {
     ID.robobunny1: ['I like to rummage through the rubbish pile.. this area is not closely watched! I hide in the garbage truck and come here when I can. You just have to be very DISCREET!'],
@@ -193,6 +200,9 @@ class Board:
             cell.append(rock)
         self.rectangle(Loc(20,1), Loc(30,5), exc=(Loc(20,3), Loc(25,5)) )
         ShopKeeper(self, Loc(22,4), id=ID.shopkeeper1)
+        for x in (23,26,27,28,29):
+            Item(self, Blocks.shelves, 'shelves', Loc(x,4), id=ID.shelves)
+        self[Loc(27,4)].inv[ID.jar_syrup] = 1
 
         for y in range(5, lev2):
             Item(self, Blocks.ladder, 'ladder', Loc(25,y), type=Type.ladder)
@@ -487,14 +497,14 @@ class Being(Mixin1):
             lo.put(loc)
 
     def action(self):
-        c = last( [x for x in self.B.get_all(self.loc) if x.id==ID.locker] )
+        c = last( [x for x in self.B.get_all(self.loc) if x.id in (ID.shelves, ID.locker)] )
         if c:
             for x in c.inv:
                 self.inv[x] += c.inv[x]
                 c.inv[x] = 0
+                Windows.win2.addstr(2,0, f'You found {descr_by_id[x]}')
         else:
             loc = self.loc.mod(1,0)
-            # pdb(self.B, loc, self.loc)
             x = self.B[loc] # TODO won't work if something is in the platform tile
             if x and getattr(x,'id',None)==ID.platform_top1:
                 PlatformEvent2(self.B).go()
@@ -680,7 +690,7 @@ class ShopKeeperEvent1(Event):
         pl = objects[ID.player]
         shk = objects[ID.shopkeeper1]
         pl.talk(shk.loc, shk)
-        timers.append(Timer(5, ShopKeeperAlarmEvent))
+        timers.append(Timer(10, ShopKeeperAlarmEvent))
 
 class ShopKeeperAlarmEvent(Event):
     def go(self):
