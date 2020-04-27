@@ -5,8 +5,10 @@ from copy import copy, deepcopy
 from time import sleep
 from random import random
 from collections import defaultdict
+from textwrap import wrap
 
-rock = '▓'
+start_x_loc = 30
+rock = '█'
 blank = ' '
 HEIGHT = 16
 GROUND = HEIGHT-2   # ground level
@@ -39,16 +41,19 @@ class Blocks:
     key = '🔑'
     door = '🚪'
     block1 = '▐'
-    block2 = '▟'
+    steps_r = '▟'
+    platform_top = '▔'
 
 class Stance:
     normal = 1
     fight = 2
     sneaky = 3
+STANCES = {v:k for k,v in Stance.__dict__.items()}
 
 class Type:
     door = 1
-BLOCKING = [rock, Type.door, Blocks.block1]
+    platform_top = 2
+BLOCKING = [rock, Type.door, Blocks.block1, Blocks.steps_r, Type.platform_top]
 
 class ID:
     platform1 = 1
@@ -63,6 +68,7 @@ class ID:
     grn_heart = 10
     key1 = 11
     door1 = 12
+    platform_top1 = 13
 
     guard1 = 100
     technician1 = 101
@@ -137,9 +143,9 @@ class Board:
         c.inv[ID.coin] += 1
         Item(self, Blocks.grn_heart, 'grn_heart', Loc(42,GROUND), id=ID.grn_heart)
         Item(self, Blocks.door, 'door', Loc(48,GROUND), id=ID.door1, type=Type.door)
-        self.put(Blocks.block1, Loc(48, GROUND-1))
+        Item(self, Blocks.block1, 'block', Loc(48,GROUND-1))
 
-        p = Player(self, Loc(30, GROUND), id=ID.player)
+        p = Player(self, Loc(start_x_loc, GROUND), id=ID.player)
         objects[ID.player] = p
         return p
 
@@ -168,7 +174,20 @@ class Board:
         self.soldiers.append(s)
 
     def board_4(self):
-        pass
+        B = self.B
+        for x in range(5):
+            row = B[-2-x]
+            row[x+2].append(Blocks.steps_r)
+        row = B[-6]
+        for cell in row[7:]:
+            cell.append(rock)
+        loc = Loc(40,GROUND-4)
+        self.remove(rock, loc)
+        Item(self, Blocks.platform_top, 'platform', loc, id=ID.platform_top1, type=Type.platform_top)
+        Item(self, Blocks.coin, 'coin', Loc(45,GROUND), id=ID.coin)
+        Item(self, Blocks.grn_heart, 'grn_heart', Loc(50,GROUND), id=ID.grn_heart)
+        Item(self, Blocks.grn_heart, 'grn_heart', Loc(55,GROUND), id=ID.grn_heart)
+
 
     def __getitem__(self, loc):
         return self.B[loc.y][loc.x][-1]
@@ -188,7 +207,6 @@ class Board:
         for y, row in enumerate(self.B):
             for x, cell in enumerate(row):
                 win.addstr(y,x, str(cell[-1]))
-        # debug(self.B[-2])
         win.refresh()
 
     def put(self, obj, loc=None):
@@ -278,6 +296,15 @@ class Being(Mixin1):
     def __str__(self):
         return self.char
 
+    def move_to_board(self, b_loc, loc):
+        if self in self.B.get_all(self.loc):
+            self.B.remove(self)
+        B = boards[b_loc.y][b_loc.x]
+        self.loc = loc
+        B.put(self)
+        self.B = B
+        return B
+
     @property
     def fight_stance(self):
         return self.stance==Stance.fight
@@ -293,7 +320,6 @@ class Being(Mixin1):
         if chk_oob(self.loc, *m):
             return True, self.loc.mod(*m)
         else:
-            print("in _move self.B.loc", self.B.loc)
             if self.is_player and chk_b_oob(self.B.loc, *m):
                 return LOAD_BOARD, self.B.loc.mod(*m)
         return 0, 0
@@ -311,17 +337,14 @@ class Being(Mixin1):
                 self.attack(being)
             elif being.id == ID.robobunny1:
                 txt = conversations[being.id]
-                ln = len(txt)
                 w = 78 - new.x
-                lines = (ln // w) + 4
+                lines = (len(txt) // w) + 4
                 debug(lines, w, new.y-lines, new.x)
-                from textwrap import wrap
-                txt = wrap(txt, w)
-                txt = '\n'.join(txt)
-                w = newwin(lines, w, new.y-lines, new.x)
-                w.addstr(0,0, txt)
-                w.getkey()
-                del w
+                txt = wrap('\n'.join(txt), w)
+                win = newwin(lines, w, new.y-lines, new.x)
+                win.addstr(0,0, txt)
+                win.getkey()
+                del win
             else:
                 self.switch_places()    # TODO support direction
             return True, True
@@ -357,7 +380,7 @@ class Being(Mixin1):
                 items = B.get_all(new)
                 for x in reversed(items):
                     if x.id == ID.grn_heart:
-                        self.health = min(10, self.health+1)
+                        self.health = min(15, self.health+1)
                         B.remove(x)
                     elif x.id in pick_up:
                         self.inv[x.id] += 1
@@ -427,15 +450,25 @@ class Being(Mixin1):
             for x in c.inv:
                 self.inv[x] += c.inv[x]
                 c.inv[x] = 0
+        else:
+            loc = self.loc.mod(1,0)
+            # pdb(self.B, loc, self.loc)
+            x = self.B[loc] # TODO won't work if something is in the platform tile
+            if x and getattr(x,'id',None)==ID.platform_top1:
+                PlatformEvent2(self.B).go()
+
+    def get_top_item(self):
+        x = self.B[self.loc]
+        return None if x==blank else x
 
 def first(x):
     return x[0] if x else None
 def last(x):
     return x[-1] if x else None
 
-def pdb(stdscr):
+def pdb(*arg):
     curses.nocbreak()
-    stdscr.keypad(0)
+    Windows.win.keypad(0)
     curses.echo()
     curses.endwin()
     import pdb; pdb.set_trace()
@@ -459,21 +492,21 @@ class GuardAttackEvent1(Event):
         for _ in range(35):
             if mode==1:
                 if y>=HEIGHT-10:
-                    platform.move(B, 'k')
+                    platform.move('k')
                     guard.move('k', fly=1)
                     y = guard.loc.y
                 else:
                     mode = 2
             elif mode==2:
                 if x>=3:
-                    platform.move(B, 'h')
+                    platform.move('h')
                     guard.move('h', fly=1)
                     x = guard.loc.x
                 else:
                     mode = 3
             elif mode==3:
                 if y<GROUND:
-                    platform.move(B, 'j')
+                    platform.move('j')
                     guard.move('j', fly=1)
                     y = guard.loc.y
                 else:
@@ -530,44 +563,40 @@ class ClimbThroughGrillEvent1(Event):
     once = False
     def go(self):
         player = objects[ID.player]
-        B = self.B
-        B.remove(player)
-        bi = B.loc.x
-        B = boards[0][2 if bi==0 else 0]
-        player.loc = Loc(25 if bi==0 else 36, GROUND)
-        B.put(player)
-        B.draw(Windows.win)
-        player.B = B
+        bi = self.B.loc.x
+        loc = Loc(25 if bi==0 else 36, GROUND)
+        b_loc = Loc(2 if bi==0 else 0, 0)
         Windows.win2.addstr(2,0, 'You climb through the grill into a space that opens into an open area outside the building')
-        return B
+        return player.move_to_board(b_loc, loc)
 
 class AlarmEvent1(Event):
     def go(self):
         if self.done: return
-        B = self.B
+        # B = self.B
         tech = objects[ID.technician1]
         x, y = tech.loc
-        ok = 0
-        player = objects[ID.player]
+        # ok = 0
+        # player = objects[ID.player]
 
         for _ in range(35):
             tech.move('l')
-            platform1 = objects[ID.platform1]
+            # platform1 = objects[ID.platform1]
 
-            if ID.alarm1 in B.get_ids(tech.loc):
+            if ID.alarm1 in self.B.get_ids(tech.loc):
                 Windows.win2.addstr(2,0, '!ALARM!')
-                B.remove(player)
-                B = boards[0][0]
-                player.B = B
-                player.put(Loc(0, GROUND))
-                platform1.tele(Loc(15, GROUND))
-                objects[ID.guard1].tele(Loc(15, GROUND))
-                ok = 1
-            B.draw(Windows.win)
-            if ok: break
+                return Saves().load('start')
+                # B.remove(player)
+                # B = boards[0][0]
+                # player.B = B
+                # player.put(Loc(0, GROUND))
+                # platform1.tele(Loc(15, GROUND))
+                # objects[ID.guard1].tele(Loc(15, GROUND))
+                # ok = 1
+            self.B.draw(Windows.win)
+            # if ok: break
             sleep(0.1)
-        self.done = True
-        return B
+        # self.done = True
+        # return B
 
 class GarbageTruckEvent(Event):
     def go(self):
@@ -588,6 +617,21 @@ class GarbageTruckEvent(Event):
                 break
             B.draw(Windows.win)
             sleep(SLP)
+        return pl.move_to_board(Loc(3,0), Loc(0,GROUND))
+
+class PlatformEvent2(Event):
+    def go(self):
+        B = self.B
+        p = objects[ID.platform_top1]
+        pl = objects[ID.player]
+        dir = 'j' if pl.loc.y == GROUND-5 else 'k'
+        for _ in range(45):
+            p.move(dir)
+            pl.move(dir, fly=1)
+            if pl.loc.y in (GROUND, GROUND-5):
+                break
+            B.draw(Windows.win)
+            sleep(0.2)
 
 class Player(Being):
     char = '🙍'
@@ -651,11 +695,13 @@ def main(stdscr):
     B = b1 = Board(Loc(0,0))
     b2 = Board(Loc(1,0))
     b3 = Board(Loc(2,0))
+    b4 = Board(Loc(3,0))
 
     player = b1.board_1()
     b2.board_2()
     b3.board_3()
-    boards.append([b1, b2, b3])
+    b4.board_4()
+    boards.append([b1, b2, b3, b4])
 
     stdscr.clear()
     B.draw(win)
@@ -683,11 +729,9 @@ def main(stdscr):
             rv = player.move(k)
             if rv[0] == LOAD_BOARD:
                 loc = rv[1]
-                B.remove(player)
-                B = boards[loc.y][loc.x]
-                player.loc.x = 0 if k=='l' else 78
-                B.put(player)
-                player.B = B
+                x = 0 if k=='l' else 78     # TODO support up/down
+                p_loc = Loc(x, player.loc.y)
+                player.move_to_board(loc, p_loc)
 
         elif k == '.':
             if last_cmd=='.':
@@ -707,6 +751,8 @@ def main(stdscr):
             pass
         elif k == ' ':
             player.action()
+        elif k == '4':
+            B = player.move_to_board( Loc(3,0), Loc(35, GROUND-5) )
 
         if k != '.':
             wait_count = 0
@@ -727,11 +773,6 @@ def main(stdscr):
             player, B = Saves().load('start')
             objects[ID.player] = player
 
-        B.draw(win)
-        key = '[key]' if player.inv[ID.key1] else ''
-        win2.addstr(0,0, f'[H{player.health}] [${player.inv[ID.coin]}] {key}')
-        win2.refresh()
-
         for evt in triggered_events:
             debug(evt)
             if evt in done_events and evt.once:
@@ -742,8 +783,10 @@ def main(stdscr):
             done_events.add(evt)
 
         triggered_events.clear()
-        print("player.loc", player.loc)
-
+        B.draw(win)
+        key = '[key]' if player.inv[ID.key1] else ''
+        win2.addstr(0,0, f'[{STANCES[player.stance]}] [H{player.health}] [${player.inv[ID.coin]}] {key}')
+        win2.refresh()
 
 def debug(*args):
     debug_log.write(str(args) + '\n')
