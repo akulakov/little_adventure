@@ -77,9 +77,11 @@ class ID:
     player = 102
     soldier1 = 103
     robobunny1 = 104
+    shopkeeper1 = 105
 
 conversations = {
-    ID.robobunny1: 'I like to rummage through the rubbish pile.. this area is not closely watched! I hide in the garbage truck and come here when I can. You just have to be very DISCREET!',
+    ID.robobunny1: ['I like to rummage through the rubbish pile.. this area is not closely watched! I hide in the garbage truck and come here when I can. You just have to be very DISCREET!'],
+    ID.shopkeeper1: ['Twinsen!? I thought you were arrested?', 'They let me out early for good behaviour!', 'But.. nobody gets out of Citadel alive!'],
 }
 
 def mkcell():
@@ -184,7 +186,9 @@ class Board:
         row = B[lev2]
         for cell in row[7:]:
             cell.append(rock)
-        self.rectangle(Loc(20,1), Loc(30,5), exc=Loc(25,5))
+        self.rectangle(Loc(20,1), Loc(30,5), exc=(Loc(20,3), Loc(25,5)) )
+        ShopKeeper(self, Loc(22,4), id=ID.shopkeeper1)
+
         for y in range(5, lev2):
             Item(self, Blocks.ladder, 'ladder', Loc(25,y), type=Type.ladder)
 
@@ -206,8 +210,9 @@ class Board:
             self.put(rock, Loc(a.x, y))
         for y in range(a.y+1, b.y):
             self.put(rock, Loc(b.x, y))
-        if exc:
-            self.remove(rock, exc)
+        exc = exc or []
+        for loc in exc:
+            self.remove(rock, loc)
 
     def __getitem__(self, loc):
         return self.B[loc.y][loc.x][-1]
@@ -338,8 +343,6 @@ class Being(Mixin1):
         return self.stance==Stance.sneaky
 
     def _move(self, dir, fly=False):
-        # if dir == 'j': return
-        # if dir == 'k': return
         m = dict(h=(0,-1), l=(0,1), j=(1,0), k=(-1,0))[dir]
         if chk_oob(self.loc, *m):
             return True, self.loc.mod(*m)
@@ -348,6 +351,16 @@ class Being(Mixin1):
                 return LOAD_BOARD, self.B.loc.mod(*m)
         return 0, 0
 
+    def talk(self, loc, being):
+        for txt in conversations[being.id]:
+            w = 78 - loc.x
+            lines = (len(txt) // w) + 4
+            txt = wrap(txt, w)
+            txt = '\n'.join(txt)
+            win = newwin(lines, w, loc.y-lines, loc.x)
+            win.addstr(0,0, txt)
+            win.getkey()
+            del win
 
     def move(self, dir, fly=False):
         B = self.B
@@ -360,15 +373,7 @@ class Being(Mixin1):
             if self.fight_stance or self.hostile:
                 self.attack(being)
             elif being.id == ID.robobunny1:
-                txt = conversations[being.id]
-                w = 78 - new.x
-                lines = (len(txt) // w) + 4
-                debug(lines, w, new.y-lines, new.x)
-                txt = wrap('\n'.join(txt), w)
-                win = newwin(lines, w, new.y-lines, new.x)
-                win.addstr(0,0, txt)
-                win.getkey()
-                del win
+                self.talk(new, being)
             else:
                 self.switch_places()    # TODO support direction
             return True, True
@@ -386,6 +391,8 @@ class Being(Mixin1):
                     triggered_events.append(GuardAttackEvent1)
 
         if new:
+            if B.loc.x==3 and new==Loc(25,5):
+                triggered_events.append(ShopKeeperEvent1)
             objs = [o.type for o in B.get_all_obj(new)]
             if not fly and not Type.ladder in objs:
                 # fall
@@ -659,6 +666,12 @@ class PlatformEvent2(Event):
             B.draw(Windows.win)
             sleep(0.2)
 
+class ShopKeeperEvent1(Event):
+    def go(self):
+        pl = objects[ID.player]
+        shk = objects[ID.shopkeeper1]
+        pl.talk(shk.loc, shk)
+
 class Player(Being):
     char = '🙍'
     health = 10
@@ -678,6 +691,9 @@ class Technician(Being):
 
 class RoboBunny(Being):
     char = 'r'
+
+class ShopKeeper(Being):
+    char = '🙇'
 
 class NPCs:
     pass
