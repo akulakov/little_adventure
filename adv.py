@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
-Bugs:
-    - player doesn't move after shopkeeper1 alarm evt
+TODO
+    - update stairs on screen 2
 """
 from curses import wrapper, newwin
 import curses
@@ -331,6 +331,7 @@ class Being(Mixin1):
         return self.char
 
     def move_to_board(self, b_loc, loc):
+        print('in move_to_board')
         if self in self.B.get_all(self.loc):
             self.B.remove(self)
         B = boards[b_loc.y][b_loc.x]
@@ -347,15 +348,6 @@ class Being(Mixin1):
     def sneaky_stance(self):
         return self.stance==Stance.sneaky
 
-    def _move(self, dir, fly=False):
-        m = dict(h=(0,-1), l=(0,1), j=(1,0), k=(-1,0))[dir]
-        if chk_oob(self.loc, *m):
-            return True, self.loc.mod(*m)
-        else:
-            if self.is_player and chk_b_oob(self.B.loc, *m):
-                return LOAD_BOARD, self.B.loc.mod(*m)
-        return 0, 0
-
     def talk(self, loc, being):
         for txt in conversations[being.id]:
             w = 78 - loc.x
@@ -368,10 +360,21 @@ class Being(Mixin1):
             win.getkey()
             del win
 
+    def _move(self, dir, fly=False):
+        m = dict(h=(0,-1), l=(0,1), j=(1,0), k=(-1,0))[dir]
+        if chk_oob(self.loc, *m):
+            return True, self.loc.mod(*m)
+        else:
+            if self.is_player and chk_b_oob(self.B.loc, *m):
+                print('returning LOAD_BOARD')
+                return LOAD_BOARD, self.B.loc.mod(*m)
+        return 0, 0
+
     def move(self, dir, fly=False):
         B = self.B
         rv = self._move(dir, fly)
         if rv and (rv[0] == LOAD_BOARD):
+            print('move: returning LOAD_BOARD')
             return rv
         new = rv[1]
         if new and isinstance(B[new], Being):
@@ -683,9 +686,10 @@ class ShopKeeperAlarmEvent(Event):
     def go(self):
         shk = objects[ID.shopkeeper1]
         if shk.health > 0:
-            player, B = Saves().load('start')
-            objects[ID.player] = player
-            return B
+            return Saves().load('start')
+            # player, B = Saves().load('start')
+            # objects[ID.player] = player
+            # return B
 
 class Timer:
     def __init__(self, turns, evt):
@@ -792,7 +796,7 @@ def main(stdscr):
                 loc = rv[1]
                 x = 0 if k=='l' else 78     # TODO support up/down
                 p_loc = Loc(x, player.loc.y)
-                player.move_to_board(loc, p_loc)
+                B = player.move_to_board(loc, p_loc)
 
         elif k == '.':
             if last_cmd=='.':
@@ -839,8 +843,11 @@ def main(stdscr):
             if evt in done_events and evt.once:
                 continue
             rv = evt(B).go()
-            if isinstance(rv, Board):
-                B = rv
+            try:
+                player, B = rv
+            except Exception as e:
+                print("e", e)
+                pass
             done_events.add(evt)
 
         triggered_events.clear()
@@ -848,11 +855,13 @@ def main(stdscr):
             t.turns -= 1
             if not t.turns:
                 triggered_events.append(t.evt)
+                print("triggered_events", triggered_events)
         timers[:] = [t for t in timers if t.turns>0]
         B.draw(win)
         key = '[key]' if player.inv[ID.key1] else ''
         win2.addstr(0,0, f'[{STANCES[player.stance]}] [H{player.health}] [${player.inv[ID.coin]}] {key}')
         win2.refresh()
+
 
 def debug(*args):
     debug_log.write(str(args) + '\n')
