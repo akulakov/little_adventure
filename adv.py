@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 """
 bugs
- - when getting item from a locker it should display description
- - when getting a heart from a locker health should be updated instead of getting it to inv?? (or not?)
 
 TODO
     - update stairs on screen 2
@@ -50,13 +48,18 @@ class Blocks:
     key = '🔑'
     door = '🚪'
     block1 = '▐'
-    steps_r = '▟'
+    steps_r = '▞'
+    steps_l = '▚'
     platform_top = '▔'
     ladder = '☰'
     honey = '🍯'
     shelves = '☷'
     chair = '⑁'
     fountain = '⛲'
+    small_table = '▿'
+    table2 = '⍡'
+    stool = '⍑'
+    underline = '▁'
 
 class Stance:
     normal = 1
@@ -70,7 +73,7 @@ class Type:
     ladder = 3
     fountain = 4
     chair = 5
-BLOCKING = [rock, Type.door, Blocks.block1, Blocks.steps_r, Type.platform_top]
+BLOCKING = [rock, Type.door, Blocks.block1, Blocks.steps_r, Blocks.steps_l, Type.platform_top]
 
 class ID:
     platform1 = 1
@@ -97,7 +100,7 @@ class ID:
     shopkeeper1 = 105
 items_by_id = {v:k for k,v in ID.__dict__.items()}
 descr_by_id = copy(items_by_id)
-descr_by_id.update({14: 'a jar of syrup'})
+descr_by_id.update({14: 'a jar of syrup', 10: 'a green heart'})
 
 conversations = {
     ID.robobunny1: ['I like to rummage through the rubbish pile.. this area is not closely watched! I hide in the garbage truck and come here when I can. You just have to be very DISCREET!'],
@@ -203,16 +206,25 @@ class Board:
         s = Soldier(self, Loc(70, GROUND), id=ID.soldier1)
         self.soldiers.append(s)
 
+    def make_steps(self, start, mod, to_height, char=Blocks.steps_r):
+        n = start.y - to_height
+        newx = None
+        for x in range(n):
+            row = self.B[start.y-x]
+            newx = start.x+(mod*x)
+            row[newx].append(char)
+        return newx
+
     def board_4(self):
         B = self.B
         lev2 = 10
-        for x in range(5):
-            row = B[-2-x]
-            row[x+2].append(Blocks.steps_r)
+        self.make_steps(Loc(2,GROUND), +1, 9)
+        self.make_steps(Loc(77,GROUND), -1, 9, Blocks.steps_l)
+
         row = B[lev2]
-        for cell in row[7:]:
+        for cell in row[7:-6]:
             cell.append(rock)
-        self.labels.append((0,21, "𝓪𝓫𝓮 𝓸𝓵𝓭 𝓼𝓱𝓸𝓹𝓹𝓮"))    # Abe old shoppe
+        self.labels.append((0,20, "𝓪𝓫𝓮 𝓸𝓵𝓭 𝓼𝓱𝓸𝓹𝓹𝓮"))    # Abe old shoppe
         self.rectangle(Loc(20,1), Loc(30,5), exc=(Loc(20,3), Loc(25,5)) )
         ShopKeeper(self, Loc(21,4), id=ID.shopkeeper1)
         for x in (23,26,27,28,29):
@@ -230,7 +242,11 @@ class Board:
         Item(self, Blocks.grn_heart, 'grn_heart', Loc(55,GROUND), id=ID.grn_heart)
 
     def board_5(self):
-        pass
+        self.rectangle(Loc(20,1), Loc(60,10), exc=(Loc(20,7), Loc(30,10)) )
+        for x in range(22,30,2):
+            Item(self, Blocks.stool, 'stool', Loc(x,9))
+        for y in range(10, GROUND+1):
+            Item(self, Blocks.ladder, 'ladder', Loc(30,y), type=Type.ladder)
 
     def rectangle(self, a, b, exc=None):
         row = self.B[a.y]
@@ -787,12 +803,14 @@ def main(stdscr):
     b2 = Board(Loc(1,0))
     b3 = Board(Loc(2,0))
     b4 = Board(Loc(3,0))
+    b5 = Board(Loc(4,0))
 
     player = b1.board_1()
     b2.board_2()
     b3.board_3()
     b4.board_4()
-    boards.append([b1, b2, b3, b4])
+    b5.board_5()
+    boards.append([b1, b2, b3, b4, b5])
 
     stdscr.clear()
     B.draw(win)
@@ -845,6 +863,8 @@ def main(stdscr):
             player.action()
         elif k == '4':
             B = player.move_to_board( Loc(3,0), Loc(35, GROUND-5) )
+        elif k == '5':
+            B = player.move_to_board( Loc(4,0), Loc(35, GROUND) )
 
         if k != '.':
             wait_count = 0
