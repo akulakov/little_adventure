@@ -72,7 +72,9 @@ class Blocks:
     water = '⏖'
     elephant = '🐘'
     rabbit = '🐰'
+    wine = '🍷'
     crates = (crate1, crate2, crate3, crate4)
+
 
 class Stance:
     normal = 1
@@ -114,6 +116,7 @@ class ID:
     crate1 = 17
     door2 = 18
     grill3 = 19
+    wine = 20
 
     guard1 = 100
     technician1 = 101
@@ -263,7 +266,8 @@ class Board:
         containers, crates, specials = self.load_map(5)
         containers[2].inv[ID.key1] = 1
         Eleph(self, specials[1], id=ID.max, name='Max')
-        RoboBunny(self, specials[2], id=ID.anthony, name='Anthony')
+        a = RoboBunny(self, specials[2], id=ID.anthony, name='Anthony')
+        objects[ID.anthony] = a
 
     def board_6(self):
         self.labels.append((2,20, "𝒯𝓌𝒾𝓃𝓈𝑒𝓃 𝐻𝑜𝓂𝑒"))
@@ -366,7 +370,12 @@ class Board:
         return [n for n in self.B[loc.y][loc.x] if not isinstance(n, str)]
 
     def get_ids(self, loc):
-        return ids(self.get_all(loc))
+        if isinstance(loc, Loc):
+            loc = [loc]
+        lst = []
+        for l in loc:
+            lst.extend(ids(self.get_all(l)))
+        return lst
 
     def get_types(self, loc):
         return types(self.get_all(loc))
@@ -512,8 +521,10 @@ class Being(Mixin1):
     def sneaky_stance(self):
         return self.stance==Stance.sneaky
 
-    def talk(self, loc, being):
-        for txt in conversations[being.id]:
+    def talk(self, being, dialog=None):
+        loc = being.loc
+        dialog = dialog or conversations[being.id]
+        for txt in dialog:
             w = 78 - loc.x
             lines = (len(txt) // w) + 4
             txt = wrap(txt, w)
@@ -546,7 +557,7 @@ class Being(Mixin1):
             if self.fight_stance or self.hostile:
                 self.attack(being)
             elif being.id == ID.robobunny1:
-                self.talk(new, being)
+                self.talk(being)
             else:
                 self.switch_places()    # TODO support direction
             return True, True
@@ -654,18 +665,26 @@ class Being(Mixin1):
             loc = self.loc
             self.put(r)
             ro.put(loc)
-
-        if isinstance(lo, Being):
+            Windows.win2.addstr(1, 0, f'{self} moved past {ro}')
+        elif isinstance(lo, Being):
             B.remove(lo)
             B.remove(self)
             loc = self.loc
             self.put(l)
             lo.put(loc)
+            Windows.win2.addstr(1, 0, f'{self} moved past {lo}')
 
     def action(self):
         B=self.B
         c = last( [x for x in B.get_all(self.loc) if x.type==Type.container] )
         objs = B.get_all_obj(self.loc)
+
+        r,l = self.loc.mod_r(), self.loc.mod_l()
+        locs = []
+        if chk_oob(r): locs.append(r)
+        if chk_oob(l): locs.append(l)
+
+
         if c:
             items = {k:v for k,v in c.inv.items() if v}
             lst = []
@@ -680,6 +699,8 @@ class Being(Mixin1):
             objs[-2].move('l')
             Item(B, Blocks.grill, 'grill', self.loc, id=ID.grill3)
 
+        elif ID.anthony in B.get_ids(locs):
+            BuyADrinkAnthony(B).go()
         else:
             loc = self.loc.mod(1,0)
             x = B[loc] # TODO won't work if something is in the platform tile
@@ -864,7 +885,7 @@ class ShopKeeperEvent1(Event):
     def go(self):
         pl = objects[ID.player]
         shk = objects[ID.shopkeeper1]
-        pl.talk(shk.loc, shk)
+        pl.talk(shk)
         timers.append(Timer(10, ShopKeeperAlarmEvent))
 
 class ShopKeeperAlarmEvent(Event):
@@ -876,9 +897,6 @@ class ShopKeeperAlarmEvent(Event):
 class DieEvent(Event):
     def go(self):
         return Saves().load('start')
-
-def rev_dir(dir):
-    return dict(h='l',l='h',j='k',k='j')[dir]
 
 class MagicBallEvent(Event):
     def go(self, player, last_dir):
@@ -901,6 +919,19 @@ class MagicBallEvent(Event):
             sleep(0.15)
         B.remove(mb)
 
+class BuyADrinkAnthony(Event):
+    def go(self):
+        B = self.B
+        pl = objects[ID.player]
+        pl.talk(objects[ID.anthony], ['Would you like to buy a drink for two kashes? [Y/N]'])
+        k = Windows.win.getkey()
+        if k in 'yY' and pl.inv[ID.coin]>=2:
+            pl.inv[ID.coin] -= 2
+            pl.inv[ID.wine] += 1
+            Windows.win2.addstr(2,0, 'You buy a glass of wine.')
+
+def rev_dir(dir):
+    return dict(h='l',l='h',j='k',k='j')[dir]
 
 class Timer:
     def __init__(self, turns, evt):
