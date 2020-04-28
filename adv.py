@@ -67,6 +67,8 @@ class Blocks:
     crate2 = '◨'
     crate3 = '◩'
     crate4 = '◪'
+    smoke_pipe = '⧚'
+    fireplace = '⩟'
     crates = (crate1, crate2, crate3, crate4)
 
 class Stance:
@@ -263,6 +265,7 @@ class Board:
             Item(self, Blocks.stool, 'stool', Loc(x, loc1.y-1))
 
     def board_6(self):
+        self.labels.append((2,20, "𝒯𝓌𝒾𝓃𝓈𝑒𝓃 𝐻𝑜𝓂𝑒"))
         containers, crates, specials = self.load_map(6)
         containers[0].inv[ID.magic_ball] = 1
         containers[0].inv[ID.key1] = 1
@@ -295,13 +298,17 @@ class Board:
                     elif char==Blocks.cupboard or char=='c':
                         c = Cupboard(self, loc)
                         containers.append(c)
-                    elif char==Blocks.crate1 or char=='C':
+                    elif char in Blocks.crates or char=='C':
                         c = Item(self, choice(Blocks.crates), 'crate', loc)
                         crates.append(c)
                     elif char=='s':
                         Item(self, Blocks.sunflower, 'sunflower', loc)
                     elif char==Blocks.block1:
                         Item(self, Blocks.block1, 'block', loc, type=Type.door_top_block)
+                    elif char==Blocks.smoke_pipe:
+                        Item(self, Blocks.smoke_pipe, 'smoke pipe', loc, type=Type.ladder)
+                    elif char==Blocks.fireplace:
+                        Item(self, Blocks.fireplace, 'fireplace', loc)
                     elif char==Blocks.steps_l:
                         self.put(Blocks.steps_l, loc)
                     elif char==Blocks.steps_r:
@@ -1091,7 +1098,7 @@ def editor(stdscr, _map):
         if k=='q': return
         elif k in 'hjkl':
             m = dict(h=(0,-1), l=(0,1), j=(1,0), k=(-1,0))[k]
-            if last_cmd and last_cmd not in 'sSd0123456789':
+            if last_cmd and last_cmd not in 'msSd0123456789':
                 if brush == blank:
                     B.B[loc.y][loc.x] = [blank]
                 elif brush == rock:
@@ -1106,6 +1113,8 @@ def editor(stdscr, _map):
             B.put(Blocks.steps_r, loc)
         elif k == 'S':
             B.put(Blocks.steps_l, loc)
+        elif k == 'm':
+            B.put(Blocks.smoke_pipe, loc)
         elif k == 'd':
             B.put(Blocks.door, loc)
         elif k in '0123456789':
@@ -1121,6 +1130,7 @@ def editor(stdscr, _map):
         B.draw(win)
         win.addstr(0,0,str(loc))
         win.move(loc.y, loc.x)
+
 
 if __name__ == "__main__":
     argv = sys.argv[1:]
