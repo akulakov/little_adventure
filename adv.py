@@ -62,6 +62,7 @@ class Blocks:
     underline = '▁'
     cupboard = 'ꂤ'
     sunflower = '🌻'
+    magic_ball = '❂'
 
 class Stance:
     normal = 1
@@ -95,6 +96,7 @@ class ID:
     platform_top1 = 13
     jar_syrup = 14
     shelves = 15
+    magic_ball = 16
 
     guard1 = 100
     technician1 = 101
@@ -102,6 +104,7 @@ class ID:
     soldier1 = 103
     robobunny1 = 104
     shopkeeper1 = 105
+
 items_by_id = {v:k for k,v in ID.__dict__.items()}
 descr_by_id = copy(items_by_id)
 descr_by_id.update({14: 'a jar of syrup', 10: 'a green heart'})
@@ -178,6 +181,7 @@ class Board:
         c = Locker(self, Loc(44,GROUND))
         Item(self, Blocks.door, 'door', Loc(48,GROUND), id=ID.door1, type=Type.door)
         Item(self, Blocks.block1, 'block', Loc(48,GROUND-1))
+        MagicBall(self, Loc(50, GROUND))
 
         p = Player(self, Loc(start_x_loc, GROUND), id=ID.player)
         objects[ID.player] = p
@@ -249,10 +253,14 @@ class Board:
             Item(self, Blocks.stool, 'stool', Loc(x, loc1.y-1))
 
     def board_6(self):
-        mp = open('maps/6.map').readlines()
+        containers = self.load_map(6)
+
+    def load_map(self, map_num):
+        _map = open(f'maps/{map_num}.map').readlines()
+        containers = []
         for y in range(16):
             for x in range(79):
-                char = mp[y][x]
+                char = _map[y][x]
                 loc = Loc(x,y)
                 if char != blank:
                     if char==rock:
@@ -264,11 +272,13 @@ class Board:
                     elif char=='g':
                         Item(self, Blocks.grn_heart, 'grn_heart', loc, id=ID.grn_heart)
                     elif char=='c':
-                        Cupboard(self, loc)
+                        c = Cupboard(self, loc)
+                        containers.append(c)
                     elif char=='s':
                         Item(self, Blocks.sunflower, 'sunflower', loc)
                     elif char==Blocks.block1:
                         Item(self, Blocks.block1, 'block', loc, type=Type.door_top_block)
+        return containers
 
     def make_steps(self, start, mod, to_height, char=Blocks.steps_r):
         n = start.y - to_height
@@ -328,10 +338,15 @@ class Board:
         self.B[loc.y][loc.x].remove(obj)
 
     def is_blocked(self, loc):
-        items = self.get_all(loc)
-        for x in items:
+        for x in self.get_all(loc):
             if x in BLOCKING or getattr(x, 'type', None) in BLOCKING:
                 return True
+        return False
+
+    def is_being(self, loc):
+        for x in self.get_all(loc):
+            if getattr(x, 'is_being', 0):
+                return x
         return False
 
     def avail(self, loc):
@@ -378,6 +393,7 @@ class Item(Mixin1):
         return self.char
 
     def move(self, dir):
+        print("dir", dir)
         m = dict(h=(0,-1), l=(0,1), j=(1,0), k=(-1,0))[dir]
         new = self.loc.mod(*m)
         self.B.remove(self)
@@ -400,6 +416,9 @@ class Cupboard(Item):
         elif random()>.7:
             self.inv[ID.grn_heart] += 1
 
+class MagicBall(Item):
+    def __init__(self, B, loc):
+        super().__init__(B, Blocks.magic_ball, 'magic_ball', loc, id=ID.magic_ball)
 
 class Being(Mixin1):
     stance = Stance.normal
@@ -508,7 +527,7 @@ class Being(Mixin1):
                     else:
                         break
 
-            pick_up = [ID.coin, ID.key1]
+            pick_up = [ID.coin, ID.key1, ID.magic_ball]
             B.remove(self)
             self.loc = new
 
@@ -774,6 +793,31 @@ class ShopKeeperAlarmEvent(Event):
         if shk.health > 0:
             return Saves().load('start')
 
+def rev_dir(dir):
+    return dict(h='l',l='h',j='k',k='j')[dir]
+
+class MagicBallEvent(Event):
+    def go(self, player, last_dir):
+        B = self.B
+        mb = Item(self.B, Blocks.magic_ball, '', player.loc)
+        dir = last_dir
+        for n in range(45):
+            mb.move(dir)
+            be = B.is_being(mb.loc)
+            if be and be is not player:
+                player.hit(be)
+                dir = rev_dir(dir)
+            elif B.is_blocked(mb.loc):
+                dir = rev_dir(dir)
+            elif n == 5 and dir==last_dir:
+                dir = rev_dir(dir)
+            if mb.loc == player.loc:
+                break
+            B.draw(Windows.win)
+            sleep(0.15)
+        B.remove(mb)
+
+
 class Timer:
     def __init__(self, turns, evt):
         self.turns, self.evt = turns, evt
@@ -864,6 +908,7 @@ def main(stdscr):
     Saves().save('start', B.loc)
     last_cmd = None
     wait_count = 0
+    last_dir = 'l'
 
     while 1:
         k = win.getkey()
@@ -879,6 +924,7 @@ def main(stdscr):
             player.stance = Stance.normal
             win2.addstr(1, 0, 'stance: normal')
         elif k in 'hjkl':
+            last_dir = k
             rv = player.move(k)
             if rv[0] == LOAD_BOARD:
                 loc = rv[1]
@@ -910,6 +956,9 @@ def main(stdscr):
             B = player.move_to_board( Loc(4,0), Loc(35, GROUND) )
         elif k == '6':
             B = player.move_to_board( Loc(5,0), Loc(35, GROUND) )
+        elif k == 'm':
+            if player.inv[ID.magic_ball]:
+                MagicBallEvent(B).go(player, last_dir)
 
         if k != '.':
             wait_count = 0
