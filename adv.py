@@ -7,6 +7,7 @@ TODO
 """
 from curses import wrapper, newwin
 import curses
+import sys
 from copy import copy, deepcopy
 from time import sleep
 from random import random
@@ -38,7 +39,6 @@ class Objects:
 class Blocks:
     platform = '▁'
     bell = '🔔'
-    door = '▕'
     grill = '▒'
     rubbish = '♽'
     truck = '🚚'
@@ -63,6 +63,11 @@ class Blocks:
     cupboard = '⌸'
     sunflower = '🌻'
     magic_ball = '❂'
+    crate1 = '◧'
+    crate2 = '◨'
+    crate3 = '◩'
+    crate4 = '◪'
+    crates = (crate1, crate2, crate3, crate4)
 
 class Stance:
     normal = 1
@@ -71,20 +76,22 @@ class Stance:
 STANCES = {v:k for k,v in Stance.__dict__.items()}
 
 class Type:
-    door = 1
+    # door = 1
     platform_top = 2
     ladder = 3
     fountain = 4
     chair = 5
     door_top_block = 6
     container = 7
-BLOCKING = [rock, Type.door, Blocks.block1, Blocks.steps_r, Blocks.steps_l, Type.platform_top, Type.door_top_block]
+    door1 = 8
+    crate = 9
+    door2 = 10
+BLOCKING = [rock, Type.door1, Type.door2, Blocks.block1, Blocks.steps_r, Blocks.steps_l, Type.platform_top, Type.door_top_block]
 
 class ID:
     platform1 = 1
     grill1 = 2
     alarm1 = 3
-    door1 = 4
     grill2 = 5
     rubbish1 = 6
     truck1 = 7
@@ -97,6 +104,8 @@ class ID:
     jar_syrup = 14
     shelves = 15
     magic_ball = 16
+    crate1 = 17
+    door2 = 18
 
     guard1 = 100
     technician1 = 101
@@ -179,7 +188,7 @@ class Board:
         c.inv[ID.coin] += 1
         c = Locker(self, Loc(42,GROUND))
         c = Locker(self, Loc(44,GROUND))
-        Item(self, Blocks.door, 'door', Loc(48,GROUND), id=ID.door1, type=Type.door)
+        Item(self, Blocks.door, 'door', Loc(48,GROUND), id=ID.door1, type=Type.door1)
         Item(self, Blocks.block1, 'block', Loc(48,GROUND-1))
         MagicBall(self, Loc(50, GROUND))
 
@@ -195,7 +204,7 @@ class Board:
                 cell.append(rock)
         Technician(self, Loc(20, GROUND-5), id=ID.technician1)
         Item(self, Blocks.bell, 'alarm bell', Loc(25, GROUND-5), id=ID.alarm1)
-        Item(self, Blocks.door, 'door', Loc(15, GROUND-5), id=ID.door1)
+        Item(self, Blocks.door, 'door', Loc(15, GROUND-5), id=ID.door1, type=Type.door1)
 
     def board_3(self):
         """Soldier, rubbish heap."""
@@ -253,12 +262,16 @@ class Board:
             Item(self, Blocks.stool, 'stool', Loc(x, loc1.y-1))
 
     def board_6(self):
-        containers = self.load_map(6)
+        containers, crates = self.load_map(6)
         containers[0].inv[ID.magic_ball] = 1
+        containers[0].inv[ID.key1] = 1
+        crates[5].id = ID.crate1
 
     def load_map(self, map_num):
         _map = open(f'maps/{map_num}.map').readlines()
+        crates = []
         containers = []
+        bl = Blocks
         for y in range(16):
             for x in range(79):
                 char = _map[y][x]
@@ -269,17 +282,22 @@ class Board:
                     elif char==Blocks.ladder:
                         Item(self, Blocks.ladder, 'ladder', loc, type=Type.ladder)
                     elif char=='d':
-                        Item(self, Blocks.door, 'door', loc, type=Type.door)
+                        Item(self, Blocks.door, 'door', loc, type=Type.door1)
+                    elif char=='D':
+                        Item(self, Blocks.door, 'steel door', loc, type=Type.door2)
                     elif char=='g':
                         Item(self, Blocks.grn_heart, 'grn_heart', loc, id=ID.grn_heart)
                     elif char=='c':
                         c = Cupboard(self, loc)
                         containers.append(c)
+                    elif char=='C':
+                        c = Item(self, choice(Blocks.crates), 'crate', loc)
+                        crates.append(c)
                     elif char=='s':
                         Item(self, Blocks.sunflower, 'sunflower', loc)
                     elif char==Blocks.block1:
                         Item(self, Blocks.block1, 'block', loc, type=Type.door_top_block)
-        return containers
+        return containers, crates
 
     def make_steps(self, start, mod, to_height, char=Blocks.steps_r):
         n = start.y - to_height
@@ -322,6 +340,9 @@ class Board:
     def get_ids(self, loc):
         return ids(self.get_all(loc))
 
+    def get_types(self, loc):
+        return types(self.get_all(loc))
+
     def draw(self, win):
         for y, row in enumerate(self.B):
             for x, cell in enumerate(row):
@@ -354,7 +375,6 @@ class Board:
         return not self.is_blocked(loc)
 
 
-
 def chk_oob(loc, y=0, x=0):
     return 0 <= loc.y+y <= HEIGHT-1 and 0 <= loc.x+x <= 78
 
@@ -366,6 +386,10 @@ def chk_b_oob(loc, y=0, x=0):
 
 def ids(lst):
     return [x.id for x in lst if not isinstance(x, str)]
+
+def types(lst):
+    return [x.type for x in lst if not isinstance(x, str)]
+
 
 class Mixin1:
     is_player = 0
@@ -499,11 +523,14 @@ class Being(Mixin1):
             else:
                 self.switch_places()    # TODO support direction
             return True, True
-        if new and ID.door1 in B.get_ids(new) and self.inv[ID.key1]:
+
+        # TODO This is a little messy, doors are by type and keys are by ID
+        if new and Type.door1 in B.get_types(new) and self.inv[ID.key1]:
             B.remove(B[new])    # TODO will not work if something is on top of door
-            del self.inv[ID.key1]
+            self.inv[ID.key1] -= 1
             Windows.win2.addstr(2,0, 'You open the door with your key')
             return None, None
+
         if new and B.is_blocked(new):
             new = new.mod(-1,0)
             if B.is_blocked(new):
@@ -553,6 +580,8 @@ class Being(Mixin1):
             grills = set((ID.grill1, ID.grill2))
             if self.sneaky_stance and (grills & set(B.get_ids(self.loc))):
                 triggered_events.append(ClimbThroughGrillEvent1)
+            if self.sneaky_stance and ID.grill3 in B.get_ids(self.loc):
+                ClimbThroughGrillEvent2(B).go(new)
 
             Windows.win2.refresh()
             return True, True
@@ -603,7 +632,9 @@ class Being(Mixin1):
             lo.put(loc)
 
     def action(self):
-        c = last( [x for x in self.B.get_all(self.loc) if x.type==Type.container] )
+        B=self.B
+        c = last( [x for x in B.get_all(self.loc) if x.type==Type.container] )
+        objs = B.get_all_obj(self.loc)
         if c:
             items = {k:v for k,v in c.inv.items() if v}
             lst = []
@@ -614,11 +645,15 @@ class Being(Mixin1):
             Windows.win2.addstr(2,0, 'You found {}'.format(', '.join(lst)))
             if not items:
                 Windows.win2.addstr(2,0, f'{c.name} is empty')
+        elif len(objs)>1 and objs[-2].id == ID.crate1:
+            objs[-2].move('l')
+            Item(B, Blocks.grill, 'grill', self.loc, id=ID.grill3)
+
         else:
             loc = self.loc.mod(1,0)
-            x = self.B[loc] # TODO won't work if something is in the platform tile
+            x = B[loc] # TODO won't work if something is in the platform tile
             if x and getattr(x,'id',None)==ID.platform_top1:
-                PlatformEvent2(self.B).go()
+                PlatformEvent2(B).go()
 
     def get_top_item(self):
         x = self.B[self.loc]
@@ -731,6 +766,15 @@ class ClimbThroughGrillEvent1(Event):
         b_loc = Loc(2 if bi==0 else 0, 0)
         Windows.win2.addstr(2,0, 'You climb through the grill into a space that opens into an open area outside the building')
         return player.move_to_board(b_loc, loc)
+
+class ClimbThroughGrillEvent2(Event):
+    once = False
+    def go(self, loc):
+        player = objects[ID.player]
+        bi = self.B.loc.x
+        b_loc = Loc(0 if bi==5 else 5, 0 if bi==5 else 1)
+        Windows.win2.addstr(2,0, 'You climb through the grill into a space that opens into an open area outside the building')
+        return player.move_to_board(b_loc, Loc(62,10))
 
 class AlarmEvent1(Event):
     def go(self):
@@ -891,6 +935,7 @@ def main(stdscr):
     b4 = Board(Loc(3,0))
     b5 = Board(Loc(4,0))
     b6 = Board(Loc(5,0), init_rocks=0)
+    und1 = Board(Loc(0,1), init_rocks=0)
 
     player = b1.board_1()
     b2.board_2()
@@ -898,7 +943,8 @@ def main(stdscr):
     b4.board_4()
     b5.board_5()
     b6.board_6()
-    boards.append([b1, b2, b3, b4, b5, b6])
+    und1.board_und1()
+    boards.append([b1, b2, b3, b4, b5, b6], [und1])
 
     stdscr.clear()
     B.draw(win)
@@ -1012,5 +1058,37 @@ def debug(*args):
     debug_log.flush()
 print=debug
 
+def editor(stdscr, _map):
+    begin_x = 0; begin_y = 0; width = 80
+    win = newwin(HEIGHT, width, begin_y, begin_x)
+    curses.curs_set(True)
+    loc = Loc(0,0)
+    brush = blank
+    B = Board(Loc(0,0))
+    B.load_map(_map)
+    B.draw(win)
+    while 1:
+        k = win.getkey()
+        if k=='q': return
+        elif k in 'hjkl':
+            m = dict(h=(0,-1), l=(0,1), j=(1,0), k=(-1,0))[k]
+            if brush == blank:
+                B.B[loc.y][loc.x] = [blank]
+            elif brush == rock:
+                if B[loc] != rock:
+                    B.put(rock, loc)
+            loc = loc.mod(*m)
+        elif k == ' ':
+            brush = ' '
+        elif k == 'r':
+            brush = rock
+        B.draw(win)
+        win.addstr(0,0,str(loc))
+        win.move(loc.y, loc.x)
+
 if __name__ == "__main__":
-    wrapper(main)
+    argv = sys.argv[1:]
+    if first(argv) == 'ed':
+        wrapper(editor, argv[1])
+    else:
+        wrapper(main)
