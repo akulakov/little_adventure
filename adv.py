@@ -284,22 +284,26 @@ class Board:
                         self.put(rock, loc)
                     elif char==Blocks.ladder:
                         Item(self, Blocks.ladder, 'ladder', loc, type=Type.ladder)
-                    elif char=='d':
+                    elif char==Blocks.door:
                         Item(self, Blocks.door, 'door', loc, type=Type.door1)
                     elif char=='D':
                         Item(self, Blocks.door, 'steel door', loc, type=Type.door2)
                     elif char=='g':
                         Item(self, Blocks.grn_heart, 'grn_heart', loc, id=ID.grn_heart)
-                    elif char=='c':
+                    elif char==Blocks.cupboard or char=='c':
                         c = Cupboard(self, loc)
                         containers.append(c)
-                    elif char=='C':
+                    elif char==Blocks.crate1 or char=='C':
                         c = Item(self, choice(Blocks.crates), 'crate', loc)
                         crates.append(c)
                     elif char=='s':
                         Item(self, Blocks.sunflower, 'sunflower', loc)
                     elif char==Blocks.block1:
                         Item(self, Blocks.block1, 'block', loc, type=Type.door_top_block)
+                    elif char==Blocks.steps_l:
+                        self.put(Blocks.steps_l, loc)
+                    elif char==Blocks.steps_r:
+                        self.put(Blocks.steps_r, loc)
         return containers, crates
 
     def make_steps(self, start, mod, to_height, char=Blocks.steps_r):
@@ -1072,21 +1076,29 @@ def editor(stdscr, _map):
     B = Board(Loc(0,0))
     B.load_map(_map)
     B.draw(win)
+    last_cmd = None
     while 1:
         k = win.getkey()
         if k=='q': return
         elif k in 'hjkl':
             m = dict(h=(0,-1), l=(0,1), j=(1,0), k=(-1,0))[k]
-            if brush == blank:
-                B.B[loc.y][loc.x] = [blank]
-            elif brush == rock:
-                if B[loc] != rock:
-                    B.put(rock, loc)
+            if last_cmd and last_cmd not in 'sSd':
+                if brush == blank:
+                    B.B[loc.y][loc.x] = [blank]
+                elif brush == rock:
+                    if B[loc] != rock:
+                        B.put(rock, loc)
             loc = loc.mod(*m)
         elif k == ' ':
             brush = ' '
         elif k == 'r':
             brush = rock
+        elif k == 's':
+            B.put(Blocks.steps_r, loc)
+        elif k == 'S':
+            B.put(Blocks.steps_l, loc)
+        elif k == 'd':
+            B.put(Blocks.door, loc)
         elif k == 'W':
             with open(f'maps/{_map}.map', 'w') as fp:
                 for row in B.B:
@@ -1094,6 +1106,7 @@ def editor(stdscr, _map):
                         fp.write(str(cell[-1]))
                     fp.write('\n')
             return
+        last_cmd = k
         B.draw(win)
         win.addstr(0,0,str(loc))
         win.move(loc.y, loc.x)
