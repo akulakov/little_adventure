@@ -69,6 +69,7 @@ class Blocks:
     crate4 = '◪'
     smoke_pipe = '⧚'
     fireplace = '⩟'
+    water = '⏖'
     crates = (crate1, crate2, crate3, crate4)
 
 class Stance:
@@ -88,6 +89,8 @@ class Type:
     door1 = 8
     crate = 9
     door2 = 10
+    water = 11
+
 BLOCKING = [rock, Type.door1, Type.door2, Blocks.block1, Blocks.steps_r, Blocks.steps_l, Type.platform_top, Type.door_top_block]
 
 class ID:
@@ -309,6 +312,8 @@ class Board:
                         Item(self, Blocks.smoke_pipe, 'smoke pipe', loc, type=Type.ladder)
                     elif char==Blocks.fireplace:
                         Item(self, Blocks.fireplace, 'fireplace', loc)
+                    elif char==Blocks.water:
+                        Item(self, Blocks.water, 'water', loc, type=Type.water)
                     elif char==Blocks.steps_l:
                         self.put(Blocks.steps_l, loc)
                     elif char==Blocks.steps_r:
@@ -567,8 +572,11 @@ class Being(Mixin1):
                 new2 = new
                 while 1:
                     new2 = new2.mod(1,0)
-                    objs = [o.type for o in B.get_all_obj(new2)]
-                    if chk_oob(new2) and B.avail(new2) and not Type.ladder in objs:
+                    if getattr(B[new2], 'type', None) == Type.water:
+                        triggered_events.append(DieEvent)
+                        Windows.win2.addstr(1, 0, 'You fall into the water and drown...')
+                        return None, None
+                    if chk_oob(new2) and B.avail(new2) and not Type.ladder in B.get_types(new2):
                         new = new2
                     else:
                         break
@@ -861,6 +869,10 @@ class ShopKeeperAlarmEvent(Event):
         if shk.health > 0:
             return Saves().load('start')
 
+class DieEvent(Event):
+    def go(self):
+        return Saves().load('start')
+
 def rev_dir(dir):
     return dict(h='l',l='h',j='k',k='j')[dir]
 
@@ -1087,7 +1099,7 @@ def editor(stdscr, _map):
     begin_x = 0; begin_y = 0; width = 80
     win = newwin(HEIGHT, width, begin_y, begin_x)
     curses.curs_set(True)
-    loc = Loc(0,0)
+    loc = Loc(40, 8)
     brush = blank
     B = Board(Loc(0,0))
     B.load_map(_map)
@@ -1098,7 +1110,7 @@ def editor(stdscr, _map):
         if k=='q': return
         elif k in 'hjkl':
             m = dict(h=(0,-1), l=(0,1), j=(1,0), k=(-1,0))[k]
-            if last_cmd and last_cmd not in 'msSd0123456789':
+            if last_cmd and last_cmd not in 'wmsSd0123456789':
                 if brush == blank:
                     B.B[loc.y][loc.x] = [blank]
                 elif brush == rock:
@@ -1119,6 +1131,8 @@ def editor(stdscr, _map):
             B.put(Blocks.door, loc)
         elif k in '0123456789':
             B.put(k, loc)
+        elif k in 'w':
+            B.put(Blocks.water, loc)
         elif k == 'W':
             with open(f'maps/{_map}.map', 'w') as fp:
                 for row in B.B:
