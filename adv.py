@@ -70,6 +70,8 @@ class Blocks:
     smoke_pipe = '⧚'
     fireplace = '⩟'
     water = '⏖'
+    elephant = '🐘'
+    rabbit = '🐰'
     crates = (crate1, crate2, crate3, crate4)
 
 class Stance:
@@ -119,6 +121,8 @@ class ID:
     soldier1 = 103
     robobunny1 = 104
     shopkeeper1 = 105
+    max = 106
+    anthony = 107
 
 items_by_id = {v:k for k,v in ID.__dict__.items()}
 descr_by_id = copy(items_by_id)
@@ -257,6 +261,9 @@ class Board:
     def board_5(self):
         self.labels.append((2,20, "𝓐𝓷𝓽𝓱𝓸𝓷𝔂 𝓫𝓪𝓻"))
         containers, crates, specials = self.load_map(5)
+        containers[2].inv[ID.key1] = 1
+        Eleph(self, specials[1], id=ID.max, name='Max')
+        RoboBunny(self, specials[2], id=ID.anthony, name='Anthony')
 
     def board_6(self):
         self.labels.append((2,20, "𝒯𝓌𝒾𝓃𝓈𝑒𝓃 𝐻𝑜𝓂𝑒"))
@@ -269,7 +276,7 @@ class Board:
         containers, crates, specials = self.load_map('und1')
         Item(self, Blocks.grill, 'grill', specials[1], id=ID.grill3)
 
-    def load_map(self, map_num):
+    def load_map(self, map_num, for_editor=0):
         _map = open(f'maps/{map_num}.map').readlines()
         crates = []
         containers = []
@@ -289,6 +296,9 @@ class Board:
                         Item(self, Blocks.door, 'steel door', loc, type=Type.door2)
                     elif char=='g':
                         Item(self, Blocks.grn_heart, 'grn_heart', loc, id=ID.grn_heart)
+                    elif char==Blocks.locker or char=='o':
+                        l = Locker(self, loc)
+                        containers.append(l)
                     elif char==Blocks.cupboard or char=='c':
                         c = Cupboard(self, loc)
                         containers.append(c)
@@ -313,6 +323,8 @@ class Board:
                         self.put(Blocks.steps_r, loc)
                     elif char in '0123456789':
                         specials[int(char)] = loc
+                        if for_editor:
+                            self.put(char, loc)
         return containers, crates, specials
 
     def make_steps(self, start, mod, to_height, char=Blocks.steps_r):
@@ -470,10 +482,9 @@ class Being(Mixin1):
     kash = 0
     type = None
 
-    def __init__(self, B, loc=None, put=True, id=None):
-        self.B = B
-        self.id = id
-        self.loc = loc
+    def __init__(self, B, loc=None, put=True, id=None, name=None):
+        self.B, self.id, self.loc, self.name = B, id, loc, name
+
         self.inv = defaultdict(int)
         if id:
             objects[id] = self
@@ -913,10 +924,13 @@ class Technician(Being):
     char = 't'
 
 class RoboBunny(Being):
-    char = 'r'
+    char = Blocks.rabbit
 
 class ShopKeeper(Being):
     char = '🙇'
+
+class Eleph(Being):
+    char = Blocks.elephant
 
 class NPCs:
     pass
@@ -1079,7 +1093,7 @@ def main(stdscr):
         timers[:] = [t for t in timers if t.turns>0]
         B.draw(win)
         key = '[key]' if player.inv[ID.key1] else ''
-        win2.addstr(0,0, f'[{STANCES[player.stance]}] [H{player.health}] [${player.inv[ID.coin]}] {key}')
+        win2.addstr(0,0, f'[{STANCES[player.stance]}] [H{player.health}] [{player.inv[ID.coin]} Kashes] {key}')
         win2.refresh()
 
 
@@ -1093,9 +1107,9 @@ def editor(stdscr, _map):
     win = newwin(HEIGHT, width, begin_y, begin_x)
     curses.curs_set(True)
     loc = Loc(40, 8)
-    brush = blank
+    brush = None
     B = Board(Loc(0,0))
-    B.load_map(_map)
+    B.load_map(_map, 1)
     B.draw(win)
     last_cmd = None
 
@@ -1104,14 +1118,16 @@ def editor(stdscr, _map):
         if k=='q': return
         elif k in 'hjkl':
             m = dict(h=(0,-1), l=(0,1), j=(1,0), k=(-1,0))[k]
-            if last_cmd and last_cmd not in 'LtwmsSd0123456789':
-                if brush == blank:
-                    B.B[loc.y][loc.x] = [blank]
-                elif brush == rock:
-                    if B[loc] != rock:
-                        B.put(rock, loc)
+            # if last_cmd and last_cmd not in 'ocLtwmsSd0123456789':
+            if brush == blank:
+                B.B[loc.y][loc.x] = [blank]
+            elif brush == rock:
+                if B[loc] != rock:
+                    B.put(rock, loc)
             loc = loc.mod(*m)
         elif k == ' ':
+            brush = None
+        elif k == 'e':
             brush = ' '
         elif k == 'r':
             brush = rock
@@ -1130,7 +1146,11 @@ def editor(stdscr, _map):
         elif k in 't':
             B.put(Blocks.stool, loc)
         elif k in 'L':
-            B.put(Blocks.stool, loc)
+            B.put(Blocks.ladder, loc)
+        elif k in 'c':
+            B.put(Blocks.cupboard, loc)
+        elif k in 'o':
+            B.put(Blocks.locker, loc)
         elif k == 'W':
             with open(f'maps/{_map}.map', 'w') as fp:
                 for row in B.B:
