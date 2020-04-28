@@ -10,7 +10,7 @@ import curses
 import sys
 from copy import copy, deepcopy
 from time import sleep
-from random import random
+from random import random, choice
 from collections import defaultdict
 from textwrap import wrap
 
@@ -106,6 +106,7 @@ class ID:
     magic_ball = 16
     crate1 = 17
     door2 = 18
+    grill3 = 19
 
     guard1 = 100
     technician1 = 101
@@ -267,11 +268,13 @@ class Board:
         containers[0].inv[ID.key1] = 1
         crates[5].id = ID.crate1
 
+    def board_und1(self):
+        containers, crates = self.load_map('und1')
+
     def load_map(self, map_num):
         _map = open(f'maps/{map_num}.map').readlines()
         crates = []
         containers = []
-        bl = Blocks
         for y in range(16):
             for x in range(79):
                 char = _map[y][x]
@@ -944,7 +947,7 @@ def main(stdscr):
     b5.board_5()
     b6.board_6()
     und1.board_und1()
-    boards.append([b1, b2, b3, b4, b5, b6], [und1])
+    boards[:] = ([b1, b2, b3, b4, b5, b6], [und1])
 
     stdscr.clear()
     B.draw(win)
@@ -1003,6 +1006,8 @@ def main(stdscr):
             B = player.move_to_board( Loc(4,0), Loc(35, GROUND) )
         elif k == '6':
             B = player.move_to_board( Loc(5,0), Loc(35, GROUND) )
+        elif k == 'U':
+            B = player.move_to_board( Loc(0,1), Loc(35, 10) )
         elif k == 'm':
             if player.inv[ID.magic_ball]:
                 MagicBallEvent(B).go(player, last_dir)
@@ -1082,6 +1087,13 @@ def editor(stdscr, _map):
             brush = ' '
         elif k == 'r':
             brush = rock
+        elif k == 'W':
+            with open(f'maps/{_map}.map', 'w') as fp:
+                for row in B.B:
+                    for cell in row:
+                        fp.write(str(cell[-1]))
+                    fp.write('\n')
+            return
         B.draw(win)
         win.addstr(0,0,str(loc))
         win.move(loc.y, loc.x)
