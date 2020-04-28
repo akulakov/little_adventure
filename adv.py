@@ -263,18 +263,20 @@ class Board:
             Item(self, Blocks.stool, 'stool', Loc(x, loc1.y-1))
 
     def board_6(self):
-        containers, crates = self.load_map(6)
+        containers, crates, specials = self.load_map(6)
         containers[0].inv[ID.magic_ball] = 1
         containers[0].inv[ID.key1] = 1
         crates[5].id = ID.crate1
 
     def board_und1(self):
-        containers, crates = self.load_map('und1')
+        containers, crates, specials = self.load_map('und1')
+        Item(self, Blocks.grill, 'grill', specials[1], id=ID.grill3)
 
     def load_map(self, map_num):
         _map = open(f'maps/{map_num}.map').readlines()
         crates = []
         containers = []
+        specials = {}
         for y in range(16):
             for x in range(79):
                 char = _map[y][x]
@@ -304,7 +306,9 @@ class Board:
                         self.put(Blocks.steps_l, loc)
                     elif char==Blocks.steps_r:
                         self.put(Blocks.steps_r, loc)
-        return containers, crates
+                    elif char in '0123456789':
+                        specials[int(char)] = loc
+        return containers, crates, specials
 
     def make_steps(self, start, mod, to_height, char=Blocks.steps_r):
         n = start.y - to_height
@@ -588,7 +592,8 @@ class Being(Mixin1):
             if self.sneaky_stance and (grills & set(B.get_ids(self.loc))):
                 triggered_events.append(ClimbThroughGrillEvent1)
             if self.sneaky_stance and ID.grill3 in B.get_ids(self.loc):
-                ClimbThroughGrillEvent2(B).go(new)
+                ClimbThroughGrillEvent2.new = new
+                triggered_events.append(ClimbThroughGrillEvent2)
 
             Windows.win2.refresh()
             return True, True
@@ -776,11 +781,15 @@ class ClimbThroughGrillEvent1(Event):
 
 class ClimbThroughGrillEvent2(Event):
     once = False
-    def go(self, loc):
+    new = None
+    def go(self):
+        loc = self.new
         player = objects[ID.player]
         bi = self.B.loc.x
-        b_loc = Loc(0 if bi==5 else 5, 0 if bi==5 else 1)
-        Windows.win2.addstr(2,0, 'You climb through the grill into a space that opens into an open area outside the building')
+        x = 0 if bi==5 else 5
+        y = 1 if bi==5 else 0
+        b_loc = Loc(x, y)
+        Windows.win2.addstr(2,0, 'You climb through the grill into a strange underground area')
         return player.move_to_board(b_loc, Loc(62,10))
 
 class AlarmEvent1(Event):
@@ -1082,7 +1091,7 @@ def editor(stdscr, _map):
         if k=='q': return
         elif k in 'hjkl':
             m = dict(h=(0,-1), l=(0,1), j=(1,0), k=(-1,0))[k]
-            if last_cmd and last_cmd not in 'sSd':
+            if last_cmd and last_cmd not in 'sSd0123456789':
                 if brush == blank:
                     B.B[loc.y][loc.x] = [blank]
                 elif brush == rock:
@@ -1099,6 +1108,8 @@ def editor(stdscr, _map):
             B.put(Blocks.steps_l, loc)
         elif k == 'd':
             B.put(Blocks.door, loc)
+        elif k in '0123456789':
+            B.put(k, loc)
         elif k == 'W':
             with open(f'maps/{_map}.map', 'w') as fp:
                 for row in B.B:
