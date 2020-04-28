@@ -60,7 +60,7 @@ class Blocks:
     table2 = '⍡'
     stool = '⍑'
     underline = '▁'
-    cupboard = 'ꂤ'
+    cupboard = '⌸'
     sunflower = '🌻'
     magic_ball = '❂'
 
@@ -226,7 +226,7 @@ class Board:
         ShopKeeper(self, Loc(21,4), id=ID.shopkeeper1)
 
         for x in (23,26,27,28,29):
-            Item(self, Blocks.shelves, 'shelves', Loc(x,4), id=ID.shelves)
+            Item(self, Blocks.shelves, 'shelves', Loc(x,4), id=ID.shelves, type=Type.container)
         self[Loc(27,4)].inv[ID.jar_syrup] = 1
 
         for y in range(5, lev2):
@@ -254,6 +254,7 @@ class Board:
 
     def board_6(self):
         containers = self.load_map(6)
+        containers[0].inv[ID.magic_ball] = 1
 
     def load_map(self, map_num):
         _map = open(f'maps/{map_num}.map').readlines()
@@ -602,7 +603,7 @@ class Being(Mixin1):
             lo.put(loc)
 
     def action(self):
-        c = last( [x for x in self.B.get_all(self.loc) if x.id in (ID.shelves, ID.locker)] )
+        c = last( [x for x in self.B.get_all(self.loc) if x.type==Type.container] )
         if c:
             items = {k:v for k,v in c.inv.items() if v}
             lst = []
