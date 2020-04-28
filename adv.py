@@ -60,6 +60,8 @@ class Blocks:
     table2 = '⍡'
     stool = '⍑'
     underline = '▁'
+    cupboard = 'ꂤ'
+    sunflower = '🌻'
 
 class Stance:
     normal = 1
@@ -74,6 +76,7 @@ class Type:
     fountain = 4
     chair = 5
     door_top_block = 6
+    container = 7
 BLOCKING = [rock, Type.door, Blocks.block1, Blocks.steps_r, Blocks.steps_l, Type.platform_top, Type.door_top_block]
 
 class ID:
@@ -260,6 +263,10 @@ class Board:
                         Item(self, Blocks.door, 'door', loc, type=Type.door)
                     elif char=='g':
                         Item(self, Blocks.grn_heart, 'grn_heart', loc, id=ID.grn_heart)
+                    elif char=='c':
+                        Cupboard(self, loc)
+                    elif char=='s':
+                        Item(self, Blocks.sunflower, 'sunflower', loc)
                     elif char==Blocks.block1:
                         Item(self, Blocks.block1, 'block', loc, type=Type.door_top_block)
 
@@ -379,10 +386,18 @@ class Item(Mixin1):
 
 class Locker(Item):
     def __init__(self, B, loc):
-        super().__init__(B, Blocks.locker, 'locker', loc, id=ID.locker)
+        super().__init__(B, Blocks.locker, 'locker', loc, id=ID.locker, type=Type.container)
         if random()>.6:
             self.inv[ID.coin] += 1
         elif random()>.6:
+            self.inv[ID.grn_heart] += 1
+
+class Cupboard(Item):
+    def __init__(self, B, loc):
+        super().__init__(B, Blocks.cupboard, 'cupboard', loc, type=Type.container)
+        if random()>.5:
+            self.inv[ID.coin] += 1
+        elif random()>.7:
             self.inv[ID.grn_heart] += 1
 
 
