@@ -255,17 +255,8 @@ class Board:
         Item(self, Blocks.grn_heart, 'grn_heart', Loc(55,GROUND), id=ID.grn_heart)
 
     def board_5(self):
-        self.labels.append((0,20, "𝓐𝓷𝓽𝓱𝓸𝓷𝔂 𝓫𝓪𝓻"))
-        self.rectangle(Loc(20,1), Loc(60,10), exc=(Loc(20,7), Loc(30,10)))
-        for x in range(22,30,2):
-            Item(self, Blocks.stool, 'stool', Loc(x,9))
-        for y in range(10, GROUND+1):
-            Item(self, Blocks.ladder, 'ladder', Loc(30,y), type=Type.ladder)
-        loc1 = self.make_steps(Loc(35, 9), +1, 5)
-        for x in range(loc1.x+1, 60):
-            self.put(rock, Loc(x,loc1.y))
-        for x in range(loc1.x+2,loc1.x+12,2):
-            Item(self, Blocks.stool, 'stool', Loc(x, loc1.y-1))
+        self.labels.append((2,20, "𝓐𝓷𝓽𝓱𝓸𝓷𝔂 𝓫𝓪𝓻"))
+        containers, crates, specials = self.load_map(5)
 
     def board_6(self):
         self.labels.append((2,20, "𝒯𝓌𝒾𝓃𝓈𝑒𝓃 𝐻𝑜𝓂𝑒"))
@@ -314,6 +305,8 @@ class Board:
                         Item(self, Blocks.fireplace, 'fireplace', loc)
                     elif char==Blocks.water:
                         Item(self, Blocks.water, 'water', loc, type=Type.water)
+                    elif char==Blocks.stool:
+                        Item(self, Blocks.stool, 'bar stool', loc)
                     elif char==Blocks.steps_l:
                         self.put(Blocks.steps_l, loc)
                     elif char==Blocks.steps_r:
@@ -1105,12 +1098,13 @@ def editor(stdscr, _map):
     B.load_map(_map)
     B.draw(win)
     last_cmd = None
+
     while 1:
         k = win.getkey()
         if k=='q': return
         elif k in 'hjkl':
             m = dict(h=(0,-1), l=(0,1), j=(1,0), k=(-1,0))[k]
-            if last_cmd and last_cmd not in 'wmsSd0123456789':
+            if last_cmd and last_cmd not in 'LtwmsSd0123456789':
                 if brush == blank:
                     B.B[loc.y][loc.x] = [blank]
                 elif brush == rock:
@@ -1133,6 +1127,10 @@ def editor(stdscr, _map):
             B.put(k, loc)
         elif k in 'w':
             B.put(Blocks.water, loc)
+        elif k in 't':
+            B.put(Blocks.stool, loc)
+        elif k in 'L':
+            B.put(Blocks.stool, loc)
         elif k == 'W':
             with open(f'maps/{_map}.map', 'w') as fp:
                 for row in B.B:
