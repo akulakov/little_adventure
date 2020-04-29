@@ -123,6 +123,7 @@ class ID:
     key2 = 21
     door3 = 22
     key3 = 23
+    grill4 = 24
 
     guard1 = 100
     technician1 = 101
@@ -277,6 +278,7 @@ class Board:
         containers[0].inv[ID.key1] = 1
         crates[5].id = ID.crate1
         TriggerEventLocation(self, specials[1], evt=MaxState1)
+        Item(self, Blocks.grill, 'grill', specials[2], id=ID.grill4)
 
     def board_7(self):
         containers, crates, doors, specials = self.load_map(7)
@@ -284,6 +286,7 @@ class Board:
         clone1.inv[ID.key3] = [Item(self, Blocks.key, 'key', id=ID.key3, put=0), 1]
         Julien.id = ID.julien
         doors[0].type = Type.door3
+        Item(self, Blocks.grill, 'grill', specials[1], id=ID.grill4)
 
     def board_und1(self):
         containers, crates, doors, specials = self.load_map('und1')
@@ -670,11 +673,15 @@ class Being(Mixin1):
             if ID.door1 in B.get_ids(self.loc):
                 triggered_events.append(AlarmEvent1)
             grills = set((ID.grill1, ID.grill2))
-            if self.sneaky_stance and (grills & set(B.get_ids(self.loc))):
-                triggered_events.append(ClimbThroughGrillEvent1)
-            if self.sneaky_stance and ID.grill3 in B.get_ids(self.loc):
-                ClimbThroughGrillEvent2.new = new
-                triggered_events.append(ClimbThroughGrillEvent2)
+            if self.sneaky_stance:
+                if (grills & set(B.get_ids(self.loc))):
+                    triggered_events.append(ClimbThroughGrillEvent1)
+                if ID.grill3 in B.get_ids(self.loc):
+                    ClimbThroughGrillEvent2.new = new
+                    triggered_events.append(ClimbThroughGrillEvent2)
+                if ID.grill4 in B.get_ids(self.loc):
+                    ClimbThroughGrillEvent3.new = new
+                    triggered_events.append(ClimbThroughGrillEvent3)
 
             Windows.win2.refresh()
             return True, True
@@ -906,8 +913,18 @@ class ClimbThroughGrillEvent2(Event):
         x = 0 if bi==5 else 5
         y = 1 if bi==5 else 0
         b_loc = Loc(x, y)
-        Windows.win2.addstr(2,0, 'You climb through the grill into a strange underground area')
+        Windows.win2.addstr(2,0, 'You climb through the grill ' + ('into a strange underground area' if bi==5 else 'back into your home'))
         return player.move_to_board(b_loc, Loc(62,10))
+
+class ClimbThroughGrillEvent3(Event):
+    once = False
+    def go(self):
+        player = objects[ID.player]
+        bi = self.B.loc.x
+        x = 6 if bi==5 else 5
+        b_loc = Loc(x, 0)
+        Windows.win2.addstr(2,0, 'You climb through the grill into ' + ('the port area' if bi==5 else 'back to the shore near your home'))
+        return player.move_to_board(b_loc, Loc(72, GROUND))
 
 class AlarmEvent1(Event):
     def go(self):
@@ -1287,14 +1304,14 @@ def editor(stdscr, _map):
             B.put(Blocks.elephant, loc)
         elif k in 'p':
             B.put(Blocks.platform_top, loc)
+        elif k in 'g':
+            B.put(Blocks.grill, loc)
         elif k in 'E':
             win.addstr(2,2, 'Are you sure you want to clear the map? [Y/N]')
             y = win.getkey()
             if y=='Y':
                 for row in B.B:
                     for cell in row:
-                        # cell.clear()
-                        # cell.append(blank)
                         cell[:] = [blank]
                 B.B[-1][-1].append('_')
         elif k in 'f':
