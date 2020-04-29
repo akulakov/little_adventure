@@ -74,6 +74,7 @@ class Blocks:
     rabbit = '🐰'
     wine = '🍷'
     dock_boards = '⏔'
+    ticket_seller = '⌂'
     crates = (crate1, crate2, crate3, crate4)
 
 
@@ -124,6 +125,7 @@ class ID:
     door3 = 22
     key3 = 23
     grill4 = 24
+    ticket_seller1 = 25
 
     guard1 = 100
     technician1 = 101
@@ -225,7 +227,8 @@ class Board:
         MagicBall(self, Loc(50, GROUND))
 
         p = Player(self, Loc(start_x_loc, GROUND), id=ID.player)
-        objects[ID.player] = p
+
+        # objects[ID.player] = p
         return p
 
     def board_2(self):
@@ -257,7 +260,6 @@ class Board:
         B = self.B
         containers, crates, doors, specials = self.load_map(4)
         p = Item(self, Blocks.platform_top, 'platform', specials[Blocks.platform_top], id=ID.platform_top1, type=Type.platform_top)
-        objects[ID.platform_top1] = p
         ShopKeeper(self, specials[1], name='Abe', id=ID.shopkeeper1)
         containers[3].inv[ID.jar_syrup] = 1
 
@@ -267,9 +269,7 @@ class Board:
         containers[2].inv[ID.key1] = 1
         g = Grobo(self, specials[1], id=ID.max, name='Max')
         # g = Grobo(self, specials[1], id=ID.max, name='Max', state=1)
-        objects[ID.max] = g
         b = RoboBunny(self, specials[2], id=ID.anthony, name='Anthony')
-        objects[ID.anthony] = b
 
     def board_6(self):
         self.labels.append((2,20, "𝒯𝓌𝒾𝓃𝓈𝑒𝓃 𝐻𝑜𝓂𝑒"))
@@ -287,6 +287,7 @@ class Board:
         Julien.id = ID.julien
         doors[0].type = Type.door3
         Item(self, Blocks.grill, 'grill', specials[1], id=ID.grill4)
+        tick = Item(self, Blocks.ticket_seller, 'Ticket seller booth', specials[2], id=ID.ticket_seller1)
 
     def board_und1(self):
         containers, crates, doors, specials = self.load_map('und1')
@@ -498,6 +499,7 @@ class Item(Mixin1):
         self.loc = new
         self.B.put(self)
 
+
 class TriggerEventLocation(Item):
     """Location that triggers an event."""
     def __init__(self, B, loc, evt, id=None):
@@ -532,8 +534,9 @@ class Being(Mixin1):
     hostile = 0
     type = None
 
-    def __init__(self, B, loc=None, put=True, id=None, name=None, state=0):
-        self.B, self.id, self.loc, self.name, self.state = B, id, loc, name, state
+    def __init__(self, B, loc=None, put=True, id=None, name=None, state=0, hostile=False, health=5):
+        self.B, self.id, self.loc, self.name, self.state, self.hostile, self.health = \
+                B, id, loc, name, state, hostile, health
 
         self.inv = defaultdict(int)
         self.inv[ID.coin] = 4
@@ -565,16 +568,17 @@ class Being(Mixin1):
 
     def talk(self, being, dialog=None, yesno=False):
         loc = being.loc
-        if yesno:
+        if isinstance(dialog, str):
             dialog = [dialog]
         dialog = dialog or conversations[being.id]
+        x = min(loc.x, 60)
         for txt in dialog:
-            w = 78 - loc.x
+            w = 78 - x
             lines = (len(txt) // w) + 4
             txt = wrap(txt, w)
             txt = '\n'.join(txt)
             offset_y = lines if loc.y<8 else -lines
-            win = newwin(lines, w, loc.y+offset_y, loc.x)
+            win = newwin(lines, w, loc.y+offset_y, x)
             win.addstr(0,0, txt + (' [Y/N]' if yesno else ''))
             k = win.getkey()
             del win
@@ -688,6 +692,7 @@ class Being(Mixin1):
         return None, None
 
     def attack(self, obj):
+        print('in attack')
         if abs(self.loc.x - obj.loc.x) <= 1 and \
            abs(self.loc.y - obj.loc.y) <= 1:
                 self.hit(obj)
@@ -747,10 +752,12 @@ class Being(Mixin1):
         objs = B.get_all_obj(self.loc)
 
         r,l = self.loc.mod_r(), self.loc.mod_l()
-        locs = []
+        locs = [self.loc]
         if chk_oob(r): locs.append(r)
         if chk_oob(l): locs.append(l)
 
+        print("B.get_ids(locs)", B.get_ids(locs))
+        print("ID.ticket_seller1", ID.ticket_seller1)
         if c:
             items = {k:v for k,v in c.inv.items() if v}
             lst = []
@@ -769,6 +776,13 @@ class Being(Mixin1):
             BuyADrinkAnthony(B).go()
         elif ID.max in B.get_ids(locs):
             MaxQuest().go(self)
+        elif ID.ticket_seller1 in B.get_ids(locs):
+            seller = objects[ID.ticket_seller1]
+            y = self.talk(seller, 'Would you like to buy some tickets?', yesno=1)
+            if y:
+                self.talk(seller, 'Here is your ticket... Wait a second... Alarm! The prisoner escaped!!')
+                c = Clone(B, self.loc.mod(0,1), hostile=1, health=20)
+                B.guards.append(c)
         else:
             loc = self.loc.mod(1,0)
             x = B[loc] # TODO won't work if something is in the platform tile
@@ -1058,6 +1072,9 @@ class Technician(Being):
 class RoboBunny(Being):
     char = Blocks.rabbit
 
+class Clone(Being):
+    char = Blocks.elephant
+
 class ShopKeeper(Being):
     char = '🙇'
 
@@ -1090,7 +1107,9 @@ class Saves:
         bl = s['cur_brd']
         B = boards[bl.y][bl.x]
         player = B[loc]
+        # pdb(B, loc)
         player.B = B
+        objects[ID.player] = player
         return player, B
 
 def dist(a,b):
@@ -1206,6 +1225,7 @@ def main(stdscr):
 
         B.guards = [g for g in B.guards if g.health>0]
         B.soldiers = [g for g in B.soldiers if g.health>0]
+        print("B.guards", B.guards)
         for g in B.guards:
             if g.hostile:
                 g.attack(player)
@@ -1217,7 +1237,6 @@ def main(stdscr):
         if player.health <= 0:
             win2.addstr(1, 0, f'Hmm.. it looks like you lost the game!')
             player, B = Saves().load('start')
-            objects[ID.player] = player
 
         for evt in triggered_events:
             debug(evt)
