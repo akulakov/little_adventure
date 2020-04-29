@@ -76,6 +76,7 @@ class Blocks:
     dock_boards = '⏔'
     ticket_seller = '⌂'
     ferry = '🚤'
+    ferry_ticket = 't'
     crates = (crate1, crate2, crate3, crate4)
 
 
@@ -128,6 +129,7 @@ class ID:
     grill4 = 24
     ticket_seller1 = 25
     ferry = 26
+    ferry_ticket = 27
 
     guard1 = 100
     technician1 = 101
@@ -157,7 +159,7 @@ conversations = {
     ID.shopkeeper1: ['Twinsen!? I thought you were arrested?', 'They let me out early for good behaviour!', 'But.. nobody gets out of Citadel alive! I.. I.. have to call the guards.'],
     ID.max1: ['Have you seen a young girl being led by two clones?', 'I think I have seen her and I will tell you more if you buy me a drink.'],
     ID.max2: ["I've seen them near the port, it looked like they were getting away from the island, which is strange, because usually prisoners stay in the citadel", 'Thank you!'],
-    ID.julien: ['Have you seen a young girl being led by two Groboclones?', 'Yes, they were here earlier today, they got on a speedboat and were off. Destination unknown.']
+    ID.julien: ['Have you seen a young girl being led by two Groboclones?', 'Yes, they were here earlier today, they got on a speedboat and were off. Destination unknown.',]
 }
 
 def mkcell():
@@ -292,6 +294,11 @@ class Board:
         doors[0].type = Type.door3
         Item(self, Blocks.grill, 'grill', specials[1], id=ID.grill4)
         tick = Item(self, Blocks.ticket_seller, 'Ticket seller booth', specials[2], id=ID.ticket_seller1)
+        # invisible, with ferry id to be able to take the ferry near this tile
+        Item(self, '', '', specials[3], id=ID.ferry)
+
+    def board_8(self):
+        containers, crates, doors, specials = self.load_map(8)
 
     def board_und1(self):
         containers, crates, doors, specials = self.load_map('und1')
@@ -549,7 +556,7 @@ class Being(Mixin1):
                 B, id, loc, name, state, hostile, health
 
         self.inv = defaultdict(int)
-        self.inv[ID.coin] = 4
+        self.inv[ID.coin] = 14
         self.inv[ID.key1] = 2
         if id:
             objects[id] = self
@@ -795,6 +802,13 @@ class Being(Mixin1):
                 B.guards.append(c)
         elif ID.julien in B.get_ids(locs):
             self.talk(objects[ID.julien])
+            y = self.talk(objects[ID.julien], 'You may be able to find out more on Principal Island. I wanted to use this ferry ticket myself but I can guess I can sell it to you for some 10 kashes and buy some candy..', yesno=1)
+            if y:
+                if self.inv[ID.coin]>=10:
+                    self.inv[ID.ferry_ticket] = 1
+                    self.inv[ID.coin] -= 10
+        elif ID.ferry in B.get_ids(locs) and self.inv[ID.ferry_ticket]:
+            triggered_events.append(TravelToPrincipalIslandEvent)
         else:
             loc = self.loc.mod(1,0)
             x = B[loc] # TODO won't work if something is in the platform tile
@@ -840,6 +854,13 @@ class Event:
     once = 1
     def __init__(self, B):
         self.B = B
+
+class TravelToPrincipalIslandEvent(Event):
+    def go(self):
+        player = objects[ID.player]
+        Windows.win2.addstr(2,0, 'You have taken the ferry to Principal island.')
+        player.inv[ID.ferry_ticket] = 0
+        return player.move_to_board( Loc(7,0), Loc(7, GROUND) )
 
 class GuardAttackEvent1(Event):
     def go(self):
@@ -1140,6 +1161,7 @@ def main(stdscr):
     b5 = Board(Loc(4,0))
     b6 = Board(Loc(5,0), init_rocks=0)
     b7 = Board(Loc(6,0), init_rocks=0)
+    b8 = Board(Loc(7,0), init_rocks=0)
     und1 = Board(Loc(0,1), init_rocks=0)
 
     player = b1.board_1()
@@ -1149,8 +1171,9 @@ def main(stdscr):
     b5.board_5()
     b6.board_6()
     b7.board_7()
+    b8.board_8()
     und1.board_und1()
-    boards[:] = ([b1, b2, b3, b4, b5, b6, b7], [und1])
+    boards[:] = ([b1, b2, b3, b4, b5, b6, b7, b8], [und1])
 
     stdscr.clear()
     B.draw(win)
@@ -1217,6 +1240,8 @@ def main(stdscr):
             B = player.move_to_board( Loc(5,0), Loc(35, GROUND) )
         elif k == '7':
             B = player.move_to_board( Loc(6,0), Loc(72, GROUND) )
+        elif k == '8':
+            B = player.move_to_board( Loc(7,0), Loc(7, GROUND) )
         elif k == 'U':
             B = player.move_to_board( Loc(0,1), Loc(35, 10) )
         elif k == 'E':
