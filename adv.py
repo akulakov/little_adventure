@@ -488,13 +488,13 @@ class Being(Mixin1):
     is_being = 1
     is_player = 0
     hostile = 0
-    kash = 0
     type = None
 
     def __init__(self, B, loc=None, put=True, id=None, name=None):
         self.B, self.id, self.loc, self.name = B, id, loc, name
 
         self.inv = defaultdict(int)
+        self.inv[ID.coin] = 4
         if id:
             objects[id] = self
         if put:
@@ -504,7 +504,6 @@ class Being(Mixin1):
         return self.char
 
     def move_to_board(self, b_loc, loc):
-        print('in move_to_board')
         if self in self.B.get_all(self.loc):
             self.B.remove(self)
         B = boards[b_loc.y][b_loc.x]
@@ -521,7 +520,7 @@ class Being(Mixin1):
     def sneaky_stance(self):
         return self.stance==Stance.sneaky
 
-    def talk(self, being, dialog=None):
+    def talk(self, being, dialog=None, yesno=False):
         loc = being.loc
         dialog = dialog or conversations[being.id]
         for txt in dialog:
@@ -531,9 +530,12 @@ class Being(Mixin1):
             txt = '\n'.join(txt)
             offset_y = lines if loc.y<8 else -lines
             win = newwin(lines, w, loc.y+offset_y, loc.x)
-            win.addstr(0,0, txt)
-            win.getkey()
+            win.addstr(0,0, txt + ' [Y/N]' if yesno else '')
+            k = win.getkey()
             del win
+            if yesno:
+                # TODO in some one-time dialogs, may need to detect 'no' explicitly
+                return k in 'Yy'
 
     def _move(self, dir, fly=False):
         m = dict(h=(0,-1), l=(0,1), j=(1,0), k=(-1,0))[dir]
@@ -683,7 +685,6 @@ class Being(Mixin1):
         locs = []
         if chk_oob(r): locs.append(r)
         if chk_oob(l): locs.append(l)
-
 
         if c:
             items = {k:v for k,v in c.inv.items() if v}
@@ -923,12 +924,14 @@ class BuyADrinkAnthony(Event):
     def go(self):
         B = self.B
         pl = objects[ID.player]
-        pl.talk(objects[ID.anthony], ['Would you like to buy a drink for two kashes? [Y/N]'])
-        k = Windows.win.getkey()
-        if k in 'yY' and pl.inv[ID.coin]>=2:
-            pl.inv[ID.coin] -= 2
-            pl.inv[ID.wine] += 1
-            Windows.win2.addstr(2,0, 'You buy a glass of wine.')
+        yes = pl.talk(objects[ID.anthony], ['Would you like to buy a drink for two kashes?'], yesno=1)
+        if yes:
+            if pl.inv[ID.coin]>=2:
+                pl.inv[ID.coin] -= 2
+                pl.inv[ID.wine] += 1
+                Windows.win2.addstr(2,0, 'You bought a glass of wine.')
+            else:
+                Windows.win2.addstr(2,0, "OH NO! You don't have enough kashes.. ..")
 
 def rev_dir(dir):
     return dict(h='l',l='h',j='k',k='j')[dir]
