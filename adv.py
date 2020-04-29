@@ -73,6 +73,7 @@ class Blocks:
     elephant = '🐘'     # Grobo
     rabbit = '🐰'
     wine = '🍷'
+    dock_boards = '⏔'
     crates = (crate1, crate2, crate3, crate4)
 
 
@@ -95,8 +96,9 @@ class Type:
     door2 = 10
     water = 11
     event_trigger = 12
+    blocking = 13
 
-BLOCKING = [rock, Type.door1, Type.door2, Blocks.block1, Blocks.steps_r, Blocks.steps_l, Type.platform_top, Type.door_top_block]
+BLOCKING = [rock, Type.door1, Type.door2, Blocks.block1, Blocks.steps_r, Blocks.steps_l, Type.platform_top, Type.door_top_block, Type.blocking]
 
 class ID:
     platform1 = 1
@@ -286,6 +288,9 @@ class Board:
         crates[5].id = ID.crate1
         TriggerEventLocation(self, specials[1], evt=MaxState1)
 
+    def board_7(self):
+        containers, crates, specials = self.load_map(7)
+
     def board_und1(self):
         containers, crates, specials = self.load_map('und1')
         Item(self, Blocks.grill, 'grill', specials[1], id=ID.grill3)
@@ -331,6 +336,8 @@ class Board:
                         Item(self, Blocks.water, 'water', loc, type=Type.water)
                     elif char==Blocks.stool:
                         Item(self, Blocks.stool, 'bar stool', loc)
+                    elif char==Blocks.dock_boards:
+                        Item(self, Blocks.dock_boards, 'dock boards', loc, type=Type.blocking)
                     elif char==Blocks.steps_l:
                         self.put(Blocks.steps_l, loc)
                     elif char==Blocks.steps_r:
@@ -1056,6 +1063,7 @@ def main(stdscr):
     b4 = Board(Loc(3,0))
     b5 = Board(Loc(4,0))
     b6 = Board(Loc(5,0), init_rocks=0)
+    b7 = Board(Loc(6,0), init_rocks=0)
     und1 = Board(Loc(0,1), init_rocks=0)
 
     player = b1.board_1()
@@ -1064,8 +1072,9 @@ def main(stdscr):
     b4.board_4()
     b5.board_5()
     b6.board_6()
+    b7.board_7()
     und1.board_und1()
-    boards[:] = ([b1, b2, b3, b4, b5, b6], [und1])
+    boards[:] = ([b1, b2, b3, b4, b5, b6, b7], [und1])
 
     stdscr.clear()
     B.draw(win)
@@ -1124,6 +1133,8 @@ def main(stdscr):
             B = player.move_to_board( Loc(4,0), Loc(35, GROUND) )
         elif k == '6':
             B = player.move_to_board( Loc(5,0), Loc(35, GROUND) )
+        elif k == '7':
+            B = player.move_to_board( Loc(6,0), Loc(35, GROUND) )
         elif k == 'U':
             B = player.move_to_board( Loc(0,1), Loc(35, 10) )
         elif k == 'm':
@@ -1229,6 +1240,8 @@ def editor(stdscr, _map):
             B.put(Blocks.cupboard, loc)
         elif k in 'o':
             B.put(Blocks.locker, loc)
+        elif k in 'B':
+            B.put(Blocks.dock_boards, loc)
         elif k == 'W':
             with open(f'maps/{_map}.map', 'w') as fp:
                 for row in B.B:
