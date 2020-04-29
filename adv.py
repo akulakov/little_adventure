@@ -708,7 +708,6 @@ class Being(Mixin1):
 
         r,l = self.loc.mod_r(), self.loc.mod_l()
         locs = []
-        max_ = objects[ID.max]
         if chk_oob(r): locs.append(r)
         if chk_oob(l): locs.append(l)
 
@@ -728,17 +727,8 @@ class Being(Mixin1):
 
         elif ID.anthony in B.get_ids(locs):
             BuyADrinkAnthony(B).go()
-        elif ID.max in B.get_ids(locs) and max_.state==1:
-            self.talk(max_, conversations[ID.max1])
-            max_.state=2
-        elif ID.max in B.get_ids(locs) and max_.state==2 and self.inv[ID.wine]:
-            y = self.talk(max_, 'Give wine to Max?', yesno=1)
-            if y:
-                self.inv[ID.wine] -= 1
-                max_.state = 3
-        elif ID.max in B.get_ids(locs) and max_.state==3:
-            self.talk(max_, conversations[ID.max2])
-            max_.state=4
+        elif ID.max in B.get_ids(locs):
+            MaxQuest().go(self)
         else:
             loc = self.loc.mod(1,0)
             x = B[loc] # TODO won't work if something is in the platform tile
@@ -748,6 +738,24 @@ class Being(Mixin1):
     def get_top_item(self):
         x = self.B[self.loc]
         return None if x==blank else x
+
+class Quest:
+    pass
+
+class MaxQuest(Quest):
+    def go(self, player):
+        max_ = objects[ID.max]
+        if max_.state==1:
+            player.talk(max_, conversations[ID.max1])
+            max_.state=2
+        elif max_.state==2 and player.inv[ID.wine]:
+            y = player.talk(max_, 'Give wine to Max?', yesno=1)
+            if y:
+                player.inv[ID.wine] -= 1
+                max_.state = 3
+        elif max_.state==3:
+            player.talk(max_, conversations[ID.max2])
+            max_.state=4
 
 def first(x):
     return x[0] if x else None
