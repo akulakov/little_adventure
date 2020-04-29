@@ -70,7 +70,7 @@ class Blocks:
     smoke_pipe = '⧚'
     fireplace = '⩟'
     water = '⏖'
-    elephant = '🐘'
+    elephant = '🐘'     # Grobo
     rabbit = '🐰'
     wine = '🍷'
     crates = (crate1, crate2, crate3, crate4)
@@ -94,6 +94,7 @@ class Type:
     crate = 9
     door2 = 10
     water = 11
+    event_trigger = 12
 
 BLOCKING = [rock, Type.door1, Type.door2, Blocks.block1, Blocks.steps_r, Blocks.steps_l, Type.platform_top, Type.door_top_block]
 
@@ -127,6 +128,10 @@ class ID:
     max = 106
     anthony = 107
 
+    max1 = 200
+    max2 = 201
+    # max_state_1 = 200
+
 items_by_id = {v:k for k,v in ID.__dict__.items()}
 descr_by_id = copy(items_by_id)
 descr_by_id.update({14: 'a jar of syrup', 10: 'a green heart'})
@@ -134,6 +139,8 @@ descr_by_id.update({14: 'a jar of syrup', 10: 'a green heart'})
 conversations = {
     ID.robobunny1: ['I like to rummage through the rubbish pile.. this area is not closely watched! I hide in the garbage truck and come here when I can. You just have to be very DISCREET!'],
     ID.shopkeeper1: ['Twinsen!? I thought you were arrested?', 'They let me out early for good behaviour!', 'But.. nobody gets out of Citadel alive! I.. I.. have to call the guards.'],
+    ID.max1: ['Have you seen a young girl being led by two clones?', 'I think I have seen her and I will tell you more if you buy me a drink.'],
+    ID.max2: ["I've seen them near the port, it looked like they were getting away from the island, which is strange, because usually prisoners stay in the citadel", 'Thank you!'],
 }
 
 def mkcell():
@@ -265,9 +272,11 @@ class Board:
         self.labels.append((2,20, "𝓐𝓷𝓽𝓱𝓸𝓷𝔂 𝓫𝓪𝓻"))
         containers, crates, specials = self.load_map(5)
         containers[2].inv[ID.key1] = 1
-        Eleph(self, specials[1], id=ID.max, name='Max')
-        a = RoboBunny(self, specials[2], id=ID.anthony, name='Anthony')
-        objects[ID.anthony] = a
+        # g = Grobo(self, specials[1], id=ID.max, name='Max')
+        g = Grobo(self, specials[1], id=ID.max, name='Max', state=1)
+        objects[ID.max] = g
+        b = RoboBunny(self, specials[2], id=ID.anthony, name='Anthony')
+        objects[ID.anthony] = b
 
     def board_6(self):
         self.labels.append((2,20, "𝒯𝓌𝒾𝓃𝓈𝑒𝓃 𝐻𝑜𝓂𝑒"))
@@ -275,6 +284,7 @@ class Board:
         containers[0].inv[ID.magic_ball] = 1
         containers[0].inv[ID.key1] = 1
         crates[5].id = ID.crate1
+        TriggerEventLocation(self, specials[1], evt=MaxState1)
 
     def board_und1(self):
         containers, crates, specials = self.load_map('und1')
@@ -369,6 +379,9 @@ class Board:
     def get_all_obj(self, loc):
         return [n for n in self.B[loc.y][loc.x] if not isinstance(n, str)]
 
+    def get_top_obj(self, loc):
+        return last(self.get_all_obj(loc))
+
     def get_ids(self, loc):
         if isinstance(loc, Loc):
             loc = [loc]
@@ -462,6 +475,12 @@ class Item(Mixin1):
         self.loc = new
         self.B.put(self)
 
+class TriggerEventLocation(Item):
+    """Location that triggers an event."""
+    def __init__(self, B, loc, evt, id=None):
+        super().__init__(B, '', '', loc, id=id, type=Type.event_trigger)
+        self.evt = evt
+
 class Locker(Item):
     def __init__(self, B, loc):
         super().__init__(B, Blocks.locker, 'locker', loc, id=ID.locker, type=Type.container)
@@ -490,11 +509,12 @@ class Being(Mixin1):
     hostile = 0
     type = None
 
-    def __init__(self, B, loc=None, put=True, id=None, name=None):
-        self.B, self.id, self.loc, self.name = B, id, loc, name
+    def __init__(self, B, loc=None, put=True, id=None, name=None, state=0):
+        self.B, self.id, self.loc, self.name, self.state = B, id, loc, name, state
 
         self.inv = defaultdict(int)
         self.inv[ID.coin] = 4
+        self.inv[ID.key1] = 2
         if id:
             objects[id] = self
         if put:
@@ -522,6 +542,8 @@ class Being(Mixin1):
 
     def talk(self, being, dialog=None, yesno=False):
         loc = being.loc
+        if yesno:
+            dialog = [dialog]
         dialog = dialog or conversations[being.id]
         for txt in dialog:
             w = 78 - loc.x
@@ -530,7 +552,7 @@ class Being(Mixin1):
             txt = '\n'.join(txt)
             offset_y = lines if loc.y<8 else -lines
             win = newwin(lines, w, loc.y+offset_y, loc.x)
-            win.addstr(0,0, txt + ' [Y/N]' if yesno else '')
+            win.addstr(0,0, txt + (' [Y/N]' if yesno else ''))
             k = win.getkey()
             del win
             if yesno:
@@ -603,7 +625,10 @@ class Being(Mixin1):
             self.loc = new
 
             if self.is_player:
+                top_obj = B.get_top_obj(new)
                 items = B.get_all(new)
+                if top_obj and top_obj.type == Type.event_trigger:
+                    triggered_events.append(top_obj.evt)
                 for x in reversed(items):
                     if x.id == ID.grn_heart:
                         self.health = min(15, self.health+1)
@@ -683,6 +708,7 @@ class Being(Mixin1):
 
         r,l = self.loc.mod_r(), self.loc.mod_l()
         locs = []
+        max_ = objects[ID.max]
         if chk_oob(r): locs.append(r)
         if chk_oob(l): locs.append(l)
 
@@ -702,6 +728,17 @@ class Being(Mixin1):
 
         elif ID.anthony in B.get_ids(locs):
             BuyADrinkAnthony(B).go()
+        elif ID.max in B.get_ids(locs) and max_.state==1:
+            self.talk(max_, conversations[ID.max1])
+            max_.state=2
+        elif ID.max in B.get_ids(locs) and max_.state==2 and self.inv[ID.wine]:
+            y = self.talk(max_, 'Give wine to Max?', yesno=1)
+            if y:
+                self.inv[ID.wine] -= 1
+                max_.state = 3
+        elif ID.max in B.get_ids(locs) and max_.state==3:
+            self.talk(max_, conversations[ID.max2])
+            max_.state=4
         else:
             loc = self.loc.mod(1,0)
             x = B[loc] # TODO won't work if something is in the platform tile
@@ -822,9 +859,7 @@ class ClimbThroughGrillEvent1(Event):
 
 class ClimbThroughGrillEvent2(Event):
     once = False
-    new = None
     def go(self):
-        loc = self.new
         player = objects[ID.player]
         bi = self.B.loc.x
         x = 0 if bi==5 else 5
@@ -922,9 +957,8 @@ class MagicBallEvent(Event):
 
 class BuyADrinkAnthony(Event):
     def go(self):
-        B = self.B
         pl = objects[ID.player]
-        yes = pl.talk(objects[ID.anthony], ['Would you like to buy a drink for two kashes?'], yesno=1)
+        yes = pl.talk(objects[ID.anthony], 'Would you like to buy a drink for two kashes?', yesno=1)
         if yes:
             if pl.inv[ID.coin]>=2:
                 pl.inv[ID.coin] -= 2
@@ -932,6 +966,10 @@ class BuyADrinkAnthony(Event):
                 Windows.win2.addstr(2,0, 'You bought a glass of wine.')
             else:
                 Windows.win2.addstr(2,0, "OH NO! You don't have enough kashes.. ..")
+
+class MaxState1(Event):
+    def go(self):
+        objects[ID.max].state = 1
 
 def rev_dir(dir):
     return dict(h='l',l='h',j='k',k='j')[dir]
@@ -963,12 +1001,14 @@ class RoboBunny(Being):
 class ShopKeeper(Being):
     char = '🙇'
 
-class Eleph(Being):
+class Grobo(Being):
     char = Blocks.elephant
 
 class NPCs:
     pass
 class OtherBeings:
+    pass
+class Windows:
     pass
 
 class Saves:
@@ -992,9 +1032,6 @@ class Saves:
         player = B[loc]
         player.B = B
         return player, B
-
-class Windows:
-    pass
 
 def dist(a,b):
     return max(abs(a.loc.x - b.loc.x),
@@ -1145,7 +1182,6 @@ def editor(stdscr, _map):
     B = Board(Loc(0,0))
     B.load_map(_map, 1)
     B.draw(win)
-    last_cmd = None
 
     while 1:
         k = win.getkey()
@@ -1192,7 +1228,6 @@ def editor(stdscr, _map):
                         fp.write(str(cell[-1]))
                     fp.write('\n')
             return
-        last_cmd = k
         B.draw(win)
         win.addstr(0,0,str(loc))
         win.move(loc.y, loc.x)
