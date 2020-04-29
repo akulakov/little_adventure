@@ -1125,9 +1125,17 @@ def main(stdscr):
         elif k=='n':
             player.stance = Stance.normal
             win2.addstr(1, 0, 'stance: normal')
-        elif k in 'hjkl':
+
+        elif k in 'hjklHL':
             last_dir = k
-            rv = player.move(k)
+            if k in 'HL':
+                k = k.lower()
+                for _ in range(5):
+                    rv = player.move(k)
+                    if rv[0] == LOAD_BOARD:
+                        break
+            else:
+                rv = player.move(k)
             if rv[0] == LOAD_BOARD:
                 loc = rv[1]
                 x = 0 if k=='l' else 78     # TODO support up/down
@@ -1165,6 +1173,9 @@ def main(stdscr):
         elif k == 'm':
             if player.inv[ID.magic_ball]:
                 MagicBallEvent(B).go(player, last_dir)
+        elif k == 'i':
+            pass
+
 
         if k != '.':
             wait_count = 0
