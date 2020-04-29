@@ -139,7 +139,13 @@ class ID:
 
 items_by_id = {v:k for k,v in ID.__dict__.items()}
 descr_by_id = copy(items_by_id)
-descr_by_id.update({14: 'a jar of syrup', 10: 'a green heart'})
+descr_by_id.update(
+    {14: 'a jar of syrup',
+     10: 'a green heart',
+     11: 'a simple key',
+     9 : 'kashes',
+    }
+)
 
 conversations = {
     ID.robobunny1: ['I like to rummage through the rubbish pile.. this area is not closely watched! I hide in the garbage truck and come here when I can. You just have to be very DISCREET!'],
@@ -246,32 +252,13 @@ class Board:
         self.soldiers.append(s)
 
     def board_4(self):
-        B = self.B
-        lev2 = 10
-        loc1 = self.make_steps(Loc(2,GROUND), +1, 9)
-        loc2 = self.make_steps(Loc(77,GROUND), -1, 9, Blocks.steps_l)
-
-        row = B[lev2]
-        for cell in row[loc1.x+1:loc2.x]:
-            cell.append(rock)
-
         self.labels.append((0,20, "𝓪𝓫𝓮 𝓸𝓵𝓭 𝓼𝓱𝓸𝓹𝓹𝓮"))    # Abe old shoppe
-        self.rectangle(Loc(20,1), Loc(30,5), exc=(Loc(20,3), Loc(25,5)) )
-        ShopKeeper(self, Loc(21,4), id=ID.shopkeeper1)
-
-        for x in (23,26,27,28,29):
-            Item(self, Blocks.shelves, 'shelves', Loc(x,4), id=ID.shelves, type=Type.container)
-        self[Loc(27,4)].inv[ID.jar_syrup] = 1
-
-        for y in range(5, lev2):
-            Item(self, Blocks.ladder, 'ladder', Loc(25,y), type=Type.ladder)
-
-        loc = Loc(40,GROUND-4)
-        self.remove(rock, loc)
-        Item(self, Blocks.platform_top, 'platform', loc, id=ID.platform_top1, type=Type.platform_top)
-        Item(self, Blocks.coin, 'coin', Loc(45,GROUND), id=ID.coin)
-        Item(self, Blocks.grn_heart, 'grn_heart', Loc(50,GROUND), id=ID.grn_heart)
-        Item(self, Blocks.grn_heart, 'grn_heart', Loc(55,GROUND), id=ID.grn_heart)
+        B = self.B
+        containers, crates, doors, specials = self.load_map(4)
+        p = Item(self, Blocks.platform_top, 'platform', specials[Blocks.platform_top], id=ID.platform_top1, type=Type.platform_top)
+        objects[ID.platform_top1] = p
+        ShopKeeper(self, specials[1], name='Abe', id=ID.shopkeeper1)
+        containers[3].inv[ID.jar_syrup] = 1
 
     def board_5(self):
         self.labels.append((2,20, "𝓐𝓷𝓽𝓱𝓸𝓷𝔂 𝓫𝓪𝓻"))
@@ -349,6 +336,13 @@ class Board:
                         Item(self, Blocks.stool, 'bar stool', loc)
                     elif char==Blocks.dock_boards:
                         Item(self, Blocks.dock_boards, 'dock boards', loc, type=Type.blocking)
+                    elif char==Blocks.shelves:
+                        s = Item(self, Blocks.shelves, 'shelves', loc, type=Type.container)
+                        containers.append(s)
+                    elif char==Blocks.platform_top:
+                        specials[Blocks.platform_top] = loc
+                        if for_editor:
+                            self.put(Blocks.platform_top, loc)
                     elif char==Blocks.steps_l:
                         self.put(Blocks.steps_l, loc)
                     elif char==Blocks.steps_r:
@@ -445,6 +439,13 @@ class Board:
     def avail(self, loc):
         return not self.is_blocked(loc)
 
+    def display(self, txt):
+        w = max(len(l) for l in txt) + 1
+        win = newwin(len(txt), w, 5, 5)
+        for y, ln in enumerate(txt):
+            win.addstr(y,0, ln)
+        k = win.getkey()
+        del win
 
 def chk_oob(loc, y=0, x=0):
     return 0 <= loc.y+y <= HEIGHT-1 and 0 <= loc.x+x <= 78
@@ -625,7 +626,7 @@ class Being(Mixin1):
                     triggered_events.append(GuardAttackEvent1)
 
         if new:
-            if B.loc.x==3 and new==Loc(25,5):
+            if B.loc.x==3 and new==Loc(23,8):   # TODO use trigger event location
                 triggered_events.append(ShopKeeperEvent1)
 
             objs = [o.type for o in B.get_all_obj(new)]
@@ -649,7 +650,7 @@ class Being(Mixin1):
 
             if self.is_player:
                 top_obj = B.get_top_obj(new)
-                items = B.get_all(new)
+                items = B.get_all_obj(new)
                 if top_obj and top_obj.type == Type.event_trigger:
                     triggered_events.append(top_obj.evt)
                 for x in reversed(items):
@@ -659,7 +660,7 @@ class Being(Mixin1):
                     elif x.id in pick_up:
                         self.inv[x.id] += 1
                         B.remove(x)
-                names = [i.name for i in B.get_all(new)]
+                names = [i.name for i in B.get_all_obj(new)]
                 plural = len(names)>1
                 names = ', '.join(names)
                 if names:
@@ -948,11 +949,13 @@ class PlatformEvent2(Event):
         B = self.B
         p = objects[ID.platform_top1]
         pl = objects[ID.player]
-        dir = 'j' if pl.loc.y == GROUND-5 else 'k'
+        dir = 'j' if pl.loc.y == GROUND-4 else 'k'
         for _ in range(45):
+            ploc = p.loc
             p.move(dir)
+            print("at ploc", str(B.get_all(ploc)))
             pl.move(dir, fly=1)
-            if pl.loc.y in (GROUND, GROUND-5):
+            if pl.loc.y in (GROUND, GROUND-4):
                 break
             B.draw(Windows.win)
             sleep(0.2)
@@ -1156,8 +1159,6 @@ def main(stdscr):
         elif k == 'L':
             player, B = Saves().load('start')
             objects[ID.player] = player
-        elif k == 'i':
-            pass
         elif k == ' ':
             player.action()
         elif k == '4':
@@ -1170,12 +1171,17 @@ def main(stdscr):
             B = player.move_to_board( Loc(6,0), Loc(72, GROUND) )
         elif k == 'U':
             B = player.move_to_board( Loc(0,1), Loc(35, 10) )
+        elif k == 'E':
+            B.display(str(B.get_all(player.loc)))
         elif k == 'm':
             if player.inv[ID.magic_ball]:
                 MagicBallEvent(B).go(player, last_dir)
         elif k == 'i':
-            pass
-
+            txt = []
+            for k, n in player.inv.items():
+                item = descr_by_id[k]
+                txt.append(f'{item:20}{n}')
+            B.display(txt)
 
         if k != '.':
             wait_count = 0
@@ -1279,6 +1285,20 @@ def editor(stdscr, _map):
             B.put(Blocks.dock_boards, loc)
         elif k in 'G':
             B.put(Blocks.elephant, loc)
+        elif k in 'p':
+            B.put(Blocks.platform_top, loc)
+        elif k in 'E':
+            win.addstr(2,2, 'Are you sure you want to clear the map? [Y/N]')
+            y = win.getkey()
+            if y=='Y':
+                for row in B.B:
+                    for cell in row:
+                        # cell.clear()
+                        # cell.append(blank)
+                        cell[:] = [blank]
+                B.B[-1][-1].append('_')
+        elif k in 'f':
+            B.put(Blocks.shelves, loc)
         elif k == 'W':
             with open(f'maps/{_map}.map', 'w') as fp:
                 for row in B.B:
