@@ -84,7 +84,6 @@ class Stance:
 STANCES = {v:k for k,v in Stance.__dict__.items()}
 
 class Type:
-    # door = 1
     platform_top = 2
     ladder = 3
     fountain = 4
@@ -97,8 +96,9 @@ class Type:
     water = 11
     event_trigger = 12
     blocking = 13
+    door3 = 14
 
-BLOCKING = [rock, Type.door1, Type.door2, Blocks.block1, Blocks.steps_r, Blocks.steps_l, Type.platform_top, Type.door_top_block, Type.blocking]
+BLOCKING = [rock, Type.door1, Type.door2, Type.door3, Blocks.block1, Blocks.steps_r, Blocks.steps_l, Type.platform_top, Type.door_top_block, Type.blocking]
 
 class ID:
     platform1 = 1
@@ -120,6 +120,9 @@ class ID:
     door2 = 18
     grill3 = 19
     wine = 20
+    key2 = 21
+    door3 = 22
+    key3 = 23
 
     guard1 = 100
     technician1 = 101
@@ -129,10 +132,10 @@ class ID:
     shopkeeper1 = 105
     max = 106
     anthony = 107
+    julien = 108
 
     max1 = 200
     max2 = 201
-    # max_state_1 = 200
 
 items_by_id = {v:k for k,v in ID.__dict__.items()}
 descr_by_id = copy(items_by_id)
@@ -272,34 +275,40 @@ class Board:
 
     def board_5(self):
         self.labels.append((2,20, "𝓐𝓷𝓽𝓱𝓸𝓷𝔂 𝓫𝓪𝓻"))
-        containers, crates, specials = self.load_map(5)
+        containers, crates, doors, specials = self.load_map(5)
         containers[2].inv[ID.key1] = 1
-        # g = Grobo(self, specials[1], id=ID.max, name='Max')
-        g = Grobo(self, specials[1], id=ID.max, name='Max', state=1)
+        g = Grobo(self, specials[1], id=ID.max, name='Max')
+        # g = Grobo(self, specials[1], id=ID.max, name='Max', state=1)
         objects[ID.max] = g
         b = RoboBunny(self, specials[2], id=ID.anthony, name='Anthony')
         objects[ID.anthony] = b
 
     def board_6(self):
         self.labels.append((2,20, "𝒯𝓌𝒾𝓃𝓈𝑒𝓃 𝐻𝑜𝓂𝑒"))
-        containers, crates, specials = self.load_map(6)
+        containers, crates, doors, specials = self.load_map(6)
         containers[0].inv[ID.magic_ball] = 1
         containers[0].inv[ID.key1] = 1
         crates[5].id = ID.crate1
         TriggerEventLocation(self, specials[1], evt=MaxState1)
 
     def board_7(self):
-        containers, crates, specials = self.load_map(7)
+        containers, crates, doors, specials = self.load_map(7)
+        Julien, clone1 = specials[Blocks.elephant]
+        clone1.inv[ID.key3] = [Item(self, Blocks.key, 'key', id=ID.key3, put=0), 1]
+        Julien.id = ID.julien
+        doors[0].type = Type.door3
 
     def board_und1(self):
-        containers, crates, specials = self.load_map('und1')
+        containers, crates, doors, specials = self.load_map('und1')
         Item(self, Blocks.grill, 'grill', specials[1], id=ID.grill3)
 
     def load_map(self, map_num, for_editor=0):
         _map = open(f'maps/{map_num}.map').readlines()
         crates = []
         containers = []
-        specials = {}
+        doors = []
+        specials = defaultdict(list)
+
         for y in range(16):
             for x in range(79):
                 char = _map[y][x]
@@ -310,9 +319,11 @@ class Board:
                     elif char==Blocks.ladder:
                         Item(self, Blocks.ladder, 'ladder', loc, type=Type.ladder)
                     elif char==Blocks.door:
-                        Item(self, Blocks.door, 'door', loc, type=Type.door1)
+                        d = Item(self, Blocks.door, 'door', loc, type=Type.door1)
+                        doors.append(d)
                     elif char=='D':
-                        Item(self, Blocks.door, 'steel door', loc, type=Type.door2)
+                        d = Item(self, Blocks.door, 'steel door', loc, type=Type.door2)
+                        doors.append(d)
                     elif char=='g':
                         Item(self, Blocks.grn_heart, 'grn_heart', loc, id=ID.grn_heart)
                     elif char==Blocks.locker or char=='o':
@@ -342,11 +353,14 @@ class Board:
                         self.put(Blocks.steps_l, loc)
                     elif char==Blocks.steps_r:
                         self.put(Blocks.steps_r, loc)
+                    elif char==Blocks.elephant:
+                        g = Grobo(self, loc)
+                        specials[Blocks.elephant].append(g)
                     elif char in '0123456789':
                         specials[int(char)] = loc
                         if for_editor:
                             self.put(char, loc)
-        return containers, crates, specials
+        return containers, crates, doors, specials
 
     def make_steps(self, start, mod, to_height, char=Blocks.steps_r):
         n = start.y - to_height
@@ -438,7 +452,6 @@ def chk_oob(loc, y=0, x=0):
 def chk_b_oob(loc, y=0, x=0):
     h = len(boards)
     w = len(boards[0])
-    debug('chk_b_oob', loc.x, x)
     return 0 <= loc.y+y <= h-1 and 0 <= loc.x+x <= w-1
 
 def ids(lst):
@@ -475,7 +488,6 @@ class Item(Mixin1):
         return self.char
 
     def move(self, dir):
-        print("dir", dir)
         m = dict(h=(0,-1), l=(0,1), j=(1,0), k=(-1,0))[dir]
         new = self.loc.mod(*m)
         self.B.remove(self)
@@ -572,7 +584,6 @@ class Being(Mixin1):
             return True, self.loc.mod(*m)
         else:
             if self.is_player and chk_b_oob(self.B.loc, *m):
-                print('returning LOAD_BOARD')
                 return LOAD_BOARD, self.B.loc.mod(*m)
         return 0, 0
 
@@ -580,7 +591,6 @@ class Being(Mixin1):
         B = self.B
         rv = self._move(dir, fly)
         if rv and (rv[0] == LOAD_BOARD):
-            print('move: returning LOAD_BOARD')
             return rv
         new = rv[1]
         if new and isinstance(B[new], Being):
@@ -597,6 +607,12 @@ class Being(Mixin1):
         if new and Type.door1 in B.get_types(new) and self.inv[ID.key1]:
             B.remove(B[new])    # TODO will not work if something is on top of door
             self.inv[ID.key1] -= 1
+            Windows.win2.addstr(2,0, 'You open the door with your key')
+            return None, None
+
+        if new and Type.door3 in B.get_types(new) and self.inv[ID.key3]:
+            B.remove(B[new])    # TODO will not work if something is on top of door
+            self.inv[ID.key3] -= 1
             Windows.win2.addstr(2,0, 'You open the door with your key')
             return None, None
 
@@ -627,7 +643,7 @@ class Being(Mixin1):
                     else:
                         break
 
-            pick_up = [ID.coin, ID.key1, ID.magic_ball]
+            pick_up = [ID.coin, ID.key1, ID.key2, ID.key3, ID.magic_ball]
             B.remove(self)
             self.loc = new
 
@@ -685,6 +701,15 @@ class Being(Mixin1):
                     Item(self.B, Blocks.coin, 'one kash', obj.loc, id=ID.coin)
                 elif random()>0.6:
                     Item(self.B, Blocks.grn_heart, 'heart', obj.loc, id=ID.grn_heart)
+                print("obj", obj)
+                print("obj.inv", obj.inv)
+                for k, val in obj.inv.items():    # TODO: create according to `qty`
+                    # temp hack around all beings having some coin
+                    if isinstance(val, int): continue
+                    it, qty = val
+                    # TODO note item will not have a `loc` (ok for now)
+                    it.loc = obj.loc
+                    self.B.put(it, obj.loc)
 
     def switch_places(self):
         B = self.B
@@ -1134,7 +1159,7 @@ def main(stdscr):
         elif k == '6':
             B = player.move_to_board( Loc(5,0), Loc(35, GROUND) )
         elif k == '7':
-            B = player.move_to_board( Loc(6,0), Loc(35, GROUND) )
+            B = player.move_to_board( Loc(6,0), Loc(72, GROUND) )
         elif k == 'U':
             B = player.move_to_board( Loc(0,1), Loc(35, 10) )
         elif k == 'm':
@@ -1179,7 +1204,6 @@ def main(stdscr):
             t.turns -= 1
             if not t.turns:
                 triggered_events.append(t.evt)
-                print("triggered_events", triggered_events)
         timers[:] = [t for t in timers if t.turns>0]
         B.draw(win)
         key = '[key]' if player.inv[ID.key1] else ''
@@ -1205,15 +1229,15 @@ def editor(stdscr, _map):
     while 1:
         k = win.getkey()
         if k=='q': return
-        elif k in 'hjkl':
-            m = dict(h=(0,-1), l=(0,1), j=(1,0), k=(-1,0))[k]
-            # if last_cmd and last_cmd not in 'ocLtwmsSd0123456789':
+        elif k in 'hjklyubnHL':
+            m = dict(h=(0,-1), l=(0,1), j=(1,0), k=(-1,0), y=(-1,-1), u=(-1,1), b=(1,-1), n=(1,1), H=(0,-5), L=(0,5))[k]
             if brush == blank:
                 B.B[loc.y][loc.x] = [blank]
             elif brush == rock:
                 if B[loc] != rock:
                     B.put(rock, loc)
             loc = loc.mod(*m)
+
         elif k == ' ':
             brush = None
         elif k == 'e':
@@ -1224,7 +1248,7 @@ def editor(stdscr, _map):
             B.put(Blocks.steps_r, loc)
         elif k == 'S':
             B.put(Blocks.steps_l, loc)
-        elif k == 'm':
+        elif k == 'M':
             B.put(Blocks.smoke_pipe, loc)
         elif k == 'd':
             B.put(Blocks.door, loc)
@@ -1234,7 +1258,7 @@ def editor(stdscr, _map):
             B.put(Blocks.water, loc)
         elif k in 't':
             B.put(Blocks.stool, loc)
-        elif k in 'L':
+        elif k in 'a':
             B.put(Blocks.ladder, loc)
         elif k in 'c':
             B.put(Blocks.cupboard, loc)
@@ -1242,6 +1266,8 @@ def editor(stdscr, _map):
             B.put(Blocks.locker, loc)
         elif k in 'B':
             B.put(Blocks.dock_boards, loc)
+        elif k in 'G':
+            B.put(Blocks.elephant, loc)
         elif k == 'W':
             with open(f'maps/{_map}.map', 'w') as fp:
                 for row in B.B:
