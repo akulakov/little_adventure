@@ -75,6 +75,7 @@ class Blocks:
     wine = '🍷'
     dock_boards = '⏔'
     ticket_seller = '⌂'
+    ferry = '🚤'
     crates = (crate1, crate2, crate3, crate4)
 
 
@@ -126,6 +127,7 @@ class ID:
     key3 = 23
     grill4 = 24
     ticket_seller1 = 25
+    ferry = 26
 
     guard1 = 100
     technician1 = 101
@@ -155,6 +157,7 @@ conversations = {
     ID.shopkeeper1: ['Twinsen!? I thought you were arrested?', 'They let me out early for good behaviour!', 'But.. nobody gets out of Citadel alive! I.. I.. have to call the guards.'],
     ID.max1: ['Have you seen a young girl being led by two clones?', 'I think I have seen her and I will tell you more if you buy me a drink.'],
     ID.max2: ["I've seen them near the port, it looked like they were getting away from the island, which is strange, because usually prisoners stay in the citadel", 'Thank you!'],
+    ID.julien: ['Have you seen a young girl being led by two Groboclones?', 'Yes, they were here earlier today, they got on a speedboat and were off. Destination unknown.']
 }
 
 def mkcell():
@@ -282,9 +285,10 @@ class Board:
 
     def board_7(self):
         containers, crates, doors, specials = self.load_map(7)
-        Julien, clone1 = specials[Blocks.elephant]
+        julien, clone1 = specials[Blocks.elephant]
         clone1.inv[ID.key3] = [Item(self, Blocks.key, 'key', id=ID.key3, put=0), 1]
-        Julien.id = ID.julien
+        julien.id = ID.julien
+        objects[julien.id] = julien
         doors[0].type = Type.door3
         Item(self, Blocks.grill, 'grill', specials[1], id=ID.grill4)
         tick = Item(self, Blocks.ticket_seller, 'Ticket seller booth', specials[2], id=ID.ticket_seller1)
@@ -343,10 +347,13 @@ class Board:
                     elif char==Blocks.shelves:
                         s = Item(self, Blocks.shelves, 'shelves', loc, type=Type.container)
                         containers.append(s)
+                    elif char==Blocks.ferry:
+                        s = Item(self, Blocks.ferry, 'ferry', loc, id=ID.ferry)
                     elif char==Blocks.platform_top:
                         specials[Blocks.platform_top] = loc
                         if for_editor:
                             self.put(Blocks.platform_top, loc)
+
                     elif char==Blocks.steps_l:
                         self.put(Blocks.steps_l, loc)
                     elif char==Blocks.steps_r:
@@ -422,7 +429,10 @@ class Board:
 
     def put(self, obj, loc=None):
         loc = loc or obj.loc
-        self.B[loc.y][loc.x].append(obj)
+        try: self.B[loc.y][loc.x].append(obj)
+        except Exception as e:
+            sys.stdout.write(str(loc))
+            raise
 
     def remove(self, obj, loc=None):
         loc = loc or obj.loc
@@ -778,11 +788,13 @@ class Being(Mixin1):
             MaxQuest().go(self)
         elif ID.ticket_seller1 in B.get_ids(locs):
             seller = objects[ID.ticket_seller1]
-            y = self.talk(seller, 'Would you like to buy some tickets?', yesno=1)
+            y = self.talk(seller, 'Would you like to buy a ferry ticket?', yesno=1)
             if y:
                 self.talk(seller, 'Here is your ticket... Wait a second... Alarm! The prisoner escaped!!')
                 c = Clone(B, self.loc.mod(0,1), hostile=1, health=20)
                 B.guards.append(c)
+        elif ID.julien in B.get_ids(locs):
+            self.talk(objects[ID.julien])
         else:
             loc = self.loc.mod(1,0)
             x = B[loc] # TODO won't work if something is in the platform tile
@@ -1325,6 +1337,9 @@ def editor(stdscr, _map):
             B.put(Blocks.platform_top, loc)
         elif k in 'g':
             B.put(Blocks.grill, loc)
+        elif k in 'F':
+            B.put(Blocks.ferry, loc)
+
         elif k in 'E':
             win.addstr(2,2, 'Are you sure you want to clear the map? [Y/N]')
             y = win.getkey()
