@@ -78,6 +78,7 @@ class Blocks:
     ferry = '🚤'
     ferry_ticket = 't'
     soldier = '⍾'
+    bars = '┇'
     crates = (crate1, crate2, crate3, crate4)
 
 
@@ -133,6 +134,7 @@ class ID:
     ferry_ticket = 27
     grill5 = 28
     grill6 = 29
+    bars1 = 30
 
     guard1 = 100
     technician1 = 101
@@ -215,6 +217,8 @@ class Board:
         self.guards = []
         self.soldiers = []
         self.labels = []
+        self.spawn_locations = {}
+        self.trigger_locations = {}
         self.loc = loc
 
     def board_1(self):
@@ -306,8 +310,13 @@ class Board:
         containers, crates, doors, specials = self.load_map(8)
         Item(self, Blocks.grill, 'grill', specials[1], id=ID.grill5)
         Item(self, Blocks.grill, 'grill', specials[2], id=ID.grill6)
+        Item(self, Blocks.bars, 'jail bars', specials[5], id=ID.bars1)
+        TriggerEventLocation(self, specials[7], evt=JailEvent)
         s = Soldier(self, specials[3], id=ID.soldier2)
         self.guards.append(s)
+        self.spawn_locations[4] = specials[4]
+        self.spawn_locations[5] = specials[5]
+        self.spawn_locations[6] = specials[6]
 
     def board_und1(self):
         containers, crates, doors, specials = self.load_map('und1')
@@ -333,25 +342,33 @@ class Board:
                         self.put(rock, loc)
                     elif char==Blocks.ladder:
                         Item(self, Blocks.ladder, 'ladder', loc, type=Type.ladder)
+
                     elif char==Blocks.door:
                         d = Item(self, Blocks.door, 'door', loc, type=Type.door1)
                         doors.append(d)
+
                     elif char=='D':
                         d = Item(self, Blocks.door, 'steel door', loc, type=Type.door2)
                         doors.append(d)
+
                     elif char=='g':
                         Item(self, Blocks.grn_heart, 'grn_heart', loc, id=ID.grn_heart)
+
                     elif char==Blocks.locker or char=='o':
                         l = Locker(self, loc)
                         containers.append(l)
+
                     elif char==Blocks.cupboard or char=='c':
                         c = Cupboard(self, loc)
                         containers.append(c)
+
                     elif char in Blocks.crates or char=='C':
                         c = Item(self, choice(Blocks.crates), 'crate', loc)
                         crates.append(c)
+
                     elif char=='s':
                         Item(self, Blocks.sunflower, 'sunflower', loc)
+
                     elif char==Blocks.block1:
                         Item(self, Blocks.block1, 'block', loc, type=Type.door_top_block)
                     elif char==Blocks.smoke_pipe:
@@ -370,7 +387,9 @@ class Board:
                         s = Item(self, Blocks.shelves, 'shelves', loc, type=Type.container)
                         containers.append(s)
                     elif char==Blocks.ferry:
-                        s = Item(self, Blocks.ferry, 'ferry', loc, id=ID.ferry)
+                        Item(self, Blocks.ferry, 'ferry', loc, id=ID.ferry)
+                    elif char==Blocks.bars:
+                        Item(self, Blocks.bars, 'jail bars', loc, type=Type.blocking)
                     elif char==Blocks.platform_top:
                         specials[Blocks.platform_top] = loc
                         if for_editor:
@@ -1134,12 +1153,13 @@ class SoldierEvent2(Event):
         pl.tele(pl.loc.mod(0,-3))
         self.B.draw(Windows.win)
         Windows.win2.addstr(1, 0, 'You climb through the window covered by a grill and escape to the open area')
+        pl.state = 1
         if s.state == 0:
             ch = pl.talk(s)
-            if ch==2:
-                s.state = 1
-            else:
+            if ch==1:
                 s.hostile = 1
+            else:
+                s.state = 1
 
 def rev_dir(dir):
     return dict(h='l',l='h',j='k',k='j')[dir]
@@ -1433,6 +1453,8 @@ def editor(stdscr, _map):
             B.put(Blocks.ferry, loc)
         elif k in 'O':
             B.put(Blocks.soldier, loc)
+        elif k in 'A':
+            B.put(Blocks.bars, loc)
 
         elif k in 'E':
             win.addstr(2,2, 'Are you sure you want to clear the map? [Y/N]')
@@ -1452,6 +1474,8 @@ def editor(stdscr, _map):
                     fp.write('\n')
             return
         B.draw(win)
+        tool = 'eraser' if brush==' ' else ('rock' if brush==rock else '')
+        win.addstr(0,73, tool)
         win.addstr(0,0,str(loc))
         win.move(loc.y, loc.x)
 
