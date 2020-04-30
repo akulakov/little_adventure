@@ -304,6 +304,10 @@ class Board:
         containers, crates, doors, specials = self.load_map('und1')
         Item(self, Blocks.grill, 'grill', specials[1], id=ID.grill3)
 
+    def board_sea1(self):
+        specials = self.load_map('sea1')[-1]
+        Item(self, Blocks.ferry, 'ferry', specials[1], id=ID.ferry)
+
     def load_map(self, map_num, for_editor=0):
         _map = open(f'maps/{map_num}.map').readlines()
         crates = []
@@ -858,8 +862,14 @@ class Event:
 class TravelToPrincipalIslandEvent(Event):
     def go(self):
         player = objects[ID.player]
-        Windows.win2.addstr(2,0, 'You have taken the ferry to Principal island.')
         player.inv[ID.ferry_ticket] = 0
+        B = boards[1][1]
+        f = objects[ID.ferry]
+        for _ in range(75):
+            f.move('h')
+            B.draw(Windows.win)
+            sleep(0.15)
+        Windows.win2.addstr(2,0, 'You have taken the ferry to Principal island.')
         return player.move_to_board( Loc(7,0), Loc(7, GROUND) )
 
 class GuardAttackEvent1(Event):
@@ -1163,6 +1173,7 @@ def main(stdscr):
     b7 = Board(Loc(6,0), init_rocks=0)
     b8 = Board(Loc(7,0), init_rocks=0)
     und1 = Board(Loc(0,1), init_rocks=0)
+    sea1 = Board(Loc(1,1), init_rocks=0)
 
     player = b1.board_1()
     b2.board_2()
@@ -1173,7 +1184,8 @@ def main(stdscr):
     b7.board_7()
     b8.board_8()
     und1.board_und1()
-    boards[:] = ([b1, b2, b3, b4, b5, b6, b7, b8], [und1])
+    sea1.board_sea1()
+    boards[:] = ([b1, b2, b3, b4, b5, b6, b7, b8], [und1, sea1])
 
     stdscr.clear()
     B.draw(win)
@@ -1242,6 +1254,8 @@ def main(stdscr):
             B = player.move_to_board( Loc(6,0), Loc(72, GROUND) )
         elif k == '8':
             B = player.move_to_board( Loc(7,0), Loc(7, GROUND) )
+        elif k == '9':
+            B = player.move_to_board( Loc(1,1), Loc(7, GROUND) )
         elif k == 'U':
             B = player.move_to_board( Loc(0,1), Loc(35, 10) )
         elif k == 'E':

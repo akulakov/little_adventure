@@ -2,6 +2,9 @@
 __pycache__/
 *.py[cod]
 *$py.class
+.*.sw[a-z]
+*.bk
+debug
 
 # C extensions
 *.so
