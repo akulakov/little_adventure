@@ -132,6 +132,7 @@ class ID:
     ferry = 26
     ferry_ticket = 27
     grill5 = 28
+    grill6 = 29
 
     guard1 = 100
     technician1 = 101
@@ -142,6 +143,7 @@ class ID:
     max = 106
     anthony = 107
     julien = 108
+    soldier2 = 109
 
     max1 = 200
     max2 = 201
@@ -161,7 +163,9 @@ conversations = {
     ID.shopkeeper1: ['Twinsen!? I thought you were arrested?', 'They let me out early for good behaviour!', 'But.. nobody gets out of Citadel alive! I.. I.. have to call the guards.'],
     ID.max1: ['Have you seen a young girl being led by two clones?', 'I think I have seen her and I will tell you more if you buy me a drink.'],
     ID.max2: ["I've seen them near the port, it looked like they were getting away from the island, which is strange, because usually prisoners stay in the citadel", 'Thank you!'],
-    ID.julien: ['Have you seen a young girl being led by two Groboclones?', 'Yes, they were here earlier today, they got on a speedboat and were off. Destination unknown.',]
+    ID.julien: ['Have you seen a young girl being led by two Groboclones?', 'Yes, they were here earlier today, they got on a speedboat and were off. Destination unknown.'],
+    ID.soldier2: ['Wait! How did you get here, and who are you?',
+                  ["I'm Twinsen, I'm escaping!", "Fixing the antenna.", "Santa Claus."]],
 }
 
 def mkcell():
@@ -264,9 +268,8 @@ class Board:
 
     def board_4(self):
         self.labels.append((0,20, "𝓪𝓫𝓮 𝓸𝓵𝓭 𝓼𝓱𝓸𝓹𝓹𝓮"))    # Abe old shoppe
-        B = self.B
         containers, crates, doors, specials = self.load_map(4)
-        p = Item(self, Blocks.platform_top, 'platform', specials[Blocks.platform_top], id=ID.platform_top1, type=Type.platform_top)
+        Item(self, Blocks.platform_top, 'platform', specials[Blocks.platform_top], id=ID.platform_top1, type=Type.platform_top)
         ShopKeeper(self, specials[1], name='Abe', id=ID.shopkeeper1)
         containers[3].inv[ID.jar_syrup] = 1
 
@@ -274,9 +277,9 @@ class Board:
         self.labels.append((2,20, "𝓐𝓷𝓽𝓱𝓸𝓷𝔂 𝓫𝓪𝓻"))
         containers, crates, doors, specials = self.load_map(5)
         containers[2].inv[ID.key1] = 1
-        g = Grobo(self, specials[1], id=ID.max, name='Max')
+        Grobo(self, specials[1], id=ID.max, name='Max')
         # g = Grobo(self, specials[1], id=ID.max, name='Max', state=1)
-        b = RoboBunny(self, specials[2], id=ID.anthony, name='Anthony')
+        RoboBunny(self, specials[2], id=ID.anthony, name='Anthony')
 
     def board_6(self):
         self.labels.append((2,20, "𝒯𝓌𝒾𝓃𝓈𝑒𝓃 𝐻𝑜𝓂𝑒"))
@@ -295,14 +298,16 @@ class Board:
         objects[julien.id] = julien
         doors[0].type = Type.door3
         Item(self, Blocks.grill, 'grill', specials[1], id=ID.grill4)
-        tick = Item(self, Blocks.ticket_seller, 'Ticket seller booth', specials[2], id=ID.ticket_seller1)
+        Item(self, Blocks.ticket_seller, 'Ticket seller booth', specials[2], id=ID.ticket_seller1)
         # invisible, with ferry id to be able to take the ferry near this tile
         Item(self, '', '', specials[3], id=ID.ferry)
 
     def board_8(self):
         containers, crates, doors, specials = self.load_map(8)
         Item(self, Blocks.grill, 'grill', specials[1], id=ID.grill5)
-        Item(self, Blocks.grill, 'grill', specials[2], id=ID.grill5)
+        Item(self, Blocks.grill, 'grill', specials[2], id=ID.grill6)
+        s = Soldier(self, specials[3], id=ID.soldier2)
+        self.guards.append(s)
 
     def board_und1(self):
         containers, crates, doors, specials = self.load_map('und1')
@@ -475,7 +480,7 @@ class Board:
         win = newwin(len(txt), w, 5, 5)
         for y, ln in enumerate(txt):
             win.addstr(y,0, ln)
-        k = win.getkey()
+        win.getkey()
         del win
 
 def chk_oob(loc, y=0, x=0):
@@ -599,7 +604,14 @@ class Being(Mixin1):
             dialog = [dialog]
         dialog = dialog or conversations[being.id]
         x = min(loc.x, 60)
+        multichoice = 0
         for txt in dialog:
+            lst = []
+            if isinstance(txt, (list,tuple)):
+                multichoice = len(txt)
+                for n, t in enumerate(txt):
+                    lst.append(f'{n+1}) {t}')
+                txt = '\n'.join(lst)
             w = 78 - x
             lines = (len(txt) // w) + 4
             txt = wrap(txt, w)
@@ -607,11 +619,24 @@ class Being(Mixin1):
             offset_y = lines if loc.y<8 else -lines
             win = newwin(lines, w, loc.y+offset_y, x)
             win.addstr(0,0, txt + (' [Y/N]' if yesno else ''))
-            k = win.getkey()
-            del win
             if yesno:
                 # TODO in some one-time dialogs, may need to detect 'no' explicitly
+                k = win.getkey()
+                del win
                 return k in 'Yy'
+            elif multichoice:
+                for _ in range(10):
+                    k = win.getkey()
+                    try:
+                        k=int(k)
+                    except ValueError:
+                        k = 0
+                    if k in range(1, multichoice+1):
+                        del win
+                        return k
+            win.getkey()
+            del win
+
 
     def _move(self, dir, fly=False):
         m = dict(h=(0,-1), l=(0,1), j=(1,0), k=(-1,0))[dir]
@@ -662,7 +687,11 @@ class Being(Mixin1):
         if new:
             if ID.grill5 in B.get_ids(new):
                 new = new.mod(0,-3)
-                Windows.win2.addstr(1, 0, 'You climb through the window covered by a grill and escape to the area just outside')
+                Windows.win2.addstr(1, 0, 'You climb through the window covered by a grill and escape to a small nook under the stairs')
+            if ID.grill6 in B.get_ids(new):
+                SoldierEvent2(B).go()
+                return None, None
+
             if B.loc.x==3 and new==Loc(23,8):   # TODO use trigger event location
                 triggered_events.append(ShopKeeperEvent1)
 
@@ -1097,6 +1126,21 @@ class MaxState1(Event):
     def go(self):
         objects[ID.max].state = 1
 
+
+class SoldierEvent2(Event):
+    def go(self):
+        s = objects[ID.soldier2]
+        pl = objects[ID.player]
+        pl.tele(pl.loc.mod(0,-3))
+        self.B.draw(Windows.win)
+        Windows.win2.addstr(1, 0, 'You climb through the window covered by a grill and escape to the open area')
+        if s.state == 0:
+            ch = pl.talk(s)
+            if ch==2:
+                s.state = 1
+            else:
+                s.hostile = 1
+
 def rev_dir(dir):
     return dict(h='l',l='h',j='k',k='j')[dir]
 
@@ -1387,6 +1431,8 @@ def editor(stdscr, _map):
             B.put(Blocks.grill, loc)
         elif k in 'F':
             B.put(Blocks.ferry, loc)
+        elif k in 'O':
+            B.put(Blocks.soldier, loc)
 
         elif k in 'E':
             win.addstr(2,2, 'Are you sure you want to clear the map? [Y/N]')
