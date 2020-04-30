@@ -146,9 +146,11 @@ class ID:
     anthony = 107
     julien = 108
     soldier2 = 109
+    guard2 = 110
 
     max1 = 200
     max2 = 201
+    trick_guard = 202
 
 items_by_id = {v:k for k,v in ID.__dict__.items()}
 descr_by_id = copy(items_by_id)
@@ -168,6 +170,7 @@ conversations = {
     ID.julien: ['Have you seen a young girl being led by two Groboclones?', 'Yes, they were here earlier today, they got on a speedboat and were off. Destination unknown.'],
     ID.soldier2: ['Wait! How did you get here, and who are you?',
                   ["I'm Twinsen, I'm escaping!", "Fixing the antenna.", "Santa Claus."]],
+    ID.guard2: ['Hey! I think the stone is loose in my cell! I might escape..', "Hmm, that's odd, I remember checking the camera earlier.. I guess there's no harm in checking again!"]
 }
 
 def mkcell():
@@ -304,20 +307,21 @@ class Board:
         containers, crates, doors, specials = self.load_map(8)
         Item(self, Blocks.grill, 'grill', specials[1], id=ID.grill5)
         Item(self, Blocks.grill, 'grill', specials[2], id=ID.grill6)
-        Item(self, Blocks.bars, 'jail bars', specials[5], id=ID.bars1)
+        Item(self, Blocks.bars, 'jail bars', specials[5], id=ID.bars1, type=Type.blocking)
+        Item(self, '', '', specials[8], id=ID.trick_guard)
         TriggerEventLocation(self, specials[7], evt=JailEvent)
         s = Soldier(self, specials[3], id=ID.soldier2)
         self.guards.append(s)
         self.spawn_locations[4] = specials[4]
-        self.spawn_locations[5] = specials[5]
         self.spawn_locations[6] = specials[6]
+        self.spawn_locations[8] = specials[8]
 
     def board_und1(self):
         containers, crates, doors, specials = self.load_map('und1')
         Item(self, Blocks.grill, 'grill', specials[1], id=ID.grill3)
 
     def board_sea1(self):
-        specials = self.load_map('sea1')[-1]
+        specials = self.load_map('sea1')[3]
         Item(self, Blocks.ferry, 'ferry', specials[1], id=ID.ferry)
 
     def load_map(self, map_num, for_editor=0):
@@ -473,7 +477,11 @@ class Board:
     def draw(self, win):
         for y, row in enumerate(self.B):
             for x, cell in enumerate(row):
-                win.addstr(y,x, str(cell[-1]))
+                # tricky bug: if an 'invisible' item put somewhere, then a being moves on top of it, it's drawn, but
+                # when it's moved out, the invisible item is drawn, but being an empty string, it doesn't draw over the
+                # being's char, so the 'image' of the being remains there, even after being moved away.
+                cell = [c for c in cell if str(c)]
+                win.addstr(y,x, str(last(cell)))
         for y,x,txt in self.labels:
             win.addstr(y,x,txt)
         win.refresh()
@@ -488,6 +496,7 @@ class Board:
     def remove(self, obj, loc=None):
         loc = loc or obj.loc
         self.B[loc.y][loc.x].remove(obj)
+        print("self.B[loc.y][loc.x]", self.B[loc.y][loc.x])
 
     def is_blocked(self, loc):
         for x in self.get_all(loc):
@@ -756,12 +765,15 @@ class Being(Mixin1):
                     elif x.id in pick_up:
                         self.inv[x.id] += 1
                         B.remove(x)
-                names = [i.name for i in B.get_all_obj(new)]
+                names = [i.name for i in B.get_all_obj(new) if i.name]
                 plural = len(names)>1
                 names = ', '.join(names)
                 if names:
                     a = ':' if plural else ' a'
                     Windows.win2.addstr(2,0, f'You see{a} {names}')
+
+            # this needs to be after previous block because the block looks at `top_obj` which would always be the being
+            # instead of an event trigger item
             self.put(new)
             if ID.door1 in B.get_ids(self.loc):
                 triggered_events.append(AlarmEvent1)
@@ -844,8 +856,6 @@ class Being(Mixin1):
         if chk_oob(r): locs.append(r)
         if chk_oob(l): locs.append(l)
 
-        print("B.get_ids(locs)", B.get_ids(locs))
-        print("ID.ticket_seller1", ID.ticket_seller1)
         if c:
             items = {k:v for k,v in c.inv.items() if v}
             lst = []
@@ -862,6 +872,10 @@ class Being(Mixin1):
 
         elif ID.anthony in B.get_ids(locs):
             BuyADrinkAnthony(B).go()
+        elif ID.trick_guard in B.get_ids(locs):
+            self.talk(objects[ID.guard2])
+            B.remove(objects[ID.bars1])
+            objects[ID.guard2].move('l')
         elif ID.max in B.get_ids(locs):
             MaxQuest().go(self)
         elif ID.ticket_seller1 in B.get_ids(locs):
@@ -927,7 +941,17 @@ class Event:
         self.B = B
 
 class JailEvent(Event):
-    pass
+    once = False
+    def go(self):
+        player = objects[ID.player]
+        if player.state==1:
+            B=self.B
+            player.tele(B.spawn_locations[8])
+            c=Clone(B, B.spawn_locations[4])
+            B.soldiers.append(c)
+            Guard(B, B.spawn_locations[6], id=ID.guard2)
+            Windows.win2.addstr(2,0, 'Suddenly a Groboclone appears and leads you away...')
+            JailEvent.once = True
 
 class TravelToPrincipalIslandEvent(Event):
     def go(self):
@@ -1051,6 +1075,11 @@ class ClimbThroughGrillEvent3(Event):
         x = 6 if bi==5 else 5
         b_loc = Loc(x, 0)
         Windows.win2.addstr(2,0, 'You climb through the grill into ' + ('the port area' if bi==5 else 'back to the shore near your home'))
+        if player.state == 0:
+            player.state = 1
+        elif player.state == 1:
+            player.state = 2
+        print("player.state", player.state)
         return player.move_to_board(b_loc, Loc(72, GROUND))
 
 class AlarmEvent1(Event):
@@ -1367,7 +1396,7 @@ def main(stdscr):
             if g.hostile:
                 g.attack(player)
         for s in B.soldiers:
-            if s.hostile or dist(s, player) <= 5:
+            if s.hostile or dist(s, player) <= (1 if player.sneaky_stance else 5):
                 s.hostile = 1
                 s.attack(player)
 
@@ -1376,8 +1405,9 @@ def main(stdscr):
             player, B = Saves().load('start')
 
         for evt in triggered_events:
-            debug(evt)
+            print(evt)
             if evt in done_events and evt.once:
+                print('skipping event', evt)
                 continue
             rv = evt(B).go()
             if isinstance(rv, Board):
