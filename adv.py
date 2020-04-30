@@ -258,16 +258,10 @@ class Board:
 
     def board_3(self):
         """Soldier, rubbish heap."""
-        for x in range(5):
-            row = self.B[-2-x]
-            for cell in row[:5-x]:
-                cell.append(rock)
-        Item(self, Blocks.grill, 'grill', Loc(25, GROUND), id=ID.grill2)
-        RoboBunny(self, Loc(50, GROUND), id=ID.robobunny1)
-        Item(self, Blocks.rubbish, 'rubbish', Loc(55, GROUND), id=ID.rubbish1)
-        Item(self, Blocks.rubbish, 'rubbish', Loc(56, GROUND), id=ID.rubbish1)
-        Item(self, Blocks.rubbish, 'rubbish', Loc(57, GROUND), id=ID.rubbish1)
-        s = Soldier(self, Loc(70, GROUND), id=ID.soldier1)
+        containers, crates, doors, specials = self.load_map(3)
+        RoboBunny(self, specials[1], id=ID.robobunny1)
+        Item(self, Blocks.grill, 'grill', specials[2], id=ID.grill2)
+        s = Soldier(self, specials[3], id=ID.soldier1)
         self.soldiers.append(s)
 
     def board_4(self):
@@ -282,7 +276,6 @@ class Board:
         containers, crates, doors, specials = self.load_map(5)
         containers[2].inv[ID.key1] = 1
         Grobo(self, specials[1], id=ID.max, name='Max')
-        # g = Grobo(self, specials[1], id=ID.max, name='Max', state=1)
         RoboBunny(self, specials[2], id=ID.anthony, name='Anthony')
 
     def board_6(self):
@@ -295,7 +288,7 @@ class Board:
         Item(self, Blocks.grill, 'grill', specials[2], id=ID.grill4)
 
     def board_7(self):
-        self.labels.append((4,10, "𝒯𝒽𝑒 𝐹𝑒𝓇𝓇𝓎"))
+        self.labels.append((10,5, "𝒯𝒽𝑒 𝐹𝑒𝓇𝓇𝓎"))
         containers, crates, doors, specials = self.load_map(7)
         julien, clone1 = specials[Blocks.elephant]
         clone1.inv[ID.key3] = [Item(self, Blocks.key, 'key', id=ID.key3, put=0), 1]
@@ -372,25 +365,38 @@ class Board:
 
                     elif char==Blocks.block1:
                         Item(self, Blocks.block1, 'block', loc, type=Type.door_top_block)
+
                     elif char==Blocks.smoke_pipe:
                         Item(self, Blocks.smoke_pipe, 'smoke pipe', loc, type=Type.ladder)
+
                     elif char==Blocks.fireplace:
                         Item(self, Blocks.fireplace, 'fireplace', loc)
+
                     elif char==Blocks.water:
                         Item(self, Blocks.water, 'water', loc, type=Type.water)
+
                     elif char==Blocks.stool:
                         Item(self, Blocks.stool, 'bar stool', loc)
+
                     elif char==Blocks.dock_boards:
                         Item(self, Blocks.dock_boards, 'dock boards', loc, type=Type.blocking)
+
                     elif char==Blocks.grill:
                         Item(self, Blocks.grill, 'barred window', loc)
+
+                    elif char==Blocks.rubbish:
+                        Item(self, Blocks.rubbish, 'rubbish', loc, id=ID.rubbish1)
+
                     elif char==Blocks.shelves:
                         s = Item(self, Blocks.shelves, 'shelves', loc, type=Type.container)
                         containers.append(s)
+
                     elif char==Blocks.ferry:
                         Item(self, Blocks.ferry, 'ferry', loc, id=ID.ferry)
+
                     elif char==Blocks.bars:
                         Item(self, Blocks.bars, 'jail bars', loc, type=Type.blocking)
+
                     elif char==Blocks.platform_top:
                         specials[Blocks.platform_top] = loc
                         if for_editor:
@@ -398,11 +404,14 @@ class Board:
 
                     elif char==Blocks.steps_l:
                         self.put(Blocks.steps_l, loc)
+
                     elif char==Blocks.steps_r:
                         self.put(Blocks.steps_r, loc)
+
                     elif char==Blocks.elephant:
                         g = Grobo(self, loc)
                         specials[Blocks.elephant].append(g)
+
                     elif char in '0123456789':
                         specials[int(char)] = loc
                         if for_editor:
@@ -548,6 +557,7 @@ class Item(Mixin1):
         m = dict(h=(0,-1), l=(0,1), j=(1,0), k=(-1,0))[dir]
         new = self.loc.mod(*m)
         self.B.remove(self)
+        print(self.loc, "self.B.get_all(self.loc)", self.B.get_all(self.loc))
         self.loc = new
         self.B.put(self)
 
@@ -771,7 +781,6 @@ class Being(Mixin1):
         return None, None
 
     def attack(self, obj):
-        print('in attack')
         if abs(self.loc.x - obj.loc.x) <= 1 and \
            abs(self.loc.y - obj.loc.y) <= 1:
                 self.hit(obj)
@@ -1065,7 +1074,7 @@ class GarbageTruckEvent(Event):
         t = Item(B, Blocks.truck, 'Garbage truck', Loc(78, GROUND))
         dir = 'h'
         pl = objects[ID.player]
-        for _ in range(45):
+        for _ in range(75):
             t.move(dir)
             if t.loc == pl.loc:
                 dir = 'l'
@@ -1459,6 +1468,10 @@ def editor(stdscr, _map):
             B.put(Blocks.soldier, loc)
         elif k in 'A':
             B.put(Blocks.bars, loc)
+        elif k in 'R':
+            B.put(Blocks.rubbish, loc)
+        elif k in 'r':
+            B.put(Blocks.rabbit, loc)
 
         elif k in 'E':
             win.addstr(2,2, 'Are you sure you want to clear the map? [Y/N]')
