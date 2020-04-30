@@ -77,6 +77,7 @@ class Blocks:
     ticket_seller = '⌂'
     ferry = '🚤'
     ferry_ticket = 't'
+    soldier = '⍾'
     crates = (crate1, crate2, crate3, crate4)
 
 
@@ -130,6 +131,7 @@ class ID:
     ticket_seller1 = 25
     ferry = 26
     ferry_ticket = 27
+    grill5 = 28
 
     guard1 = 100
     technician1 = 101
@@ -299,6 +301,8 @@ class Board:
 
     def board_8(self):
         containers, crates, doors, specials = self.load_map(8)
+        Item(self, Blocks.grill, 'grill', specials[1], id=ID.grill5)
+        Item(self, Blocks.grill, 'grill', specials[2], id=ID.grill5)
 
     def board_und1(self):
         containers, crates, doors, specials = self.load_map('und1')
@@ -355,6 +359,8 @@ class Board:
                         Item(self, Blocks.stool, 'bar stool', loc)
                     elif char==Blocks.dock_boards:
                         Item(self, Blocks.dock_boards, 'dock boards', loc, type=Type.blocking)
+                    elif char==Blocks.grill:
+                        Item(self, Blocks.grill, 'barred window', loc)
                     elif char==Blocks.shelves:
                         s = Item(self, Blocks.shelves, 'shelves', loc, type=Type.container)
                         containers.append(s)
@@ -654,6 +660,9 @@ class Being(Mixin1):
                     triggered_events.append(GuardAttackEvent1)
 
         if new:
+            if ID.grill5 in B.get_ids(new):
+                new = new.mod(0,-3)
+                Windows.win2.addstr(1, 0, 'You climb through the window covered by a grill and escape to the area just outside')
             if B.loc.x==3 and new==Loc(23,8):   # TODO use trigger event location
                 triggered_events.append(ShopKeeperEvent1)
 
@@ -1107,7 +1116,7 @@ class Guard(Being):
 
 class Soldier(Being):
     health = 20
-    char = 's'
+    char = Blocks.soldier
 
 class Technician(Being):
     char = 't'
