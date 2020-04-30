@@ -79,6 +79,8 @@ class Blocks:
     ferry_ticket = 't'
     soldier = '⍾'
     bars = '┇'
+    tree1 = '🌲'
+    tree2 = '🌳'
     crates = (crate1, crate2, crate3, crate4)
 
 
@@ -316,6 +318,9 @@ class Board:
         self.spawn_locations[6] = specials[6]
         self.spawn_locations[8] = specials[8]
 
+    def board_9(self):
+        self.load_map(9)
+
     def board_und1(self):
         containers, crates, doors, specials = self.load_map('und1')
         Item(self, Blocks.grill, 'grill', specials[1], id=ID.grill3)
@@ -390,6 +395,9 @@ class Board:
 
                     elif char==Blocks.rubbish:
                         Item(self, Blocks.rubbish, 'rubbish', loc, id=ID.rubbish1)
+
+                    elif char in (Blocks.tree1, Blocks.tree2):
+                        Item(self, char, 'tree', loc)
 
                     elif char==Blocks.shelves:
                         s = Item(self, Blocks.shelves, 'shelves', loc, type=Type.container)
@@ -951,6 +959,8 @@ class JailEvent(Event):
             B.soldiers.append(c)
             Guard(B, B.spawn_locations[6], id=ID.guard2)
             Windows.win2.addstr(2,0, 'Suddenly a Groboclone appears and leads you away...')
+            # TODO: this is an ugly hack, instead an event should only be triggered when player is in state=1, and make
+            # this a once=True event
             JailEvent.once = True
 
 class TravelToPrincipalIslandEvent(Event):
@@ -1287,6 +1297,7 @@ def main(stdscr):
     b6 = Board(Loc(5,0), init_rocks=0)
     b7 = Board(Loc(6,0), init_rocks=0)
     b8 = Board(Loc(7,0), init_rocks=0)
+    b9 = Board(Loc(8,0), init_rocks=0)
     und1 = Board(Loc(0,1), init_rocks=0)
     sea1 = Board(Loc(1,1), init_rocks=0)
 
@@ -1298,9 +1309,10 @@ def main(stdscr):
     b6.board_6()
     b7.board_7()
     b8.board_8()
+    b9.board_9()
     und1.board_und1()
     sea1.board_sea1()
-    boards[:] = ([b1, b2, b3, b4, b5, b6, b7, b8], [und1, sea1])
+    boards[:] = ([b1, b2, b3, b4, b5, b6, b7, b8, b9], [und1, sea1])
 
     stdscr.clear()
     B.draw(win)
@@ -1391,7 +1403,6 @@ def main(stdscr):
 
         B.guards = [g for g in B.guards if g.health>0]
         B.soldiers = [g for g in B.soldiers if g.health>0]
-        print("B.guards", B.guards)
         for g in B.guards:
             if g.hostile:
                 g.attack(player)
@@ -1502,6 +1513,8 @@ def editor(stdscr, _map):
             B.put(Blocks.rubbish, loc)
         elif k in 'r':
             B.put(Blocks.rabbit, loc)
+        elif k in 'T':
+            B.put(choice((Blocks.tree1, Blocks.tree2)), loc)
 
         elif k in 'E':
             win.addstr(2,2, 'Are you sure you want to clear the map? [Y/N]')
