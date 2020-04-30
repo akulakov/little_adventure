@@ -295,6 +295,7 @@ class Board:
         Item(self, Blocks.grill, 'grill', specials[2], id=ID.grill4)
 
     def board_7(self):
+        self.labels.append((4,10, "𝒯𝒽𝑒 𝐹𝑒𝓇𝓇𝓎"))
         containers, crates, doors, specials = self.load_map(7)
         julien, clone1 = specials[Blocks.elephant]
         clone1.inv[ID.key3] = [Item(self, Blocks.key, 'key', id=ID.key3, put=0), 1]
@@ -915,6 +916,9 @@ class Event:
     once = 1
     def __init__(self, B):
         self.B = B
+
+class JailEvent(Event):
+    pass
 
 class TravelToPrincipalIslandEvent(Event):
     def go(self):
