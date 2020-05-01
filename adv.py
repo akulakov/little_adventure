@@ -81,6 +81,12 @@ class Blocks:
     bars = '┇'
     tree1 = '🌲'
     tree2 = '🌳'
+    books = '📚'
+    open_book = '📖'
+    guardrail_l = '╔'
+    guardrail_r = '╕'
+    guardrail_m = '╤'
+    tulip = '🌷'
     crates = (crate1, crate2, crate3, crate4)
 
 
@@ -335,6 +341,7 @@ class Board:
         containers = []
         doors = []
         specials = defaultdict(list)
+        BL=Blocks
 
         for y in range(16):
             for x in range(79):
@@ -387,6 +394,9 @@ class Board:
                     elif char==Blocks.stool:
                         Item(self, Blocks.stool, 'bar stool', loc)
 
+                    elif char==Blocks.tulip:
+                        Item(self, Blocks.tulip, 'tulip', loc)
+
                     elif char==Blocks.dock_boards:
                         Item(self, Blocks.dock_boards, 'dock boards', loc, type=Type.blocking)
 
@@ -396,8 +406,14 @@ class Board:
                     elif char==Blocks.rubbish:
                         Item(self, Blocks.rubbish, 'rubbish', loc, id=ID.rubbish1)
 
+                    elif char in (BL.books, BL.open_book):
+                        Item(self, char, 'books', loc)
+
                     elif char in (Blocks.tree1, Blocks.tree2):
                         Item(self, char, 'tree', loc)
+
+                    elif char in (BL.guardrail_l, BL.guardrail_r, BL.guardrail_m):
+                        Item(self, char, 'guardrail', loc)
 
                     elif char==Blocks.shelves:
                         s = Item(self, Blocks.shelves, 'shelves', loc, type=Type.container)
@@ -1459,15 +1475,21 @@ def editor(stdscr, _map):
 
     while 1:
         k = win.getkey()
-        if k=='q': return
+        if k=='Q': return
         elif k in 'hjklyubnHL':
-            m = dict(h=(0,-1), l=(0,1), j=(1,0), k=(-1,0), y=(-1,-1), u=(-1,1), b=(1,-1), n=(1,1), H=(0,-5), L=(0,5))[k]
-            if brush == blank:
-                B.B[loc.y][loc.x] = [blank]
-            elif brush == rock:
-                if B[loc] != rock:
-                    B.put(rock, loc)
-            loc = loc.mod(*m)
+            n = 1
+            if k in 'HL':
+                n = 5
+            m = dict(h=(0,-1), l=(0,1), j=(1,0), k=(-1,0), y=(-1,-1), u=(-1,1), b=(1,-1), n=(1,1), H=(0,-1), L=(0,1))[k]
+
+            for _ in range(n):
+                if brush == blank:
+                    B.B[loc.y][loc.x] = [blank]
+                elif brush == rock:
+                    if B[loc] != rock:
+                        B.put(rock, loc)
+                if chk_oob(loc.mod(*m)):
+                    loc = loc.mod(*m)
 
         elif k == ' ':
             brush = None
@@ -1485,36 +1507,55 @@ def editor(stdscr, _map):
             B.put(Blocks.door, loc)
         elif k in '0123456789':
             B.put(k, loc)
-        elif k in 'w':
+        elif k == 'w':
             B.put(Blocks.water, loc)
-        elif k in 't':
+        elif k == 't':
             B.put(Blocks.stool, loc)
-        elif k in 'a':
+        elif k == 'a':
             B.put(Blocks.ladder, loc)
-        elif k in 'c':
+        elif k == 'c':
             B.put(Blocks.cupboard, loc)
-        elif k in 'o':
-            B.put(Blocks.locker, loc)
-        elif k in 'B':
+        elif k == 'B':
             B.put(Blocks.dock_boards, loc)
-        elif k in 'G':
+        elif k == 'G':
             B.put(Blocks.elephant, loc)
-        elif k in 'p':
+        elif k == 'p':
             B.put(Blocks.platform_top, loc)
-        elif k in 'g':
+        elif k == 'g':
             B.put(Blocks.grill, loc)
-        elif k in 'F':
+        elif k == 'F':
             B.put(Blocks.ferry, loc)
-        elif k in 'O':
+        elif k == 'O':
             B.put(Blocks.soldier, loc)
-        elif k in 'A':
+        elif k == 'A':
             B.put(Blocks.bars, loc)
-        elif k in 'R':
+        elif k == 'R':
             B.put(Blocks.rubbish, loc)
-        elif k in 'r':
+        elif k == 'r':
             B.put(Blocks.rabbit, loc)
-        elif k in 'T':
+        elif k == 'T':
             B.put(choice((Blocks.tree1, Blocks.tree2)), loc)
+        elif k == 'z':
+            B.put(Blocks.guardrail_m, loc)
+        elif k == 'o':
+            cmds = 'gm gl gr l b ob'.split()
+            cmd = ''
+            BL=Blocks
+            while 1:
+                cmd += win.getkey()
+                if cmd == 'gm':
+                    B.put(BL.guardrail_m, loc)
+                elif cmd == 'gl':
+                    B.put(BL.guardrail_l, loc)
+                elif cmd == 'gr':
+                    B.put(BL.guardrail_r, loc)
+                elif cmd == 'l': B.put(BL.locker, loc)
+                elif cmd == 'b': B.put(BL.books, loc)
+                elif cmd == 'ob': B.put(BL.open_book, loc)
+                elif cmd == 't': B.put(BL.tulip, loc)
+                elif any(c.startswith(cmd) for c in cmds):
+                    continue
+                break
 
         elif k in 'E':
             win.addstr(2,2, 'Are you sure you want to clear the map? [Y/N]')
