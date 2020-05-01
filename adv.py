@@ -48,7 +48,7 @@ class Blocks:
     honey = '🍯'
     shelves = '☷'
     chair = '⑁'
-    fountain = '⛲' # TODO find a new unicode; doesn't work
+    fountain = '‿' # TODO find a new unicode; doesn't work
     small_table = '▿'
     table2 = '⍡'
     stool = '⍑'
@@ -81,6 +81,7 @@ class Blocks:
     guardrail_m = '╤'
     tulip = '🌷'
     monkey = '🐵'
+    
     crates = (crate1, crate2, crate3, crate4)
 
 
@@ -152,6 +153,8 @@ class ID:
     wally = 111
     chamonix = 112
     agen = 113
+    agen2 = 114
+    clermont_ferrand = 115
 
     max1 = 200
     max2 = 201
@@ -177,7 +180,14 @@ conversations = {
                   ["I'm Twinsen, I'm escaping!", "Fixing the antenna.", "Santa Claus."]],
     ID.guard2: ['Hey! I think the stone is loose in my cell! I might escape..', "Hmm, that's odd, I remember checking the camera earlier.. I guess there's no harm in checking again!"],
     ID.chamonix: ['Have you seen a young girl being led by two Groboclones?', "I haven't seen them.. ", "Here's something strange: I found a page torn out of a book which said, 'pull the middle lever once first then pull the right lever once.' Must be some kind of puzzle.", "I'm really enjoying a book about all kinds of wonders, one of them being a Clear Water Lake in the Himalayi mountains!"],
-    ID.agen: ["Did you know Dr. Funfrock installed his busts to protect and defend us? The ones that don't have pedestals are covering ancient undestructible seals that could put the entire system of governance in danger!"]
+    ID.agen: ["Did you know Dr. Funfrock installed his busts to protect and defend us? The ones that don't have pedestals are covering ancient undestructible seals that could put the entire system of governance in danger!"],
+    ID.agen2: ["Do you know anything interesting about any of the regulars here at the library?",
+               "Not much, we are all boring folk! We read immersive fictional stories and try to imagine we are in the place of the here of the story, and then the dangers and triumphs of the story can make your heart beat so fast! But outside of books, all we do is but complain of petty small things, like Clermont and his water.."],
+
+    ID.clermont_ferrand: ["I wish I was at Clear Water Lake, the lake water is so sweet. Why does our tap water have to taste so metallic? Even Citadel Island water is more palatable!",
+                          "Ah, don't I know it! And I have no choice but drink tap water from this fountain!", "Why is that?",
+                          "I wish I never went to my doctor - he is the one who told me I have to drink tap water!",
+                          "If there's anything anyone could do, I would sure be very grateful!!"],
 }
 
 def mkcell():
@@ -332,6 +342,7 @@ class Board:
         Grobo(self, specials[1], id=ID.wally, name='Wally')
         RoboBunny(self, specials[2], id=ID.chamonix, name='Mr. Chamonix')
         Being(self, specials[3], id=ID.agen, name='Agen', char=Blocks.monkey)
+        Being(self, specials[4], id=ID.clermont_ferrand, name='Clermont-Ferrand', char=Blocks.monkey)
 
     def board_und1(self):
         containers, crates, doors, specials = self.load_map('und1')
@@ -404,7 +415,7 @@ class Board:
                         Item(self, Blocks.tulip, 'tulip', loc)
 
                     elif char==Blocks.fountain:
-                        Item(self, Blocks.fountain, 'fountain', loc)
+                        Item(self, Blocks.fountain, 'water fountain basin', loc)
 
                     elif char==Blocks.dock_boards:
                         Item(self, Blocks.dock_boards, 'dock boards', loc, type=Type.blocking)
@@ -924,8 +935,18 @@ class Being(Mixin1):
             MaxQuest().go(self)
         elif ID.chamonix in B.get_ids(locs):
             self.talk(objects[ID.chamonix])
+        elif ID.clermont_ferrand in B.get_ids(locs) and objects[ID.clermont_ferrand].state==1:
+            self.talk(objects[ID.clermont_ferrand])
+
         elif ID.agen in B.get_ids(locs):
-            self.talk(objects[ID.agen])
+            agen = objects[ID.agen]
+            if agen.state == 0:
+                self.talk(objects[ID.agen])
+                agen.state = 1
+            elif agen.state == 1:
+                self.talk(objects[ID.agen], conversations[ID.agen2])
+                objects[ID.clermont_ferrand].state = 1
+
         elif ID.ticket_seller1 in B.get_ids(locs):
             seller = objects[ID.ticket_seller1]
             y = self.talk(seller, 'Would you like to buy a ferry ticket?', yesno=1)
