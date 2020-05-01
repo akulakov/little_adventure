@@ -81,6 +81,7 @@ class Blocks:
     guardrail_m = '╤'
     tulip = '🌷'
     monkey = '🐵'
+    antitank = '⋇'
     
     crates = (crate1, crate2, crate3, crate4)
 
@@ -344,6 +345,9 @@ class Board:
         Being(self, specials[3], id=ID.agen, name='Agen', char=Blocks.monkey)
         Being(self, specials[4], id=ID.clermont_ferrand, name='Clermont-Ferrand', char=Blocks.monkey)
 
+    def board_11(self):
+        self.load_map(11)
+
     def board_und1(self):
         containers, crates, doors, specials = self.load_map('und1')
         Item(self, Blocks.grill, 'grill', specials[1], id=ID.grill3)
@@ -414,6 +418,9 @@ class Board:
                     elif char==Blocks.tulip:
                         Item(self, Blocks.tulip, 'tulip', loc)
 
+                    elif char==Blocks.antitank:
+                        Item(self, Blocks.antitank, 'antitank hedgehog obstacle', loc)
+
                     elif char==Blocks.fountain:
                         Item(self, Blocks.fountain, 'water fountain basin', loc)
 
@@ -459,6 +466,10 @@ class Board:
                     elif char==Blocks.elephant:
                         g = Grobo(self, loc)
                         specials[Blocks.elephant].append(g)
+
+                    elif char==Blocks.soldier:
+                        s = Soldier(self, loc)
+                        self.soldiers.append(s)
 
                     elif char in '0123456789':
                         specials[int(char)] = loc
@@ -1375,8 +1386,10 @@ def main(stdscr):
     b9.board_9()
     b10 = Board(Loc(9,0), init_rocks=0)
     b10.board_10()
+    b11 = Board(Loc(10,0), init_rocks=0)
+    b11.board_11()
 
-    boards[:] = ([b1, b2, b3, b4, b5, b6, b7, b8, b9, b10], [und1, sea1])
+    boards[:] = ([b1, b2, b3, b4, b5, b6, b7, b8, b9, b10, b11], [und1, sea1])
 
     stdscr.clear()
     B.draw(win)
@@ -1602,6 +1615,7 @@ def editor(stdscr, _map):
                 elif cmd == 't': B.put(BL.tulip, loc)
                 elif cmd == 'f': B.put(BL.fountain, loc)
                 elif cmd == 'm': B.put(BL.monkey, loc)
+                elif cmd == 'a': B.put(BL.antitank, loc)
                 elif any(c.startswith(cmd) for c in cmds):
                     continue
                 break
