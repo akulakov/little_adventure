@@ -4,6 +4,7 @@ bugs
 
 TODO
     - update stairs on screen 2
+    - fast move attacks 5x in one turn
 """
 from curses import wrapper, newwin
 import curses
@@ -82,7 +83,10 @@ class Blocks:
     tulip = '🌷'
     monkey = '🐵'
     antitank = '⋇'
-    
+    red_circle = '🔴'
+    rock2 = '║'
+    rock2 = '▉'
+
     crates = (crate1, crate2, crate3, crate4)
 
 
@@ -139,6 +143,7 @@ class ID:
     grill5 = 28
     grill6 = 29
     bars1 = 30
+    red_card = 31
 
     guard1 = 100
     technician1 = 101
@@ -156,6 +161,8 @@ class ID:
     agen = 113
     agen2 = 114
     clermont_ferrand = 115
+    brenne = 116
+    trier = 117
 
     max1 = 200
     max2 = 201
@@ -164,7 +171,8 @@ class ID:
 items_by_id = {v:k for k,v in ID.__dict__.items()}
 descr_by_id = copy(items_by_id)
 descr_by_id.update(
-    {14: 'a jar of syrup',
+    {
+     14: 'a jar of syrup',
      10: 'a green heart',
      11: 'a simple key',
      9 : 'kashes',
@@ -182,6 +190,10 @@ conversations = {
     ID.guard2: ['Hey! I think the stone is loose in my cell! I might escape..', "Hmm, that's odd, I remember checking the camera earlier.. I guess there's no harm in checking again!"],
     ID.chamonix: ['Have you seen a young girl being led by two Groboclones?', "I haven't seen them.. ", "Here's something strange: I found a page torn out of a book which said, 'pull the middle lever once first then pull the right lever once.' Must be some kind of puzzle.", "I'm really enjoying a book about all kinds of wonders, one of them being a Clear Water Lake in the Himalayi mountains!"],
     ID.agen: ["Did you know Dr. Funfrock installed his busts to protect and defend us? The ones that don't have pedestals are covering ancient undestructible seals that could put the entire system of governance in danger!"],
+    ID.brenne: ["I've heard you fought some soldiers and clones, I guess I can trust you.. You should see my brother on the Proxima Island, I know that he made a fake red card. Just tell him the word 'Amos'. He lives in a red house, it's hard to miss."],
+
+    ID.trier: ["Hi, are you the Brenne's brother?", "Yes", "I have a message for you, it's 'AMOS'.", "You don't have to shout, but that sounds right.", "Is there anything you would like from me?", "Yes, Brenne mentioned the Red Card.", "Ah, so you are curious about all the secret places and nice things hidden therein? Well some things may be not so nice, but I'm sure you'll take it in stride, and get out getting out's what's doc ordered! Here I am, blabbering like an old senile NPC while I'm sure you have quests to finish, to prove your mettle. Here you have it, the red card, good as new! Except it shouldn't look new, that would be suspicious, so I've aged it a bit."],
+
     ID.agen2: ["Do you know anything interesting about any of the regulars here at the library?",
                "Not much, we are all boring folk! We read immersive fictional stories and try to imagine we are in the place of the here of the story, and then the dangers and triumphs of the story can make your heart beat so fast! But outside of books, all we do is but complain of petty small things, like Clermont and his water.."],
 
@@ -452,6 +464,9 @@ class Board:
                     elif char==Blocks.bars:
                         Item(self, Blocks.bars, 'jail bars', loc, type=Type.blocking)
 
+                    elif char==Blocks.rock2:
+                        Item(self, char, '', loc)
+
                     elif char==Blocks.platform_top:
                         specials[Blocks.platform_top] = loc
                         if for_editor:
@@ -652,17 +667,18 @@ class MagicBall(Item):
 
 class Being(Mixin1):
     stance = Stance.normal
-    health = 5
+    health = None
     is_being = 1
     is_player = 0
     hostile = 0
     type = None
     char = None
 
-    def __init__(self, B, loc=None, put=True, id=None, name=None, state=0, hostile=False, health=5, char='?'):
-        self.B, self.id, self.loc, self.name, self.state, self.hostile, self.health = \
-                B, id, loc, name, state, hostile, health
+    def __init__(self, B, loc=None, put=True, id=None, name=None, state=0, hostile=False, health=None, char='?'):
+        self.B, self.id, self.loc, self.name, self.state, self.hostile  = \
+                B, id, loc, name, state, hostile
 
+        self.health = self.health or health or 5
         self.char = self.char or char
         self.inv = defaultdict(int)
         self.inv[ID.coin] = 14
@@ -736,8 +752,6 @@ class Being(Mixin1):
             self.B.draw(Windows.win)
             Windows.win2.clear()
             Windows.win2.refresh()
-            # Windows.win.refresh()
-
 
     def _move(self, dir, fly=False):
         m = dict(h=(0,-1), l=(0,1), j=(1,0), k=(-1,0))[dir]
@@ -874,6 +888,7 @@ class Being(Mixin1):
 
     def hit(self, obj):
         if obj.health:
+            print("obj,obj.health", obj,obj.health)
             obj.health -= 1
             Windows.win2.addstr(1, 0, f'{self} hits {obj} for 1pt')
             if obj.is_being:
@@ -1337,12 +1352,14 @@ class Saves:
         s['beings'] = deepcopy(OtherBeings)
         s['cur_brd'] = cur_brd
         s['player'] = deepcopy(objects[ID.player])
+        print("in save s['player'].loc", s['player'].loc)
         self.saves[name] = s
 
     def load(self, name):
         s = self.saves[name]
         boards[:] = s['boards']
         loc = s['player'].loc
+        print("load, player loc", loc)
         bl = s['cur_brd']
         B = boards[bl.y][bl.x]
         player = B[loc]
@@ -1598,6 +1615,8 @@ def editor(stdscr, _map):
             B.put(choice((Blocks.tree1, Blocks.tree2)), loc)
         elif k == 'z':
             B.put(Blocks.guardrail_m, loc)
+        elif k == 'x':
+            B.put(Blocks.rock2, loc)
 
         elif k == 'o':
             cmds = 'gm gl gr l b ob f'.split()
