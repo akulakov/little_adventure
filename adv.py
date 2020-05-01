@@ -712,9 +712,7 @@ class Being(Mixin1):
             txt = wrap(txt, w)
             txt = '\n'.join(txt)
             offset_y = lines if loc.y<8 else -lines
-            #       (13, 21, 10, -13, 57)
 
-            print(lines, w, loc.y, offset_y, x)
             y = max(0, loc.y+offset_y)
             win = newwin(lines, w, y, x)
             win.addstr(0,0, txt + (' [Y/N]' if yesno else ''))
@@ -735,6 +733,10 @@ class Being(Mixin1):
                         return k
             win.getkey()
             del win
+            self.B.draw(Windows.win)
+            Windows.win2.clear()
+            Windows.win2.refresh()
+            # Windows.win.refresh()
 
 
     def _move(self, dir, fly=False):
