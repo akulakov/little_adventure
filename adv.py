@@ -29,13 +29,6 @@ objects = {}
 timers = []
 
 
-class Objects:
-    obj = {}
-    def __getitem__(self, id):
-        return self.obj.get(id)
-    def __setitem__(self, id, obj):
-        self.obj[id] = obj
-
 class Blocks:
     platform = '▁'
     bell = '🔔'
@@ -55,7 +48,7 @@ class Blocks:
     honey = '🍯'
     shelves = '☷'
     chair = '⑁'
-    fountain = '⛲'
+    fountain = '⛲' # TODO find a new unicode; doesn't work
     small_table = '▿'
     table2 = '⍡'
     stool = '⍑'
@@ -87,6 +80,7 @@ class Blocks:
     guardrail_r = '╕'
     guardrail_m = '╤'
     tulip = '🌷'
+    monkey = '🐵'
     crates = (crate1, crate2, crate3, crate4)
 
 
@@ -155,6 +149,9 @@ class ID:
     julien = 108
     soldier2 = 109
     guard2 = 110
+    wally = 111
+    chamonix = 112
+    agen = 113
 
     max1 = 200
     max2 = 201
@@ -178,7 +175,9 @@ conversations = {
     ID.julien: ['Have you seen a young girl being led by two Groboclones?', 'Yes, they were here earlier today, they got on a speedboat and were off. Destination unknown.'],
     ID.soldier2: ['Wait! How did you get here, and who are you?',
                   ["I'm Twinsen, I'm escaping!", "Fixing the antenna.", "Santa Claus."]],
-    ID.guard2: ['Hey! I think the stone is loose in my cell! I might escape..', "Hmm, that's odd, I remember checking the camera earlier.. I guess there's no harm in checking again!"]
+    ID.guard2: ['Hey! I think the stone is loose in my cell! I might escape..', "Hmm, that's odd, I remember checking the camera earlier.. I guess there's no harm in checking again!"],
+    ID.chamonix: ['Have you seen a young girl being led by two Groboclones?', "I haven't seen them.. ", "Here's something strange: I found a page torn out of a book which said, 'pull the middle lever once first then pull the right lever once.' Must be some kind of puzzle.", "I'm really enjoying a book about all kinds of wonders, one of them being a Clear Water Lake in the Himalayi mountains!"],
+    ID.agen: ["Did you know Dr. Funfrock installed his busts to protect and defend us? The ones that don't have pedestals are covering ancient undestructible seals that could put the entire system of governance in danger!"]
 }
 
 def mkcell():
@@ -325,7 +324,14 @@ class Board:
         self.spawn_locations[8] = specials[8]
 
     def board_9(self):
+        # trees map
         self.load_map(9)
+
+    def board_10(self):
+        containers, crates, doors, specials = self.load_map(10)
+        Grobo(self, specials[1], id=ID.wally, name='Wally')
+        RoboBunny(self, specials[2], id=ID.chamonix, name='Mr. Chamonix')
+        Being(self, specials[3], id=ID.agen, name='Agen', char=Blocks.monkey)
 
     def board_und1(self):
         containers, crates, doors, specials = self.load_map('und1')
@@ -396,6 +402,9 @@ class Board:
 
                     elif char==Blocks.tulip:
                         Item(self, Blocks.tulip, 'tulip', loc)
+
+                    elif char==Blocks.fountain:
+                        Item(self, Blocks.fountain, 'fountain', loc)
 
                     elif char==Blocks.dock_boards:
                         Item(self, Blocks.dock_boards, 'dock boards', loc, type=Type.blocking)
@@ -520,7 +529,6 @@ class Board:
     def remove(self, obj, loc=None):
         loc = loc or obj.loc
         self.B[loc.y][loc.x].remove(obj)
-        print("self.B[loc.y][loc.x]", self.B[loc.y][loc.x])
 
     def is_blocked(self, loc):
         for x in self.get_all(loc):
@@ -590,7 +598,6 @@ class Item(Mixin1):
         m = dict(h=(0,-1), l=(0,1), j=(1,0), k=(-1,0))[dir]
         new = self.loc.mod(*m)
         self.B.remove(self)
-        print(self.loc, "self.B.get_all(self.loc)", self.B.get_all(self.loc))
         self.loc = new
         self.B.put(self)
 
@@ -628,11 +635,13 @@ class Being(Mixin1):
     is_player = 0
     hostile = 0
     type = None
+    char = None
 
-    def __init__(self, B, loc=None, put=True, id=None, name=None, state=0, hostile=False, health=5):
+    def __init__(self, B, loc=None, put=True, id=None, name=None, state=0, hostile=False, health=5, char='?'):
         self.B, self.id, self.loc, self.name, self.state, self.hostile, self.health = \
                 B, id, loc, name, state, hostile, health
 
+        self.char = self.char or char
         self.inv = defaultdict(int)
         self.inv[ID.coin] = 14
         self.inv[ID.key1] = 2
@@ -763,12 +772,20 @@ class Being(Mixin1):
                 # fall
                 new2 = new
                 while 1:
+                    # TODO: these may overdraw non-blocking items; it's an ugly hack but creates a nice fall animation
+                    # for now
+                    Windows.win.addstr(self.loc.y, self.loc.x, ' ')
+                    Windows.win.addstr(new2.y, new2.x, ' ')
                     new2 = new2.mod(1,0)
                     if getattr(B[new2], 'type', None) == Type.water:
                         triggered_events.append(DieEvent)
                         Windows.win2.addstr(1, 0, 'You fall into the water and drown...')
                         return None, None
                     if chk_oob(new2) and B.avail(new2) and not Type.ladder in B.get_types(new2):
+                        # ugly hack for the fall animation
+                        Windows.win.addstr(new2.y, new2.x, str(self))
+                        sleep(0.1)
+                        Windows.win.refresh()
                         new = new2
                     else:
                         break
@@ -838,8 +855,6 @@ class Being(Mixin1):
                     Item(self.B, Blocks.coin, 'one kash', obj.loc, id=ID.coin)
                 elif random()>0.6:
                     Item(self.B, Blocks.grn_heart, 'heart', obj.loc, id=ID.grn_heart)
-                print("obj", obj)
-                print("obj.inv", obj.inv)
                 for k, val in obj.inv.items():    # TODO: create according to `qty`
                     # temp hack around all beings having some coin
                     if isinstance(val, int): continue
@@ -902,6 +917,8 @@ class Being(Mixin1):
             objects[ID.guard2].move('l')
         elif ID.max in B.get_ids(locs):
             MaxQuest().go(self)
+        elif ID.chamonix in B.get_ids(locs):
+            self.talk(objects[ID.chamonix])
         elif ID.ticket_seller1 in B.get_ids(locs):
             seller = objects[ID.ticket_seller1]
             y = self.talk(seller, 'Would you like to buy a ferry ticket?', yesno=1)
@@ -1105,7 +1122,6 @@ class ClimbThroughGrillEvent3(Event):
             player.state = 1
         elif player.state == 1:
             player.state = 2
-        print("player.state", player.state)
         return player.move_to_board(b_loc, Loc(72, GROUND))
 
 class AlarmEvent1(Event):
@@ -1150,9 +1166,7 @@ class PlatformEvent2(Event):
         pl = objects[ID.player]
         dir = 'j' if pl.loc.y == GROUND-4 else 'k'
         for _ in range(45):
-            ploc = p.loc
             p.move(dir)
-            print("at ploc", str(B.get_all(ploc)))
             pl.move(dir, fly=1)
             if pl.loc.y in (GROUND, GROUND-4):
                 break
@@ -1325,10 +1339,16 @@ def main(stdscr):
     b6.board_6()
     b7.board_7()
     b8.board_8()
-    b9.board_9()
+
     und1.board_und1()
     sea1.board_sea1()
-    boards[:] = ([b1, b2, b3, b4, b5, b6, b7, b8, b9], [und1, sea1])
+
+    b9 = Board(Loc(8,0), init_rocks=0)
+    b9.board_9()
+    b10 = Board(Loc(9,0), init_rocks=0)
+    b10.board_10()
+
+    boards[:] = ([b1, b2, b3, b4, b5, b6, b7, b8, b9, b10], [und1, sea1])
 
     stdscr.clear()
     B.draw(win)
@@ -1432,9 +1452,7 @@ def main(stdscr):
             player, B = Saves().load('start')
 
         for evt in triggered_events:
-            print(evt)
             if evt in done_events and evt.once:
-                print('skipping event', evt)
                 continue
             rv = evt(B).go()
             if isinstance(rv, Board):
@@ -1537,8 +1555,9 @@ def editor(stdscr, _map):
             B.put(choice((Blocks.tree1, Blocks.tree2)), loc)
         elif k == 'z':
             B.put(Blocks.guardrail_m, loc)
+
         elif k == 'o':
-            cmds = 'gm gl gr l b ob'.split()
+            cmds = 'gm gl gr l b ob f'.split()
             cmd = ''
             BL=Blocks
             while 1:
@@ -1553,6 +1572,8 @@ def editor(stdscr, _map):
                 elif cmd == 'b': B.put(BL.books, loc)
                 elif cmd == 'ob': B.put(BL.open_book, loc)
                 elif cmd == 't': B.put(BL.tulip, loc)
+                elif cmd == 'f': B.put(BL.fountain, loc)
+                elif cmd == 'm': B.put(BL.monkey, loc)
                 elif any(c.startswith(cmd) for c in cmds):
                     continue
                 break
