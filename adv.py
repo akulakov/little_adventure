@@ -684,12 +684,17 @@ class Being(Mixin1):
                 for n, t in enumerate(txt):
                     lst.append(f'{n+1}) {t}')
                 txt = '\n'.join(lst)
+            x = min(40, x)
             w = 78 - x
             lines = (len(txt) // w) + 4
             txt = wrap(txt, w)
             txt = '\n'.join(txt)
             offset_y = lines if loc.y<8 else -lines
-            win = newwin(lines, w, loc.y+offset_y, x)
+            #       (13, 21, 10, -13, 57)
+
+            print(lines, w, loc.y, offset_y, x)
+            y = max(0, loc.y+offset_y)
+            win = newwin(lines, w, y, x)
             win.addstr(0,0, txt + (' [Y/N]' if yesno else ''))
             if yesno:
                 # TODO in some one-time dialogs, may need to detect 'no' explicitly
@@ -784,7 +789,7 @@ class Being(Mixin1):
                     if chk_oob(new2) and B.avail(new2) and not Type.ladder in B.get_types(new2):
                         # ugly hack for the fall animation
                         Windows.win.addstr(new2.y, new2.x, str(self))
-                        sleep(0.1)
+                        sleep(0.05)
                         Windows.win.refresh()
                         new = new2
                     else:
@@ -919,6 +924,8 @@ class Being(Mixin1):
             MaxQuest().go(self)
         elif ID.chamonix in B.get_ids(locs):
             self.talk(objects[ID.chamonix])
+        elif ID.agen in B.get_ids(locs):
+            self.talk(objects[ID.agen])
         elif ID.ticket_seller1 in B.get_ids(locs):
             seller = objects[ID.ticket_seller1]
             y = self.talk(seller, 'Would you like to buy a ferry ticket?', yesno=1)
@@ -1418,7 +1425,7 @@ def main(stdscr):
         elif k == '8':
             B = player.move_to_board( Loc(7,0), Loc(7, GROUND) )
         elif k == '9':
-            B = player.move_to_board( Loc(1,1), Loc(7, GROUND) )
+            B = player.move_to_board( Loc(9,0), Loc(7, GROUND) )
         elif k == 'U':
             B = player.move_to_board( Loc(0,1), Loc(35, 10) )
         elif k == 'E':
