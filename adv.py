@@ -255,28 +255,13 @@ class Board:
         self.loc = loc
 
     def board_1(self):
-        Item(self, Blocks.platform, 'mobile platform', Loc(15, GROUND), id=ID.platform1)
-        g = Guard(self, Loc(15, GROUND), id=ID.guard1)
+        containers, crates, doors, specials = self.load_map(1)
+        containers[3].inv[ID.key1] = 1
+        Item(self, Blocks.platform, 'mobile platform', specials[1], id=ID.platform1)
+        g = Guard(self, specials[1], id=ID.guard1)
         self.guards = [g]
-
-        self.put(rock, Loc(5, GROUND))
-        self.put(rock, Loc(5, GROUND-1))
-        for x in range(4):
-            Item(self, Blocks.grill, 'grill', Loc(20+(x*4), GROUND))
-        Item(self, Blocks.grill, 'grill', Loc(20+16, GROUND), id=ID.grill1)
-
-        Item(self, Blocks.key, 'key', Loc(37,GROUND), id=ID.key1)
-        c = Locker(self, Loc(40,GROUND))
-        c.inv[ID.coin] += 1
-        c = Locker(self, Loc(42,GROUND))
-        c = Locker(self, Loc(44,GROUND))
-        Item(self, Blocks.door, 'door', Loc(48,GROUND), type=Type.door1)
-        Item(self, Blocks.block1, 'block', Loc(48,GROUND-1))
-        MagicBall(self, Loc(50, GROUND))
-
-        p = Player(self, Loc(start_x_loc, GROUND), id=ID.player)
-
-        # objects[ID.player] = p
+        Item(self, Blocks.grill, 'grill', specials[2], id=ID.grill1)
+        p = Player(self, specials[3], id=ID.player)
         return p
 
     def board_2(self):
@@ -1075,7 +1060,7 @@ class GuardAttackEvent1(Event):
         x, y = guard.loc
         platform = objects[ID.platform1]
 
-        for _ in range(35):
+        for _ in range(55):
             if mode==1:
                 if y>=HEIGHT-10:
                     platform.move('k')
