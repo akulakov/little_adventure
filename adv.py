@@ -167,6 +167,7 @@ class ID:
     max1 = 200
     max2 = 201
     trick_guard = 202
+    talk_to_brenne = 203
 
 items_by_id = {v:k for k,v in ID.__dict__.items()}
 descr_by_id = copy(items_by_id)
@@ -241,12 +242,8 @@ class Loc:
 
 
 class Board:
-    def __init__(self, loc, init_rocks=True):
+    def __init__(self, loc):
         self.B = B = [mkrow() for _ in range(HEIGHT)]
-        bottom = B[-1]
-        if init_rocks:
-            for cell in bottom:
-                cell.append(rock)
         self.guards = []
         self.soldiers = []
         self.labels = []
@@ -342,6 +339,13 @@ class Board:
     def board_11(self):
         self.load_map(11)
 
+    def board_12(self):
+        self.labels.append((3,47, "𝒯𝒽𝑒 𝒞𝒾𝓉𝒶𝒹𝑒𝓁"))
+        specials = self.load_map(12)[3]
+        RoboBunny(self, specials[1], id=ID.brenne, name='Brenne')
+        Item(self, '', '', specials[1].mod(0,-2), id=ID.talk_to_brenne)
+
+    # -----------------------------------------------------------------------------------------------
     def board_und1(self):
         containers, crates, doors, specials = self.load_map('und1')
         Item(self, Blocks.grill, 'grill', specials[1], id=ID.grill3)
@@ -944,6 +948,8 @@ class Being(Mixin1):
             self.talk(objects[ID.guard2])
             B.remove(objects[ID.bars1])
             objects[ID.guard2].move('l')
+        elif ID.talk_to_brenne in B.get_ids(locs):
+            self.talk(objects[ID.brenne])
         elif ID.max in B.get_ids(locs):
             MaxQuest().go(self)
         elif ID.chamonix in B.get_ids(locs):
@@ -1372,12 +1378,12 @@ def main(stdscr):
     b3 = Board(Loc(2,0))
     b4 = Board(Loc(3,0))
     b5 = Board(Loc(4,0))
-    b6 = Board(Loc(5,0), init_rocks=0)
-    b7 = Board(Loc(6,0), init_rocks=0)
-    b8 = Board(Loc(7,0), init_rocks=0)
-    b9 = Board(Loc(8,0), init_rocks=0)
-    und1 = Board(Loc(0,1), init_rocks=0)
-    sea1 = Board(Loc(1,1), init_rocks=0)
+    b6 = Board(Loc(5,0))
+    b7 = Board(Loc(6,0))
+    b8 = Board(Loc(7,0))
+    b9 = Board(Loc(8,0))
+    und1 = Board(Loc(0,1))
+    sea1 = Board(Loc(1,1))
 
     player = b1.board_1()
     b2.board_2()
@@ -1391,14 +1397,16 @@ def main(stdscr):
     und1.board_und1()
     sea1.board_sea1()
 
-    b9 = Board(Loc(8,0), init_rocks=0)
+    b9 = Board(Loc(8,0))
     b9.board_9()
-    b10 = Board(Loc(9,0), init_rocks=0)
+    b10 = Board(Loc(9,0))
     b10.board_10()
-    b11 = Board(Loc(10,0), init_rocks=0)
+    b11 = Board(Loc(10,0))
     b11.board_11()
+    b12 = Board(Loc(11,0))
+    b12.board_12()
 
-    boards[:] = ([b1, b2, b3, b4, b5, b6, b7, b8, b9, b10, b11], [und1, sea1])
+    boards[:] = ([b1, b2, b3, b4, b5, b6, b7, b8, b9, b10, b11, b12], [und1, sea1])
 
     stdscr.clear()
     B.draw(win)
@@ -1469,6 +1477,8 @@ def main(stdscr):
             B = player.move_to_board( Loc(7,0), Loc(7, GROUND) )
         elif k == '9':
             B = player.move_to_board( Loc(9,0), Loc(7, GROUND) )
+        elif k == '0':
+            B = player.move_to_board( Loc(11,0), Loc(7, GROUND-1) )
         elif k == 'U':
             B = player.move_to_board( Loc(0,1), Loc(35, 10) )
         elif k == 'E':
