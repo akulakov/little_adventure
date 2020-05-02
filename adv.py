@@ -85,7 +85,7 @@ class Blocks:
     antitank = '⋇'
     red_circle = '🔴'
     rock2 = '║'
-    rock2 = '▉'
+    rock2 = '▧'
 
     crates = (crate1, crate2, crate3, crate4)
 
@@ -270,7 +270,7 @@ class Board:
         c.inv[ID.coin] += 1
         c = Locker(self, Loc(42,GROUND))
         c = Locker(self, Loc(44,GROUND))
-        Item(self, Blocks.door, 'door', Loc(48,GROUND), id=ID.door1, type=Type.door1)
+        Item(self, Blocks.door, 'door', Loc(48,GROUND), type=Type.door1)
         Item(self, Blocks.block1, 'block', Loc(48,GROUND-1))
         MagicBall(self, Loc(50, GROUND))
 
@@ -281,13 +281,10 @@ class Board:
 
     def board_2(self):
         """Technician, alarm."""
-        for x in range(5):
-            row = self.B[-2-x]
-            for cell in row[10+x:]:
-                cell.append(rock)
-        Technician(self, Loc(20, GROUND-5), id=ID.technician1)
-        Item(self, Blocks.bell, 'alarm bell', Loc(25, GROUND-5), id=ID.alarm1)
-        Item(self, Blocks.door, 'door', Loc(15, GROUND-5), id=ID.door1, type=Type.door1)
+        containers, crates, doors, specials = self.load_map(2)
+        Technician(self, specials[1], id=ID.technician1)
+        Item(self, Blocks.bell, 'alarm bell', specials[2], id=ID.alarm1)
+        doors[0].id = ID.door1
 
     def board_3(self):
         """Soldier, rubbish heap."""
@@ -780,6 +777,9 @@ class Being(Mixin1):
 
         # TODO This is a little messy, doors are by type and keys are by ID
         if new and Type.door1 in B.get_types(new) and self.inv[ID.key1]:
+            d = B[new]
+            if d.id == ID.door1:
+                triggered_events.append(AlarmEvent1)
             B.remove(B[new])    # TODO will not work if something is on top of door
             self.inv[ID.key1] -= 1
             Windows.win2.addstr(2,0, 'You open the door with your key')
@@ -859,8 +859,8 @@ class Being(Mixin1):
             # this needs to be after previous block because the block looks at `top_obj` which would always be the being
             # instead of an event trigger item
             self.put(new)
-            if ID.door1 in B.get_ids(self.loc):
-                triggered_events.append(AlarmEvent1)
+            # if ID.door1 in B.get_ids(self.loc):
+            #     triggered_events.append(AlarmEvent1)
             grills = set((ID.grill1, ID.grill2))
             if self.sneaky_stance:
                 if (grills & set(B.get_ids(self.loc))):
@@ -1351,7 +1351,11 @@ class Saves:
         s['boards'] = deepcopy(boards)
         s['beings'] = deepcopy(OtherBeings)
         s['cur_brd'] = cur_brd
+        player = objects[ID.player]
         s['player'] = deepcopy(objects[ID.player])
+        bl = cur_brd
+        B = boards[bl.y][bl.x]
+        print("B.get_all(player.loc)", B.get_all(player.loc))
         print("in save s['player'].loc", s['player'].loc)
         self.saves[name] = s
 
@@ -1362,6 +1366,7 @@ class Saves:
         print("load, player loc", loc)
         bl = s['cur_brd']
         B = boards[bl.y][bl.x]
+        print("B.get_all(loc)", B.get_all(loc))
         player = B[loc]
         # pdb(B, loc)
         player.B = B
@@ -1617,6 +1622,8 @@ def editor(stdscr, _map):
             B.put(Blocks.guardrail_m, loc)
         elif k == 'x':
             B.put(Blocks.rock2, loc)
+        elif k == 'X':
+            B.put(Blocks.shelves, loc)
 
         elif k == 'o':
             cmds = 'gm gl gr l b ob f'.split()
