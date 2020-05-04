@@ -348,6 +348,9 @@ class Board:
         RoboBunny(self, specials[1], id=ID.brenne, name='Brenne')
         Item(self, '', '', specials[1].mod(0,-2), id=ID.talk_to_brenne)
 
+    def board_top1(self):
+        specials = self.load_map('top1')[3]
+
     # -----------------------------------------------------------------------------------------------
     def board_und1(self):
         containers, crates, doors, specials = self.load_map('und1')
@@ -1415,7 +1418,10 @@ def main(stdscr):
     b12 = Board(Loc(11,1))
     b12.board_12()
 
-    boards[:] = ([], [b1, b2, b3, b4, b5, b6, b7, b8, b9, b10, b11, b12], [und1])
+    top1 = Board(Loc(9,0))
+    top1.board_top1()
+
+    boards[:] = ([None,None,None,None, None,None,None,None, None,top1], [b1, b2, b3, b4, b5, b6, b7, b8, b9, b10, b11, b12], [und1])
 
     stdscr.clear()
     B.draw(win)
@@ -1454,8 +1460,12 @@ def main(stdscr):
                 rv = player.move(k)
             if rv[0] == LOAD_BOARD:
                 loc = rv[1]
-                x = 0 if k=='l' else 78     # TODO support up/down
-                p_loc = Loc(x, player.loc.y)
+                x, y = player.loc
+                if k=='l': x = 0
+                if k=='h': x = 78
+                if k=='k': y = 15
+                if k=='j': y = 0
+                p_loc = Loc(x, y)
                 B = player.move_to_board(loc, p_loc)
 
         elif k == '.':
