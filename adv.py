@@ -169,6 +169,9 @@ class ID:
     trick_guard = 202
     talk_to_brenne = 203
 
+    sea_level1 = 300
+
+
 items_by_id = {v:k for k,v in ID.__dict__.items()}
 descr_by_id = copy(items_by_id)
 descr_by_id.update(
@@ -581,7 +584,7 @@ def chk_oob(loc, y=0, x=0):
 
 def chk_b_oob(loc, y=0, x=0):
     h = len(boards)
-    w = len(boards[0])
+    w = len(boards[1])
     return 0 <= loc.y+y <= h-1 and 0 <= loc.x+x <= w-1
 
 def ids(lst):
@@ -1047,14 +1050,14 @@ class TravelToPrincipalIslandEvent(Event):
     def go(self):
         player = objects[ID.player]
         player.inv[ID.ferry_ticket] = 0
-        B = boards[1][1]
+        B = objects[ID.sea_level1]
         f = objects[ID.ferry]
         for _ in range(75):
             f.move('h')
             B.draw(Windows.win)
             sleep(0.15)
         Windows.win2.addstr(2,0, 'You have taken the ferry to Principal island.')
-        return player.move_to_board( Loc(7,0), Loc(7, GROUND) )
+        return player.move_to_board( Loc(7, self.B.loc[1]), Loc(7, GROUND) )
 
 class GuardAttackEvent1(Event):
     def go(self):
@@ -1142,7 +1145,7 @@ class ClimbThroughGrillEvent1(Event):
         player = objects[ID.player]
         bi = self.B.loc.x
         loc = Loc(25 if bi==0 else 36, GROUND)
-        b_loc = Loc(2 if bi==0 else 0, 0)
+        b_loc = Loc(2 if bi==0 else 0, self.B.loc.y)
         Windows.win2.addstr(2,0, 'You climb through the grill into a space that opens into an open area outside the building')
         return player.move_to_board(b_loc, loc)
 
@@ -1151,8 +1154,12 @@ class ClimbThroughGrillEvent2(Event):
     def go(self):
         player = objects[ID.player]
         bi = self.B.loc.x
+        brd_y = self.B.loc.y
         x = 0 if bi==5 else 5
-        y = 1 if bi==5 else 0
+        if bi==5:
+            y-=1
+        else:
+            y+=1
         b_loc = Loc(x, y)
         Windows.win2.addstr(2,0, 'You climb through the grill ' + ('into a strange underground area' if bi==5 else 'back into your home'))
         return player.move_to_board(b_loc, Loc(62,10))
@@ -1163,7 +1170,7 @@ class ClimbThroughGrillEvent3(Event):
         player = objects[ID.player]
         bi = self.B.loc.x
         x = 6 if bi==5 else 5
-        b_loc = Loc(x, 0)
+        b_loc = Loc(x, self.B.loc.y)
         Windows.win2.addstr(2,0, 'You climb through the grill into ' + ('the port area' if bi==5 else 'back to the shore near your home'))
         if player.state == 0:
             player.state = 1
@@ -1204,7 +1211,7 @@ class GarbageTruckEvent(Event):
                 break
             B.draw(Windows.win)
             sleep(SLP)
-        return pl.move_to_board(Loc(3,0), Loc(0,GROUND))
+        return pl.move_to_board(Loc(3, B.loc.y), Loc(0,GROUND))
 
 class PlatformEvent2(Event):
     def go(self):
@@ -1373,17 +1380,19 @@ def main(stdscr):
     win = Windows.win = newwin(HEIGHT, width, begin_y, begin_x)
     begin_x = 0; begin_y = 16; height = 6; width = 80
     win2 = Windows.win2 = newwin(height, width, begin_y, begin_x)
-    B = b1 = Board(Loc(0,0))
-    b2 = Board(Loc(1,0))
-    b3 = Board(Loc(2,0))
-    b4 = Board(Loc(3,0))
-    b5 = Board(Loc(4,0))
-    b6 = Board(Loc(5,0))
-    b7 = Board(Loc(6,0))
-    b8 = Board(Loc(7,0))
-    b9 = Board(Loc(8,0))
-    und1 = Board(Loc(0,1))
-    sea1 = Board(Loc(1,1))
+    B = b1 = Board(Loc(0,1))
+    b2 = Board(Loc(1,1))
+    b3 = Board(Loc(2,1))
+    b4 = Board(Loc(3,1))
+    b5 = Board(Loc(4,1))
+    b6 = Board(Loc(5,1))
+    b7 = Board(Loc(6,1))
+    b8 = Board(Loc(7,1))
+    b9 = Board(Loc(8,1))
+
+    und1 = Board(Loc(0,0))
+    sea1 = Board(None)
+    objects[ID.sea_level1] = sea1
 
     player = b1.board_1()
     b2.board_2()
@@ -1397,16 +1406,16 @@ def main(stdscr):
     und1.board_und1()
     sea1.board_sea1()
 
-    b9 = Board(Loc(8,0))
+    b9 = Board(Loc(8,1))
     b9.board_9()
-    b10 = Board(Loc(9,0))
+    b10 = Board(Loc(9,1))
     b10.board_10()
-    b11 = Board(Loc(10,0))
+    b11 = Board(Loc(10,1))
     b11.board_11()
-    b12 = Board(Loc(11,0))
+    b12 = Board(Loc(11,1))
     b12.board_12()
 
-    boards[:] = ([b1, b2, b3, b4, b5, b6, b7, b8, b9, b10, b11, b12], [und1, sea1])
+    boards[:] = ([], [b1, b2, b3, b4, b5, b6, b7, b8, b9, b10, b11, b12], [und1])
 
     stdscr.clear()
     B.draw(win)
@@ -1466,21 +1475,21 @@ def main(stdscr):
         elif k == ' ':
             player.action()
         elif k == '4':
-            B = player.move_to_board( Loc(3,0), Loc(35, GROUND-5) )
+            B = player.move_to_board( Loc(3,1), Loc(35, GROUND-5) )
         elif k == '5':
-            B = player.move_to_board( Loc(4,0), Loc(35, GROUND) )
+            B = player.move_to_board( Loc(4,1), Loc(35, GROUND) )
         elif k == '6':
-            B = player.move_to_board( Loc(5,0), Loc(35, GROUND) )
+            B = player.move_to_board( Loc(5,1), Loc(35, GROUND) )
         elif k == '7':
-            B = player.move_to_board( Loc(6,0), Loc(72, GROUND) )
+            B = player.move_to_board( Loc(6,1), Loc(72, GROUND) )
         elif k == '8':
-            B = player.move_to_board( Loc(7,0), Loc(7, GROUND) )
+            B = player.move_to_board( Loc(7,1), Loc(7, GROUND) )
         elif k == '9':
-            B = player.move_to_board( Loc(9,0), Loc(7, GROUND) )
+            B = player.move_to_board( Loc(9,1), Loc(7, GROUND) )
         elif k == '0':
-            B = player.move_to_board( Loc(11,0), Loc(7, GROUND-1) )
+            B = player.move_to_board( Loc(11,1), Loc(7, GROUND-1) )
         elif k == 'U':
-            B = player.move_to_board( Loc(0,1), Loc(35, 10) )
+            B = player.move_to_board( Loc(0,0), Loc(35, 10) )
         elif k == 'E':
             B.display(str(B.get_all(player.loc)))
         elif k == 'm':
