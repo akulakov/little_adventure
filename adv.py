@@ -86,6 +86,7 @@ class Blocks:
     red_circle = '🔴'
     rock2 = '║'
     rock2 = '▧'
+    platform2 = '▭'
 
     crates = (crate1, crate2, crate3, crate4)
 
@@ -111,7 +112,8 @@ class Type:
     blocking = 13
     door3 = 14
 
-BLOCKING = [rock, Type.door1, Type.door2, Type.door3, Blocks.block1, Blocks.steps_r, Blocks.steps_l, Type.platform_top, Type.door_top_block, Type.blocking]
+BLOCKING = [rock, Type.door1, Type.door2, Type.door3, Blocks.block1, Blocks.steps_r, Blocks.steps_l, Type.platform_top,
+            Type.door_top_block, Type.blocking]
 
 class ID:
     platform1 = 1
@@ -419,6 +421,7 @@ class Board:
                     elif char==Blocks.stool:
                         Item(self, Blocks.stool, 'bar stool', loc)
 
+
                     elif char==Blocks.tulip:
                         Item(self, Blocks.tulip, 'tulip', loc)
 
@@ -466,6 +469,9 @@ class Board:
 
                     elif char==Blocks.steps_l:
                         self.put(Blocks.steps_l, loc)
+
+                    elif char==Blocks.platform2:
+                        Item(self, Blocks.platform2, '', loc, type=Type.blocking)
 
                     elif char==Blocks.steps_r:
                         self.put(Blocks.steps_r, loc)
@@ -561,6 +567,8 @@ class Board:
 
     def is_blocked(self, loc):
         for x in self.get_all(loc):
+            print("x", x)
+            print("x in BLOCKING", x in BLOCKING)
             if x in BLOCKING or getattr(x, 'type', None) in BLOCKING:
                 return True
         return False
@@ -1421,7 +1429,9 @@ def main(stdscr):
     top1 = Board(Loc(9,0))
     top1.board_top1()
 
-    boards[:] = ([None,None,None,None, None,None,None,None, None,top1], [b1, b2, b3, b4, b5, b6, b7, b8, b9, b10, b11, b12], [und1])
+    boards[:] = ([None,None,None,None, None,None,None,None, None,top1],
+                 [b1, b2, b3, b4, b5, b6, b7, b8, b9, b10, b11, b12],
+                 [und1])
 
     stdscr.clear()
     B.draw(win)
@@ -1580,11 +1590,8 @@ def editor(stdscr, _map):
             m = dict(h=(0,-1), l=(0,1), j=(1,0), k=(-1,0), y=(-1,-1), u=(-1,1), b=(1,-1), n=(1,1), H=(0,-1), L=(0,1))[k]
 
             for _ in range(n):
-                if brush == blank:
-                    B.B[loc.y][loc.x] = [blank]
-                elif brush == rock:
-                    if B[loc] != rock:
-                        B.put(rock, loc)
+                if brush:
+                    B.B[loc.y][loc.x] = [brush]
                 if chk_oob(loc.mod(*m)):
                     loc = loc.mod(*m)
 
@@ -1596,8 +1603,10 @@ def editor(stdscr, _map):
             brush = rock
         elif k == 's':
             B.put(Blocks.steps_r, loc)
+            brush = Blocks.steps_r
         elif k == 'S':
             B.put(Blocks.steps_l, loc)
+            brush = Blocks.steps_l
         elif k == 'M':
             B.put(Blocks.smoke_pipe, loc)
         elif k == 'd':
@@ -1614,28 +1623,32 @@ def editor(stdscr, _map):
             B.put(Blocks.cupboard, loc)
         elif k == 'B':
             B.put(Blocks.dock_boards, loc)
-        elif k == 'G':
-            B.put(Blocks.elephant, loc)
         elif k == 'p':
             B.put(Blocks.platform_top, loc)
         elif k == 'g':
             B.put(Blocks.grill, loc)
         elif k == 'F':
             B.put(Blocks.ferry, loc)
-        elif k == 'O':
-            B.put(Blocks.soldier, loc)
         elif k == 'A':
             B.put(Blocks.bars, loc)
         elif k == 'R':
             B.put(Blocks.rubbish, loc)
+
+        elif k == 'G':
+            B.put(Blocks.elephant, loc)
         elif k == 'r':
             B.put(Blocks.rabbit, loc)
+        elif k == 'O':
+            B.put(Blocks.soldier, loc)
+
         elif k == 'T':
             B.put(choice((Blocks.tree1, Blocks.tree2)), loc)
         elif k == 'z':
             B.put(Blocks.guardrail_m, loc)
+            brush = Blocks.guardrail_m
         elif k == 'x':
             B.put(Blocks.rock2, loc)
+            brush = Blocks.rock2
         elif k == 'X':
             B.put(Blocks.shelves, loc)
 
@@ -1645,19 +1658,20 @@ def editor(stdscr, _map):
             BL=Blocks
             while 1:
                 cmd += win.getkey()
-                if cmd == 'gm':
-                    B.put(BL.guardrail_m, loc)
-                elif cmd == 'gl':
-                    B.put(BL.guardrail_l, loc)
-                elif cmd == 'gr':
-                    B.put(BL.guardrail_r, loc)
-                elif cmd == 'l': B.put(BL.locker, loc)
-                elif cmd == 'b': B.put(BL.books, loc)
+                if   cmd == 'gm': B.put(BL.guardrail_m, loc)
+                elif cmd == 'gl': B.put(BL.guardrail_l, loc)
+                elif cmd == 'gr': B.put(BL.guardrail_r, loc)
+
+                elif cmd == 'l':  B.put(BL.locker, loc)
+                elif cmd == 'b':  B.put(BL.books, loc)
                 elif cmd == 'ob': B.put(BL.open_book, loc)
-                elif cmd == 't': B.put(BL.tulip, loc)
-                elif cmd == 'f': B.put(BL.fountain, loc)
+                elif cmd == 't':  B.put(BL.tulip, loc)
+                elif cmd == 'f':  B.put(BL.fountain, loc)
+                elif cmd == 'a':  B.put(BL.antitank, loc)
+                elif cmd == 'p':  B.put(BL.platform2, loc)
+
                 elif cmd == 'm': B.put(BL.monkey, loc)
-                elif cmd == 'a': B.put(BL.antitank, loc)
+
                 elif any(c.startswith(cmd) for c in cmds):
                     continue
                 break
@@ -1680,7 +1694,14 @@ def editor(stdscr, _map):
                     fp.write('\n')
             return
         B.draw(win)
-        tool = 'eraser' if brush==' ' else ('rock' if brush==rock else '')
+        if brush==blank:
+            tool = 'eraser'
+        elif brush==rock:
+            tool = 'rock'
+        elif not brush:
+            tool = ''
+        else:
+            tool = brush
         win.addstr(0,73, tool)
         win.addstr(0,0,str(loc))
         win.move(loc.y, loc.x)
