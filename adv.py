@@ -87,6 +87,8 @@ class Blocks:
     rock2 = '║'
     rock2 = '▧'
     platform2 = '▭'
+    angled1 = '╱'
+    angled2 = '╲'
 
     crates = (crate1, crate2, crate3, crate4)
 
@@ -247,7 +249,7 @@ class Loc:
 
 
 class Board:
-    def __init__(self, loc):
+    def __init__(self, loc, _map):
         self.B = B = [mkrow() for _ in range(HEIGHT)]
         self.guards = []
         self.soldiers = []
@@ -255,9 +257,10 @@ class Board:
         self.spawn_locations = {}
         self.trigger_locations = {}
         self.loc = loc
+        self._map = _map
 
     def board_1(self):
-        containers, crates, doors, specials = self.load_map(1)
+        containers, crates, doors, specials = self.load_map(self._map)
         containers[3].inv[ID.key1] = 1
         Item(self, Blocks.platform, 'mobile platform', specials[1], id=ID.platform1)
         g = Guard(self, specials[1], id=ID.guard1)
@@ -268,14 +271,14 @@ class Board:
 
     def board_2(self):
         """Technician, alarm."""
-        containers, crates, doors, specials = self.load_map(2)
+        containers, crates, doors, specials = self.load_map(self._map)
         Technician(self, specials[1], id=ID.technician1)
         Item(self, Blocks.bell, 'alarm bell', specials[2], id=ID.alarm1)
         doors[0].id = ID.door1
 
     def board_3(self):
         """Soldier, rubbish heap."""
-        containers, crates, doors, specials = self.load_map(3)
+        containers, crates, doors, specials = self.load_map(self._map)
         RoboBunny(self, specials[1], id=ID.robobunny1)
         Item(self, Blocks.grill, 'grill', specials[2], id=ID.grill2)
         s = Soldier(self, specials[3], id=ID.soldier1)
@@ -283,21 +286,21 @@ class Board:
 
     def board_4(self):
         self.labels.append((0,20, "𝓪𝓫𝓮 𝓸𝓵𝓭 𝓼𝓱𝓸𝓹𝓹𝓮"))    # Abe old shoppe
-        containers, crates, doors, specials = self.load_map(4)
+        containers, crates, doors, specials = self.load_map(self._map)
         Item(self, Blocks.platform_top, 'platform', specials[Blocks.platform_top], id=ID.platform_top1, type=Type.platform_top)
         ShopKeeper(self, specials[1], name='Abe', id=ID.shopkeeper1)
         containers[3].inv[ID.jar_syrup] = 1
 
     def board_5(self):
         self.labels.append((2,20, "𝓐𝓷𝓽𝓱𝓸𝓷𝔂 𝓫𝓪𝓻"))
-        containers, crates, doors, specials = self.load_map(5)
+        containers, crates, doors, specials = self.load_map(self._map)
         containers[2].inv[ID.key1] = 1
         Grobo(self, specials[1], id=ID.max, name='Max')
         RoboBunny(self, specials[2], id=ID.anthony, name='Anthony')
 
     def board_6(self):
         self.labels.append((2,20, "𝒯𝓌𝒾𝓃𝓈𝑒𝓃 𝐻𝑜𝓂𝑒"))
-        containers, crates, doors, specials = self.load_map(6)
+        containers, crates, doors, specials = self.load_map(self._map)
         containers[0].inv[ID.magic_ball] = 1
         containers[0].inv[ID.key1] = 1
         crates[5].id = ID.crate1
@@ -306,7 +309,7 @@ class Board:
 
     def board_7(self):
         self.labels.append((10,5, "𝒯𝒽𝑒 𝐹𝑒𝓇𝓇𝓎"))
-        containers, crates, doors, specials = self.load_map(7)
+        containers, crates, doors, specials = self.load_map(self._map)
         julien, clone1 = specials[Blocks.elephant]
         clone1.inv[ID.key3] = [Item(self, Blocks.key, 'key', id=ID.key3, put=0), 1]
         julien.id = ID.julien
@@ -318,7 +321,7 @@ class Board:
         Item(self, '', '', specials[3], id=ID.ferry)
 
     def board_8(self):
-        containers, crates, doors, specials = self.load_map(8)
+        containers, crates, doors, specials = self.load_map(self._map)
         Item(self, Blocks.grill, 'grill', specials[1], id=ID.grill5)
         Item(self, Blocks.grill, 'grill', specials[2], id=ID.grill6)
         Item(self, Blocks.bars, 'jail bars', specials[5], id=ID.bars1, type=Type.blocking)
@@ -332,21 +335,21 @@ class Board:
 
     def board_9(self):
         # trees map
-        self.load_map(9)
+        self.load_map(self._map)
 
     def board_10(self):
-        containers, crates, doors, specials = self.load_map(10)
+        containers, crates, doors, specials = self.load_map(self._map)
         Grobo(self, specials[1], id=ID.wally, name='Wally')
         RoboBunny(self, specials[2], id=ID.chamonix, name='Mr. Chamonix')
         Being(self, specials[3], id=ID.agen, name='Agen', char=Blocks.monkey)
         Being(self, specials[4], id=ID.clermont_ferrand, name='Clermont-Ferrand', char=Blocks.monkey)
 
     def board_11(self):
-        self.load_map(11)
+        self.load_map(self._map)
 
     def board_12(self):
         self.labels.append((3,47, "𝒯𝒽𝑒 𝒞𝒾𝓉𝒶𝒹𝑒𝓁"))
-        specials = self.load_map(12)[3]
+        specials = self.load_map(self._map)[3]
         RoboBunny(self, specials[1], id=ID.brenne, name='Brenne')
         Item(self, '', '', specials[1].mod(0,-2), id=ID.talk_to_brenne)
 
@@ -355,11 +358,11 @@ class Board:
 
     # -----------------------------------------------------------------------------------------------
     def board_und1(self):
-        containers, crates, doors, specials = self.load_map('und1')
+        containers, crates, doors, specials = self.load_map(self._map)
         Item(self, Blocks.grill, 'grill', specials[1], id=ID.grill3)
 
     def board_sea1(self):
-        specials = self.load_map('sea1')[3]
+        specials = self.load_map(self._map)[3]
         Item(self, Blocks.ferry, 'ferry', specials[1], id=ID.ferry)
 
     def load_map(self, map_num, for_editor=0):
@@ -459,6 +462,12 @@ class Board:
                     elif char==Blocks.bars:
                         Item(self, Blocks.bars, 'jail bars', loc, type=Type.blocking)
 
+                    elif char in (BL.angled1, BL.angled2):
+                        Item(self, char, '', loc, type=Type.blocking)
+
+                    elif char==Blocks.angled1:
+                        Item(self, Blocks.angled1, '', loc, type=Type.blocking)
+
                     elif char==Blocks.rock2:
                         Item(self, char, '', loc)
 
@@ -553,6 +562,8 @@ class Board:
         for y,x,txt in self.labels:
             win.addstr(y,x,txt)
         win.refresh()
+        if Windows.win2:
+            Windows.win2.addstr(0,74, str(self._map))
 
     def put(self, obj, loc=None):
         loc = loc or obj.loc
@@ -567,8 +578,6 @@ class Board:
 
     def is_blocked(self, loc):
         for x in self.get_all(loc):
-            print("x", x)
-            print("x in BLOCKING", x in BLOCKING)
             if x in BLOCKING or getattr(x, 'type', None) in BLOCKING:
                 return True
         return False
@@ -1349,7 +1358,7 @@ class NPCs:
 class OtherBeings:
     pass
 class Windows:
-    pass
+    win = win2 = None
 
 class Saves:
     saves = {}
@@ -1391,18 +1400,18 @@ def main(stdscr):
     win = Windows.win = newwin(HEIGHT, width, begin_y, begin_x)
     begin_x = 0; begin_y = 16; height = 6; width = 80
     win2 = Windows.win2 = newwin(height, width, begin_y, begin_x)
-    B = b1 = Board(Loc(0,1))
-    b2 = Board(Loc(1,1))
-    b3 = Board(Loc(2,1))
-    b4 = Board(Loc(3,1))
-    b5 = Board(Loc(4,1))
-    b6 = Board(Loc(5,1))
-    b7 = Board(Loc(6,1))
-    b8 = Board(Loc(7,1))
-    b9 = Board(Loc(8,1))
+    B = b1 = Board(Loc(0,1), 1)
+    b2 = Board(Loc(1,1), 2)
+    b3 = Board(Loc(2,1), 3)
+    b4 = Board(Loc(3,1), 4)
+    b5 = Board(Loc(4,1), 5)
+    b6 = Board(Loc(5,1), 6)
+    b7 = Board(Loc(6,1), 7)
+    b8 = Board(Loc(7,1), 8)
+    b9 = Board(Loc(8,1), 9)
 
-    und1 = Board(Loc(0,0))
-    sea1 = Board(None)
+    und1 = Board(Loc(0,0), 'und1')
+    sea1 = Board(None, 'sea1')
     objects[ID.sea_level1] = sea1
 
     player = b1.board_1()
@@ -1417,16 +1426,16 @@ def main(stdscr):
     und1.board_und1()
     sea1.board_sea1()
 
-    b9 = Board(Loc(8,1))
+    b9 = Board(Loc(8,1), 9)
     b9.board_9()
-    b10 = Board(Loc(9,1))
+    b10 = Board(Loc(9,1), 10)
     b10.board_10()
-    b11 = Board(Loc(10,1))
+    b11 = Board(Loc(10,1), 11)
     b11.board_11()
-    b12 = Board(Loc(11,1))
+    b12 = Board(Loc(11,1), 12)
     b12.board_12()
 
-    top1 = Board(Loc(9,0))
+    top1 = Board(Loc(9,0), 'top1')
     top1.board_top1()
 
     boards[:] = ([None,None,None,None, None,None,None,None, None,top1],
@@ -1576,7 +1585,7 @@ def editor(stdscr, _map):
     curses.curs_set(True)
     loc = Loc(40, 8)
     brush = None
-    B = Board(Loc(0,0))
+    B = Board(Loc(0,0), _map)
     B.load_map(_map, 1)
     B.draw(win)
 
@@ -1604,6 +1613,12 @@ def editor(stdscr, _map):
         elif k == 's':
             B.put(Blocks.steps_r, loc)
             brush = Blocks.steps_r
+        elif k == '/':
+            B.put(Blocks.angled1, loc)
+            brush = Blocks.angled1
+        elif k == '\\':
+            B.put(Blocks.angled2, loc)
+            brush = Blocks.angled2
         elif k == 'S':
             B.put(Blocks.steps_l, loc)
             brush = Blocks.steps_l
