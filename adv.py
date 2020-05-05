@@ -155,7 +155,7 @@ class ID:
     soldier1 = 103
     robobunny1 = 104
     shopkeeper1 = 105
-    max = 106
+    max_ = 106
     anthony = 107
     julien = 108
     soldier2 = 109
@@ -167,6 +167,11 @@ class ID:
     clermont_ferrand = 115
     brenne = 116
     trier = 117
+    morvan = 118
+    morvan2 = 119
+    montbard = 120
+    astronomer = 121
+    groboclone1 = 122
 
     max1 = 200
     max2 = 201
@@ -201,6 +206,16 @@ conversations = {
     ID.brenne: ["I've heard you fought some soldiers and clones, I guess I can trust you.. You should see my brother on the Proxima Island, I know that he made a fake red card. Just tell him the word 'Amos'. He lives in a red house, it's hard to miss."],
 
     ID.trier: ["Hi, are you the Brenne's brother?", "Yes", "I have a message for you, it's 'AMOS'.", "You don't have to shout, but that sounds right.", "Is there anything you would like from me?", "Yes, Brenne mentioned the Red Card.", "Ah, so you are curious about all the secret places and nice things hidden therein? Well some things may be not so nice, but I'm sure you'll take it in stride, and get out getting out's what's doc ordered! Here I am, blabbering like an old senile NPC while I'm sure you have quests to finish, to prove your mettle. Here you have it, the red card, good as new! Except it shouldn't look new, that would be suspicious, so I've aged it a bit."],
+
+    ID.morvan: ["Hi, have you seen my friend being led by two Groboclones?", "No, but I'm not surprised at all. And I can only guess what will happen to me. What's the worst that can happen?",
+                "<he almost seems to break down and is close to weeping but regains control>", "What will happen to you.. I wish I could tell you.. <his voice trails off>"],
+
+    ID.morvan2: ["They will stalk my home first, just like a Grobo is already menacing Montbard's house."],
+
+    ID.montbard: ["Thanks for for ridding me of this meddlesome.. <he shakes with anger and fear> .. meddlesome .. monster!",
+                  "I don't know how I can ever repay you. If there's anything you want..",
+                  "Yes, can you show me the path to the Astronomer's home?", "Yes, follow me..."
+                 ],
 
     ID.agen2: ["Do you know anything interesting about any of the regulars here at the library?",
                "Not much, we are all boring folk! We read immersive fictional stories and try to imagine we are in the place of the here of the story, and then the dangers and triumphs of the story can make your heart beat so fast! But outside of books, all we do is but complain of petty small things, like Clermont and his water.."],
@@ -250,7 +265,7 @@ class Loc:
 
 class Board:
     def __init__(self, loc, _map):
-        self.B = B = [mkrow() for _ in range(HEIGHT)]
+        self.B = [mkrow() for _ in range(HEIGHT)]
         self.guards = []
         self.soldiers = []
         self.labels = []
@@ -295,7 +310,7 @@ class Board:
         self.labels.append((2,20, "𝓐𝓷𝓽𝓱𝓸𝓷𝔂 𝓫𝓪𝓻"))
         containers, crates, doors, specials = self.load_map(self._map)
         containers[2].inv[ID.key1] = 1
-        Grobo(self, specials[1], id=ID.max, name='Max')
+        Grobo(self, specials[1], id=ID.max_, name='Max')
         RoboBunny(self, specials[2], id=ID.anthony, name='Anthony')
 
     def board_6(self):
@@ -354,7 +369,13 @@ class Board:
         Item(self, '', '', specials[1].mod(0,-2), id=ID.talk_to_brenne)
 
     def board_top1(self):
-        specials = self.load_map('top1')[3]
+        self.labels.append((0,2, "𝒜𝓈𝓉𝓇𝑜𝓃𝑜𝓂𝑒𝓇"))
+        containers, crates, doors, specials = self.load_map(self._map)
+        doors[0].type = Type.door3
+        Being(self, specials[1], id=ID.montbard, name='Montbard', char=Blocks.monkey)
+        Being(self, specials[2], id=ID.morvan, name='du Morvan', char=Blocks.monkey)
+        Being(self, specials[3], id=ID.astronomer, name='The Astronomer', char=Blocks.monkey)
+        Being(self, specials[4], id=ID.groboclone1, name='Groboclone', char=Blocks.elephant)
 
     # -----------------------------------------------------------------------------------------------
     def board_und1(self):
@@ -718,6 +739,7 @@ class Being(Mixin1):
         return self.stance==Stance.sneaky
 
     def talk(self, being, dialog=None, yesno=False):
+        being = objects.get(being) or being
         loc = being.loc
         if isinstance(dialog, str):
             dialog = [dialog]
@@ -948,6 +970,7 @@ class Being(Mixin1):
 
         r,l = self.loc.mod_r(), self.loc.mod_l()
         locs = [self.loc]
+        morvan = objects[ID.morvan]
         if chk_oob(r): locs.append(r)
         if chk_oob(l): locs.append(l)
 
@@ -973,12 +996,21 @@ class Being(Mixin1):
             objects[ID.guard2].move('l')
         elif ID.talk_to_brenne in B.get_ids(locs):
             self.talk(objects[ID.brenne])
-        elif ID.max in B.get_ids(locs):
+        elif ID.max_ in B.get_ids(locs):
             MaxQuest().go(self)
         elif ID.chamonix in B.get_ids(locs):
             self.talk(objects[ID.chamonix])
         elif ID.clermont_ferrand in B.get_ids(locs) and objects[ID.clermont_ferrand].state==1:
             self.talk(objects[ID.clermont_ferrand])
+
+        elif ID.morvan in B.get_ids(locs) and morvan.state==0:
+            self.talk(morvan)
+            morvan.state = 1
+        elif ID.morvan in B.get_ids(locs) and morvan.state==1:
+            self.talk(morvan, conversations[ID.morvan2])
+
+        elif ID.montbard in B.get_ids(locs) and objects[ID.groboclone1].dead:
+            self.talk(ID.montbard)
 
         elif ID.agen in B.get_ids(locs):
             agen = objects[ID.agen]
@@ -1015,12 +1047,21 @@ class Being(Mixin1):
         x = self.B[self.loc]
         return None if x==blank else x
 
+    @property
+    def alive(self):
+        return self.health>0
+
+    @property
+    def dead(self):
+        return not self.alive
+
+
 class Quest:
     pass
 
 class MaxQuest(Quest):
     def go(self, player):
-        max_ = objects[ID.max]
+        max_ = objects[ID.max_]
         if max_.state==1:
             player.talk(max_, conversations[ID.max1])
             max_.state=2
@@ -1173,15 +1214,15 @@ class ClimbThroughGrillEvent2(Event):
     once = False
     def go(self):
         player = objects[ID.player]
-        bi = self.B.loc.x
-        brd_y = self.B.loc.y
-        x = 0 if bi==5 else 5
-        if bi==5:
+        x, y = self.B.loc
+        if x==5:
             y-=1
         else:
             y+=1
+        x = 0 if x==5 else 5
         b_loc = Loc(x, y)
-        Windows.win2.addstr(2,0, 'You climb through the grill ' + ('into a strange underground area' if bi==5 else 'back into your home'))
+        Windows.win2.addstr(2,0, 'You climb through the grill ' +
+                            ('into a strange underground area' if x==5 else 'back into your home'))
         return player.move_to_board(b_loc, Loc(62,10))
 
 class ClimbThroughGrillEvent3(Event):
@@ -1191,7 +1232,8 @@ class ClimbThroughGrillEvent3(Event):
         bi = self.B.loc.x
         x = 6 if bi==5 else 5
         b_loc = Loc(x, self.B.loc.y)
-        Windows.win2.addstr(2,0, 'You climb through the grill into ' + ('the port area' if bi==5 else 'back to the shore near your home'))
+        Windows.win2.addstr(2,0, 'You climb through the grill into ' +
+                            ('the port area' if bi==5 else 'back to the shore near your home'))
         if player.state == 0:
             player.state = 1
         elif player.state == 1:
@@ -1299,7 +1341,7 @@ class BuyADrinkAnthony(Event):
 
 class MaxState1(Event):
     def go(self):
-        objects[ID.max].state = 1
+        objects[ID.max_].state = 1
 
 
 class SoldierEvent2(Event):
@@ -1516,7 +1558,7 @@ def main(stdscr):
         elif k == '9':
             B = player.move_to_board( Loc(9,1), Loc(7, GROUND) )
         elif k == '0':
-            B = player.move_to_board( Loc(11,1), Loc(7, GROUND-1) )
+            B = player.move_to_board( Loc(9,0), Loc(7, GROUND-1) )
         elif k == 'U':
             B = player.move_to_board( Loc(0,0), Loc(35, 10) )
         elif k == 'E':
@@ -1718,7 +1760,7 @@ def editor(stdscr, _map):
         else:
             tool = brush
         win.addstr(0,73, tool)
-        win.addstr(0,0,str(loc))
+        win.addstr(0, 0 if loc.x>40 else 70, str(loc))
         win.move(loc.y, loc.x)
 
 
