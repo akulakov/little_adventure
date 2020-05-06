@@ -89,6 +89,8 @@ class Blocks:
     platform2 = '▭'
     angled1 = '╱'
     angled2 = '╲'
+    picture = '🖼'
+    hexagon = '⎔'
 
     crates = (crate1, crate2, crate3, crate4)
 
@@ -148,6 +150,10 @@ class ID:
     grill6 = 29
     bars1 = 30
     red_card = 31
+    grill7 = 32
+    sink = 33
+    grill8 = 34
+    drawing = 35
 
     guard1 = 100
     technician1 = 101
@@ -172,6 +178,7 @@ class ID:
     montbard = 120
     astronomer = 121
     groboclone1 = 122
+    locksmith = 123
 
     max1 = 200
     max2 = 201
@@ -214,7 +221,8 @@ conversations = {
 
     ID.montbard: ["Thanks for for ridding me of this meddlesome.. <he shakes with anger and fear> .. meddlesome .. monster!",
                   "I don't know how I can ever repay you. If there's anything you want..",
-                  "Yes, can you show me the path to the Astronomer's home?", "Yes, follow me..."
+                  "Yes, can you show me the path to the Astronomer's home?", "Just use the sink in the house with the flower on the roof",
+                  "What?", "Don't worry about a thing, just do that and you will find the Astronomer.."
                  ],
 
     ID.agen2: ["Do you know anything interesting about any of the regulars here at the library?",
@@ -224,6 +232,9 @@ conversations = {
                           "Ah, don't I know it! And I have no choice but drink tap water from this fountain!", "Why is that?",
                           "I wish I never went to my doctor - he is the one who told me I have to drink tap water!",
                           "If there's anything anyone could do, I would sure be very grateful!!"],
+
+    ID.locksmith: ['Ahh! You know the secret passage! I know I can trust you...', 'I would like to see the Astronomer',
+                   'Very well, I will open the door for you.'],
 }
 
 def mkcell():
@@ -269,6 +280,7 @@ class Board:
         self.guards = []
         self.soldiers = []
         self.labels = []
+        self.doors = []
         self.spawn_locations = {}
         self.trigger_locations = {}
         self.loc = loc
@@ -370,12 +382,19 @@ class Board:
 
     def board_top1(self):
         self.labels.append((0,2, "𝒜𝓈𝓉𝓇𝑜𝓃𝑜𝓂𝑒𝓇"))
+        self.labels.append((0,20, "𝐿𝑜𝒸𝓀𝓈𝓂𝒾𝓉𝒽"))
         containers, crates, doors, specials = self.load_map(self._map)
-        doors[0].type = Type.door3
+        doors[1].type = Type.door3
+
         Being(self, specials[1], id=ID.montbard, name='Montbard', char=Blocks.monkey)
         Being(self, specials[2], id=ID.morvan, name='du Morvan', char=Blocks.monkey)
         Being(self, specials[3], id=ID.astronomer, name='The Astronomer', char=Blocks.monkey)
         Being(self, specials[4], id=ID.groboclone1, name='Groboclone', char=Blocks.elephant)
+        Being(self, specials[7], id=ID.locksmith, name='Locksmith', char=Blocks.elephant)
+
+        Item(self, Blocks.fountain, 'sink', specials[5], id=ID.sink)
+        Item(self, Blocks.hexagon, 'A Drawing with a romantic view and a horse galloping at full speed across the plain', specials[6], id=ID.drawing)
+        Item(self, Blocks.grill, 'grill', specials[8], id=ID.grill7)
 
     # -----------------------------------------------------------------------------------------------
     def board_und1(self):
@@ -390,7 +409,7 @@ class Board:
         _map = open(f'maps/{map_num}.map').readlines()
         crates = []
         containers = []
-        doors = []
+        self.doors = doors = []
         specials = defaultdict(list)
         BL=Blocks
 
@@ -971,6 +990,8 @@ class Being(Mixin1):
         r,l = self.loc.mod_r(), self.loc.mod_l()
         locs = [self.loc]
         morvan = objects[ID.morvan]
+        montbard = objects[ID.montbard]
+        locksmith = objects[ID.locksmith]
         if chk_oob(r): locs.append(r)
         if chk_oob(l): locs.append(l)
 
@@ -1010,7 +1031,23 @@ class Being(Mixin1):
             self.talk(morvan, conversations[ID.morvan2])
 
         elif ID.montbard in B.get_ids(locs) and objects[ID.groboclone1].dead:
-            self.talk(ID.montbard)
+            self.talk(montbard)
+            montbard.state = 1  # allow sink to be used
+
+        elif ID.locksmith in B.get_ids(locs) and locksmith.state==1:
+            self.talk(locksmith)
+            B.remove(B.doors[1])
+
+        elif ID.grill8 in B.get_ids(locs):
+            self.tele(objects[ID.grill7].loc)
+            Windows.win2.addstr(2,0, "You use the secret passage and find yourself in the locksmith's house")
+            locksmith.state = 1
+
+        elif ID.sink in B.get_ids(locs) and montbard.state==1:
+            dr = objects[ID.drawing]
+            loc = dr.loc
+            dr.move('h')
+            Item(B, Blocks.grill, 'grill', loc, id=ID.grill8)
 
         elif ID.agen in B.get_ids(locs):
             agen = objects[ID.agen]
@@ -1728,6 +1765,7 @@ def editor(stdscr, _map):
                 elif cmd == 'p':  B.put(BL.platform2, loc)
 
                 elif cmd == 'm': B.put(BL.monkey, loc)
+                elif cmd == 'd': B.put(BL.hexagon, loc)     # drawing
 
                 elif any(c.startswith(cmd) for c in cmds):
                     continue
