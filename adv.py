@@ -91,6 +91,7 @@ class Blocks:
     angled2 = '╲'
     picture = '🖼'
     hexagon = '⎔'
+    car = '🚗'
 
     crates = (crate1, crate2, crate3, crate4)
 
@@ -154,6 +155,7 @@ class ID:
     sink = 33
     grill8 = 34
     drawing = 35
+    car = 36
 
     guard1 = 100
     technician1 = 101
@@ -179,6 +181,7 @@ class ID:
     astronomer = 121
     groboclone1 = 122
     locksmith = 123
+    maurice = 124
 
     max1 = 200
     max2 = 201
@@ -235,6 +238,10 @@ conversations = {
 
     ID.locksmith: ['Ahh! You know the secret passage! I know I can trust you...', 'I would like to see the Astronomer',
                    'Very well, I will open the door for you.'],
+
+    ID.astronomer: ['Have you..', "I know that you are looking for your friend, but I haven't seen her. It's very odd that she was taken from Citadel island",
+                    'I feel that Dr. Funfrock is afraid of something related to the Legend. If you find out what it is, you may be able to help your friend.', 'Go to port Beluga, and talk to my dear friend Maurice, he will help you get off the island.'
+                   ],
 }
 
 def mkcell():
@@ -395,6 +402,9 @@ class Board:
         Item(self, Blocks.fountain, 'sink', specials[5], id=ID.sink)
         Item(self, Blocks.hexagon, 'A Drawing with a romantic view and a horse galloping at full speed across the plain', specials[6], id=ID.drawing)
         Item(self, Blocks.grill, 'grill', specials[8], id=ID.grill7)
+
+    def board_top2(self):
+        self.load_map(self._map)
 
     # -----------------------------------------------------------------------------------------------
     def board_und1(self):
@@ -645,7 +655,8 @@ def chk_oob(loc, y=0, x=0):
 def chk_b_oob(loc, y=0, x=0):
     h = len(boards)
     w = len(boards[1])
-    return 0 <= loc.y+y <= h-1 and 0 <= loc.x+x <= w-1
+    newx, newy = loc.x+x, loc.y+y
+    return 0 <= newy <= h-1 and 0 <= newx <= w-1 and boards[newy][newx]
 
 def ids(lst):
     return [x.id for x in lst if not isinstance(x, str)]
@@ -992,6 +1003,8 @@ class Being(Mixin1):
         morvan = objects[ID.morvan]
         montbard = objects[ID.montbard]
         locksmith = objects[ID.locksmith]
+        maurice = objects[ID.maurice]
+
         if chk_oob(r): locs.append(r)
         if chk_oob(l): locs.append(l)
 
@@ -1048,6 +1061,10 @@ class Being(Mixin1):
             loc = dr.loc
             dr.move('h')
             Item(B, Blocks.grill, 'grill', loc, id=ID.grill8)
+
+        elif ID.astronomer in B.get_ids(locs):
+            self.talk(ID.astronomer)
+            maurice.state = 1
 
         elif ID.agen in B.get_ids(locs):
             agen = objects[ID.agen]
@@ -1517,9 +1534,12 @@ def main(stdscr):
     top1 = Board(Loc(9,0), 'top1')
     top1.board_top1()
 
-    boards[:] = ([None,None,None,None, None,None,None,None, None,top1],
-                 [b1, b2, b3, b4, b5, b6, b7, b8, b9, b10, b11, b12],
-                 [und1])
+    top2 = Board(Loc(8,0), 'top2')
+    top2.board_top2()
+
+    boards[:] = ([None,None,None,None, None,None,None,None, top2,top1, None, None],
+                 [b1, b2,   b3, b4,    b5, b6,   b7, b8,    b9, b10, b11, b12],
+                 [und1,None,None,None, None,None,None,None, None,None, None, None])
 
     stdscr.clear()
     B.draw(win)
