@@ -14,6 +14,7 @@ from time import sleep
 from random import random, choice
 from collections import defaultdict
 from textwrap import wrap
+import string
 
 start_x_loc = 30
 rock = '█'
@@ -92,6 +93,8 @@ class Blocks:
     picture = '🖼'
     hexagon = '⎔'
     car = '🚗'
+    blue_round = '🔵' # unused
+    jar_syrup = '℧'
 
     crates = (crate1, crate2, crate3, crate4)
 
@@ -156,6 +159,7 @@ class ID:
     grill8 = 34
     drawing = 35
     car = 36
+    water_supply = 37
 
     guard1 = 100
     technician1 = 101
@@ -189,6 +193,7 @@ class ID:
     talk_to_brenne = 203
 
     sea_level1 = 300
+    landscape_level1 = 301
 
 
 items_by_id = {v:k for k,v in ID.__dict__.items()}
@@ -290,12 +295,14 @@ class Board:
         self.doors = []
         self.spawn_locations = {}
         self.trigger_locations = {}
+        self.colors = []
+        self.labels = []
         self.loc = loc
         self._map = _map
 
     def board_1(self):
         containers, crates, doors, specials = self.load_map(self._map)
-        containers[3].inv[ID.key1] = 1
+        containers[3].inv[objects[ID.key1]] = 1
         Item(self, Blocks.platform, 'mobile platform', specials[1], id=ID.platform1)
         g = Guard(self, specials[1], id=ID.guard1)
         self.guards = [g]
@@ -323,20 +330,22 @@ class Board:
         containers, crates, doors, specials = self.load_map(self._map)
         Item(self, Blocks.platform_top, 'platform', specials[Blocks.platform_top], id=ID.platform_top1, type=Type.platform_top)
         ShopKeeper(self, specials[1], name='Abe', id=ID.shopkeeper1)
-        containers[3].inv[ID.jar_syrup] = 1
+        jar = Item(None, Blocks.jar_syrup, 'bottle of raspberry syrup', None, id=ID.jar_syrup)
+        containers[3].inv[jar] = 1
 
     def board_5(self):
         self.labels.append((2,20, "𝓐𝓷𝓽𝓱𝓸𝓷𝔂 𝓫𝓪𝓻"))
         containers, crates, doors, specials = self.load_map(self._map)
-        containers[2].inv[ID.key1] = 1
+        containers[2].inv[objects[ID.key1]] = 1
         Grobo(self, specials[1], id=ID.max_, name='Max')
         RoboBunny(self, specials[2], id=ID.anthony, name='Anthony')
 
     def board_6(self):
         self.labels.append((2,20, "𝒯𝓌𝒾𝓃𝓈𝑒𝓃 𝐻𝑜𝓂𝑒"))
         containers, crates, doors, specials = self.load_map(self._map)
-        containers[0].inv[ID.magic_ball] = 1
-        containers[0].inv[ID.key1] = 1
+        mball = Item(None, Blocks.magic_ball, 'magic ball', None, id=ID.magic_ball)
+        containers[0].inv[mball] = 1
+        containers[0].inv[objects[ID.key1]] = 1
         crates[5].id = ID.crate1
         TriggerEventLocation(self, specials[1], evt=MaxState1)
         Item(self, Blocks.grill, 'grill', specials[2], id=ID.grill4)
@@ -345,7 +354,8 @@ class Board:
         self.labels.append((10,5, "𝒯𝒽𝑒 𝐹𝑒𝓇𝓇𝓎"))
         containers, crates, doors, specials = self.load_map(self._map)
         julien, clone1 = specials[Blocks.elephant]
-        clone1.inv[ID.key3] = [Item(self, Blocks.key, 'key', id=ID.key3, put=0), 1]
+        key3 = Item(self, Blocks.key, 'key', id=ID.key3, put=0)
+        clone1.inv[key3] = 1
         julien.id = ID.julien
         objects[julien.id] = julien
         doors[0].type = Type.door3
@@ -403,8 +413,12 @@ class Board:
         Item(self, Blocks.hexagon, 'A Drawing with a romantic view and a horse galloping at full speed across the plain', specials[6], id=ID.drawing)
         Item(self, Blocks.grill, 'grill', specials[8], id=ID.grill7)
 
-    def board_top2(self):
-        self.load_map(self._map)
+    def board_top2(self): self.load_map(self._map)
+
+    def board_top3(self):
+        self.colors = [(Loc(50,11), 1)]     # window
+        containers, crates, doors, specials = self.load_map(self._map)
+        Item(self, Blocks.car, 'Car', specials[1], id=ID.car)
 
     # -----------------------------------------------------------------------------------------------
     def board_und1(self):
@@ -414,6 +428,10 @@ class Board:
     def board_sea1(self):
         specials = self.load_map(self._map)[3]
         Item(self, Blocks.ferry, 'ferry', specials[1], id=ID.ferry)
+
+    def board_wtower(self):
+        specials = self.load_map(self._map)[3]
+        Item(self, '', '', specials[1], id=ID.water_supply)
 
     def load_map(self, map_num, for_editor=0):
         _map = open(f'maps/{map_num}.map').readlines()
@@ -473,7 +491,6 @@ class Board:
 
                     elif char==Blocks.stool:
                         Item(self, Blocks.stool, 'bar stool', loc)
-
 
                     elif char==Blocks.tulip:
                         Item(self, Blocks.tulip, 'tulip', loc)
@@ -611,6 +628,9 @@ class Board:
                 win.addstr(y,x, str(last(cell)))
         for y,x,txt in self.labels:
             win.addstr(y,x,txt)
+        for loc, col in self.colors:
+            print('adding color', loc, col)
+            win.addstr(loc.y, loc.x, str(self[loc]), curses.color_pair(col))
         win.refresh()
         if Windows.win2:
             Windows.win2.addstr(0,74, str(self._map))
@@ -685,11 +705,14 @@ class Item(Mixin1):
         self.inv = defaultdict(int)
         if id:
             objects[id] = self
-        if put:
+        if B and put:
             B.put(self)
 
     def __repr__(self):
         return self.char
+
+    def __hash__(self):
+        return self.id
 
     def move(self, dir):
         m = dict(h=(0,-1), l=(0,1), j=(1,0), k=(-1,0))[dir]
@@ -709,17 +732,17 @@ class Locker(Item):
     def __init__(self, B, loc):
         super().__init__(B, Blocks.locker, 'locker', loc, id=ID.locker, type=Type.container)
         if random()>.6:
-            self.inv[ID.coin] += 1
+            self.inv[objects[ID.coin]] += 1
         elif random()>.6:
-            self.inv[ID.grn_heart] += 1
+            self.inv[objects[ID.grn_heart]] += 1
 
 class Cupboard(Item):
     def __init__(self, B, loc):
         super().__init__(B, Blocks.cupboard, 'cupboard', loc, type=Type.container)
         if random()>.5:
-            self.inv[ID.coin] += 1
+            self.inv[objects[ID.coin]] += 1
         elif random()>.7:
-            self.inv[ID.grn_heart] += 1
+            self.inv[objects[ID.grn_heart]] += 1
 
 class MagicBall(Item):
     def __init__(self, B, loc):
@@ -741,8 +764,8 @@ class Being(Mixin1):
         self.health = self.health or health or 5
         self.char = self.char or char
         self.inv = defaultdict(int)
-        self.inv[ID.coin] = 14
-        self.inv[ID.key1] = 2
+        self.inv[objects[ID.key1]] = 2
+        self.kashes = 14
         if id:
             objects[id] = self
         if put:
@@ -840,7 +863,7 @@ class Being(Mixin1):
             return True, True
 
         # TODO This is a little messy, doors are by type and keys are by ID
-        if new and Type.door1 in B.get_types(new) and self.inv[ID.key1]:
+        if new and Type.door1 in B.get_types(new) and self.inv[objects[ID.key1]]:
             d = B[new]
             if d.id == ID.door1:
                 triggered_events.append(AlarmEvent1)
@@ -849,9 +872,9 @@ class Being(Mixin1):
             Windows.win2.addstr(2,0, 'You open the door with your key')
             return None, None
 
-        if new and Type.door3 in B.get_types(new) and self.inv[ID.key3]:
+        if new and Type.door3 in B.get_types(new) and self.inv[objects[ID.key3]]:
             B.remove(B[new])    # TODO will not work if something is on top of door
-            self.inv[ID.key3] -= 1
+            self.inv[objects[ID.key3]] -= 1
             Windows.win2.addstr(2,0, 'You open the door with your key')
             return None, None
 
@@ -897,7 +920,7 @@ class Being(Mixin1):
                     else:
                         break
 
-            pick_up = [ID.coin, ID.key1, ID.key2, ID.key3, ID.magic_ball]
+            pick_up = [ID.key1, ID.key2, ID.key3, ID.magic_ball]
             B.remove(self)
             self.loc = new
 
@@ -907,11 +930,13 @@ class Being(Mixin1):
                 if top_obj and top_obj.type == Type.event_trigger:
                     triggered_events.append(top_obj.evt)
                 for x in reversed(items):
-                    if x.id == ID.grn_heart:
+                    if x.id == ID.coin:
+                        self.kashes += 1
+                    elif x.id == ID.grn_heart:
                         self.health = min(15, self.health+1)
                         B.remove(x)
                     elif x.id in pick_up:
-                        self.inv[x.id] += 1
+                        self.inv[x] += 1
                         B.remove(x)
                 names = [i.name for i in B.get_all_obj(new) if i.name]
                 plural = len(names)>1
@@ -963,10 +988,7 @@ class Being(Mixin1):
                     Item(self.B, Blocks.coin, 'one kash', obj.loc, id=ID.coin)
                 elif random()>0.6:
                     Item(self.B, Blocks.grn_heart, 'heart', obj.loc, id=ID.grn_heart)
-                for k, val in obj.inv.items():    # TODO: create according to `qty`
-                    # temp hack around all beings having some coin
-                    if isinstance(val, int): continue
-                    it, qty = val
+                for it, qty in obj.inv.items():
                     # TODO note item will not have a `loc` (ok for now)
                     it.loc = obj.loc
                     self.B.put(it, obj.loc)
@@ -1000,21 +1022,27 @@ class Being(Mixin1):
 
         r,l = self.loc.mod_r(), self.loc.mod_l()
         locs = [self.loc]
-        morvan = objects[ID.morvan]
-        montbard = objects[ID.montbard]
-        locksmith = objects[ID.locksmith]
-        maurice = objects[ID.maurice]
+        morvan = objects.get(ID.morvan)
+        montbard = objects.get(ID.montbard)
+        locksmith = objects.get(ID.locksmith)
+        maurice = objects.get(ID.maurice)
 
         if chk_oob(r): locs.append(r)
         if chk_oob(l): locs.append(l)
+
+        def is_near(id):
+            return getattr(ID, id) in B.get_ids(locs)
 
         if c:
             items = {k:v for k,v in c.inv.items() if v}
             lst = []
             for x in items:
-                self.inv[x] += c.inv[x]
+                if x.id==ID.coin:
+                    self.kashes+=1
+                else:
+                    self.inv[x] += c.inv[x]
                 c.inv[x] = 0
-                lst.append(descr_by_id[x])
+                lst.append(str(x))
             Windows.win2.addstr(2,0, 'You found {}'.format(', '.join(lst)))
             if not items:
                 Windows.win2.addstr(2,0, f'{c.name} is empty')
@@ -1066,6 +1094,13 @@ class Being(Mixin1):
             self.talk(ID.astronomer)
             maurice.state = 1
 
+        elif is_near('car'):
+            y = self.talk(ID.car, yesno=1)
+            if y:
+                triggered_events.append(TravelByCarEvent)
+
+
+
         elif ID.agen in B.get_ids(locs):
             agen = objects[ID.agen]
             if agen.state == 0:
@@ -1086,9 +1121,9 @@ class Being(Mixin1):
             self.talk(objects[ID.julien])
             y = self.talk(objects[ID.julien], 'You may be able to find out more on Principal Island. I wanted to use this ferry ticket myself but I can guess I can sell it to you for some 10 kashes and buy some candy..', yesno=1)
             if y:
-                if self.inv[ID.coin]>=10:
+                if self.kashes>=10:
                     self.inv[ID.ferry_ticket] = 1
-                    self.inv[ID.coin] -= 10
+                    self.kashes -= 10
         elif ID.ferry in B.get_ids(locs) and self.inv[ID.ferry_ticket]:
             triggered_events.append(TravelToPrincipalIslandEvent)
         else:
@@ -1096,6 +1131,13 @@ class Being(Mixin1):
             x = B[loc] # TODO won't work if something is in the platform tile
             if x and getattr(x,'id',None)==ID.platform_top1:
                 PlatformEvent2(B).go()
+
+    def use(self):
+        win = newwin(len(self.inv), 40, 2, 10)
+        for n, (_type,qty) in enumerate(self.inv.items()):
+            win.addstr('{string.ascii_letters[n]}) {}')
+        if is_near('water_supply'):
+            pass
 
     def get_top_item(self):
         x = self.B[self.loc]
@@ -1145,6 +1187,15 @@ class Event:
     once = 1
     def __init__(self, B):
         self.B = B
+        self.player = objects[ID.player]
+
+    def animate(self, B, item, dir):
+        while 1:
+            item.move(dir)
+            B.draw(Windows.win)
+            sleep(SLP)
+            if item.loc.x in (0, 78):
+                return
 
 class JailEvent(Event):
     once = False
@@ -1160,6 +1211,23 @@ class JailEvent(Event):
             # TODO: this is an ugly hack, instead an event should only be triggered when player is in state=1, and make
             # this a once=True event
             JailEvent.once = True
+
+def status(msg):
+    Windows.win2.addstr(2,0,msg)
+
+class TravelByCarEvent(Event):
+    def go(self):
+        B = self.B
+        car = B[B.specials[1]]
+        B.remove(self.player)
+        self.animate(B, car, 'h')
+        b2 = objects[ID.landscape_level1]
+        b2.put(car, Loc(78,14))
+        self.animate(B, car, 'h')
+        if B._map == 'top3':
+            status('You have driven the car to the Water tower')
+            # B = objects[ID.wat]
+        return player.move_to_board( Loc(7, self.B.loc[1]), Loc(7, GROUND) )
 
 class TravelToPrincipalIslandEvent(Event):
     def go(self):
@@ -1386,8 +1454,8 @@ class BuyADrinkAnthony(Event):
         pl = objects[ID.player]
         yes = pl.talk(objects[ID.anthony], 'Would you like to buy a drink for two kashes?', yesno=1)
         if yes:
-            if pl.inv[ID.coin]>=2:
-                pl.inv[ID.coin] -= 2
+            if pl.kashes>=2:
+                pl.kashes -= 2
                 pl.inv[ID.wine] += 1
                 Windows.win2.addstr(2,0, 'You bought a glass of wine.')
             else:
@@ -1492,10 +1560,20 @@ def dist(a,b):
                abs(a.loc.y - b.loc.y))
 
 def main(stdscr):
+    curses.init_pair(1, curses.COLOR_BLUE, curses.COLOR_WHITE)
     begin_x = 0; begin_y = 0; width = 80
     win = Windows.win = newwin(HEIGHT, width, begin_y, begin_x)
     begin_x = 0; begin_y = 16; height = 6; width = 80
     win2 = Windows.win2 = newwin(height, width, begin_y, begin_x)
+
+    # generatable items
+    coin = Item(None, Blocks.coin, 'coin', None, id=ID.coin)
+    grn_heart = Item(None, Blocks.grn_heart, 'heart', None, id=ID.grn_heart)
+    key1 = Item(None, Blocks.key, 'key', None, id=ID.key1)
+    objects[ID.coin] = coin
+    objects[ID.grn_heart] = grn_heart
+    objects[ID.key1] = key1
+
     B = b1 = Board(Loc(0,1), 1)
     b2 = Board(Loc(1,1), 2)
     b3 = Board(Loc(2,1), 3)
@@ -1509,6 +1587,9 @@ def main(stdscr):
     und1 = Board(Loc(0,0), 'und1')
     sea1 = Board(None, 'sea1')
     objects[ID.sea_level1] = sea1
+    landscape1 = Board(None, 'landscape1')
+    wtower = Board(None, 'wtower')
+    objects[ID.landscape_level1] = landscape1
 
     player = b1.board_1()
     b2.board_2()
@@ -1521,6 +1602,7 @@ def main(stdscr):
 
     und1.board_und1()
     sea1.board_sea1()
+    wtower.board_wtower()
 
     b9 = Board(Loc(8,1), 9)
     b9.board_9()
@@ -1536,8 +1618,10 @@ def main(stdscr):
 
     top2 = Board(Loc(8,0), 'top2')
     top2.board_top2()
+    top3 = Board(Loc(7,0), 'top3')
+    top3.board_top3()
 
-    boards[:] = ([None,None,None,None, None,None,None,None, top2,top1, None, None],
+    boards[:] = ([None,None,None,None, None,None,None,top3, top2,top1, None, None],
                  [b1, b2,   b3, b4,    b5, b6,   b7, b8,    b9, b10, b11, b12],
                  [und1,None,None,None, None,None,None,None, None,None, None, None])
 
@@ -1614,8 +1698,11 @@ def main(stdscr):
             B = player.move_to_board( Loc(7,1), Loc(7, GROUND) )
         elif k == '9':
             B = player.move_to_board( Loc(9,1), Loc(7, GROUND) )
+
+        # -----------------------------------------------------------------------------------------------
         elif k == '0':
-            B = player.move_to_board( Loc(9,0), Loc(7, GROUND-1) )
+            B = player.move_to_board( Loc(7,0), Loc(7, GROUND-1) )
+
         elif k == 'U':
             B = player.move_to_board( Loc(0,0), Loc(35, 10) )
         elif k == 'E':
@@ -1669,7 +1756,7 @@ def main(stdscr):
         timers[:] = [t for t in timers if t.turns>0]
         B.draw(win)
         key = '[key]' if player.inv[ID.key1] else ''
-        win2.addstr(0,0, f'[{STANCES[player.stance]}] [H{player.health}] [{player.inv[ID.coin]} Kashes] {key}')
+        win2.addstr(0,0, f'[{STANCES[player.stance]}] [H{player.health}] [{player.kashes} Kashes] {key}')
         win2.refresh()
 
 
@@ -1679,11 +1766,13 @@ def debug(*args):
 print=debug
 
 def editor(stdscr, _map):
+    curses.init_pair(1, curses.COLOR_BLUE, curses.COLOR_WHITE)
     begin_x = 0; begin_y = 0; width = 80
     win = newwin(HEIGHT, width, begin_y, begin_x)
     curses.curs_set(True)
     loc = Loc(40, 8)
     brush = None
+    written = 0
     B = Board(Loc(0,0), _map)
     B.load_map(_map, 1)
     B.draw(win)
@@ -1784,6 +1873,8 @@ def editor(stdscr, _map):
                 elif cmd == 'a':  B.put(BL.antitank, loc)
                 elif cmd == 'p':  B.put(BL.platform2, loc)
 
+                elif cmd == 'oc':  B.put(BL.car, loc)
+
                 elif cmd == 'm': B.put(BL.monkey, loc)
                 elif cmd == 'd': B.put(BL.hexagon, loc)     # drawing
 
@@ -1807,7 +1898,7 @@ def editor(stdscr, _map):
                     for cell in row:
                         fp.write(str(cell[-1]))
                     fp.write('\n')
-            return
+            written=1
         B.draw(win)
         if brush==blank:
             tool = 'eraser'
@@ -1817,8 +1908,12 @@ def editor(stdscr, _map):
             tool = ''
         else:
             tool = brush
-        win.addstr(0,73, tool)
-        win.addstr(0, 0 if loc.x>40 else 70, str(loc))
+        win.addstr(1,73, tool)
+        win.addstr(0, 0 if loc.x>40 else 70,
+                   str(loc))
+        if written:
+            win.addstr(2,65, 'map written')
+            written=0
         win.move(loc.y, loc.x)
 
 
