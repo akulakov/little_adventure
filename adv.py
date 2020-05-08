@@ -306,6 +306,12 @@ class Loc:
     def mod_l(self):
         return self.mod(0, -1)
 
+    def mod_d(self):
+        return self.mod(1, 0)
+
+    def mod_u(self):
+        return self.mod(-1, 0)
+
 
 class Board:
     def __init__(self, loc, _map):
@@ -451,6 +457,14 @@ class Board:
 
     def board_top4(self):
         self.colors = [(Loc(41,6), 1)]     # window
+        containers, crates, doors, specials = self.load_map(self._map)
+        Item(self, Blocks.ferry, 'Sailboat', specials[1], id=ID.sailboat)
+
+    # -- White Leaf Desert --------------------------------------------------------------------------
+    def board_desert1(self):
+        lrange = lambda *x: list(range(*x))
+        for x in [8,15] + lrange(23,27) + lrange(35,79):
+            self.colors.append((Loc(x,GROUND+1), 2))
         containers, crates, doors, specials = self.load_map(self._map)
         Item(self, Blocks.ferry, 'Sailboat', specials[1], id=ID.sailboat)
 
@@ -774,7 +788,6 @@ class Item(Mixin1):
         new = self.loc.mod(*m)
         self.B.remove(self)
         self.loc = new
-        print("new", new)
         self.B.put(self)
 
 
@@ -795,10 +808,13 @@ class Locker(Item):
 class Cupboard(Item):
     def __init__(self, B, loc):
         super().__init__(B, Blocks.cupboard, 'cupboard', loc, type=Type.container)
-        if random()>.5:
-            self.add1(ID.coin)
-        elif random()>.7:
-            self.add1(ID.grn_heart)
+        # ugly: this doesn't work in the map editor because `objects` dict doesn't have these items
+        try:
+            if random()>.5:
+                self.add1(ID.coin)
+            elif random()>.7:
+                self.add1(ID.grn_heart)
+        except: pass
 
 class MagicBall(Item):
     def __init__(self, B, loc):
@@ -820,10 +836,11 @@ class Being(Mixin1):
         self.health = self.health or health or 5
         self.char = self.char or char
         self.inv = defaultdict(int)
-        self.add1(ID.key1)
+        if Misc.is_game: # not editor
+            self.add1(ID.key1)
+            self.inv[objects[ID.fuel]] = 10
         j=Item(None, Blocks.bottle, 'jar of syrup', None, id=ID.jar_syrup)
         self.inv[j] = 1
-        self.inv[objects[ID.fuel]] = 10
         self.kashes = 14
         if id:
             objects[id] = self
@@ -1079,6 +1096,7 @@ class Being(Mixin1):
         objs = B.get_all_obj(self.loc)
 
         r,l = self.loc.mod_r(), self.loc.mod_l()
+        rd, ld = r.mod_d(), l.mod_d()
         locs = [self.loc]
         morvan = objects.get(ID.morvan)
         montbard = objects.get(ID.montbard)
@@ -1089,6 +1107,8 @@ class Being(Mixin1):
 
         if chk_oob(r): locs.append(r)
         if chk_oob(l): locs.append(l)
+        if chk_oob(rd): locs.append(rd)
+        if chk_oob(ld): locs.append(ld)
 
         def is_near(id):
             return getattr(ID, id) in B.get_ids(locs)
@@ -1166,6 +1186,17 @@ class Being(Mixin1):
 
         elif is_near('legend1'):
             self.talk(self, conversations[ID.legend1])
+
+        elif is_near('sailboat'):
+            dests = [('White Leaf Desert', 'desert1'), ('Port Beluga', 'beluga')]
+            dest = dests[0] if B._map == 'beluga' else dests[1]
+            y = self.talk(self, 'Would you like to use the sailboat for 10 kashes, to go to {dest[0]}?', yesno=1)
+            if y:
+                if self.kashes>=10:
+                    self.kashes-=10
+                    triggered_events.append((TravelBySailboat, dict(dest=dest[1])))
+                else:
+                    status("Looks like you don't have enough kashes!")
 
         elif is_near('aubigny'):
             y = self.talk(aubigny, 'Would you like to buy some fuel for 5 kashes?', yesno=1)
@@ -1382,12 +1413,23 @@ class TravelToPrincipalIslandEvent(Event):
         player.remove1(ID.ferry_ticket)
         B = objects[ID.sea_level1]
         f = objects[ID.ferry]
-        for _ in range(75):
-            f.move('h')
-            B.draw(Windows.win)
-            sleep(0.15)
-        Windows.win2.addstr(2,0, 'You have taken the ferry to Principal island.')
+        self.animate(f, 'h', B=B)
+        status('You have taken the ferry to Principal island.')
         return player.move_to_board( Loc(7, self.B.loc[1]), Loc(7, GROUND) )
+
+class TravelBySailboat(Event):
+    def go(self):
+        dest = self.kwargs.get('dest')
+        player = objects[ID.player]
+        B = objects[ID.sea_level1]
+        s = objects[ID.sailboat]
+        B.put(s, Loc(78,GROUND))
+        self.animate(s, 'h', B=B)
+        status('The sailboat took you to ' + ('the White Leaf Desert' if dest=='desert1' else 'Port Beluga'))
+        if dest == 'desert1':
+            return player.move_to_board( Loc(0, 0), Loc(7, GROUND) )
+        elif dest == 'beluga':
+            return player.move_to_board(None, Loc(7, GROUND), B=objects[ID.port_beluga_level])
 
 class GuardAttackEvent1(Event):
     def go(self):
@@ -1670,6 +1712,8 @@ class OtherBeings:
     pass
 class Windows:
     win = win2 = None
+class Misc:
+    pass
 
 class Saves:
     saves = {}
@@ -1707,7 +1751,9 @@ def dist(a,b):
                abs(a.loc.y - b.loc.y))
 
 def main(stdscr):
+    Misc.is_game = 1
     curses.init_pair(1, curses.COLOR_BLUE, curses.COLOR_WHITE)
+    curses.init_pair(2, curses.COLOR_YELLOW, curses.COLOR_WHITE)
     begin_x = 0; begin_y = 0; width = 80
     win = Windows.win = newwin(HEIGHT, width, begin_y, begin_x)
     begin_x = 0; begin_y = 16; height = 6; width = 80
@@ -1723,7 +1769,7 @@ def main(stdscr):
     objects[ID.grn_heart] = grn_heart
     objects[ID.key1] = key1
 
-    MAIN_Y = 2
+    MAIN_Y = 3
     B = b1 = Board(Loc(0,MAIN_Y), 1)
     b2 = Board(Loc(1,MAIN_Y), 2)
     b3 = Board(Loc(2,MAIN_Y), 3)
@@ -1772,10 +1818,16 @@ def main(stdscr):
     top2.board_top2()
     top3 = Board(Loc(7,MAIN_Y-1), 'top3')
     top3.board_top3()
+
     top4 = Board(Loc(8,MAIN_Y-1), 'top4')
     top4.board_top4()
 
+    desert1 = Board(Loc(0,MAIN_Y-3), 'desert1')
+    desert1.board_desert1()
+
     boards[:] = (
+         [desert1,None,None,None, None,None,None,None, None,None, None, None],
+
          [None,None,None,None, None,None,None,None, top4,None, None, None],
          [None,None,None,None, None,None,None,top3, top2,top1, None, None],
          [b1, b2,   b3, b4,    b5, b6,   b7, b8,    b9, b10, b11, b12],
@@ -1856,7 +1908,7 @@ def main(stdscr):
             B = player.move_to_board( Loc(9,MAIN_Y), Loc(59, 5) )
 
         elif k == '0':
-            B = player.move_to_board( Loc(7,MAIN_Y-1), Loc(7, GROUND) )
+            B = player.move_to_board( Loc(0,0), Loc(7, GROUND) )
         # -----------------------------------------------------------------------------------------------
 
         elif k == 'u':
@@ -1927,6 +1979,7 @@ def debug(*args):
 print=debug
 
 def editor(stdscr, _map):
+    Misc.is_game = 0
     curses.init_pair(1, curses.COLOR_BLUE, curses.COLOR_WHITE)
     begin_x = 0; begin_y = 0; width = 80
     win = newwin(HEIGHT, width, begin_y, begin_x)
