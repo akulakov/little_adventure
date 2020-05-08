@@ -166,6 +166,7 @@ class ID:
     empty_bottle = 37
     car2 = 38
     fuel = 39
+    sailboat = 40
 
     guard1 = 100
     technician1 = 101
@@ -451,7 +452,7 @@ class Board:
     def board_top4(self):
         self.colors = [(Loc(41,6), 1)]     # window
         containers, crates, doors, specials = self.load_map(self._map)
-        Item(self, Blocks.car, 'Car', specials[1], id=ID.car2)
+        Item(self, Blocks.ferry, 'Sailboat', specials[1], id=ID.sailboat)
 
     # -----------------------------------------------------------------------------------------------
     def board_und1(self):
@@ -1722,17 +1723,18 @@ def main(stdscr):
     objects[ID.grn_heart] = grn_heart
     objects[ID.key1] = key1
 
-    B = b1 = Board(Loc(0,1), 1)
-    b2 = Board(Loc(1,1), 2)
-    b3 = Board(Loc(2,1), 3)
-    b4 = Board(Loc(3,1), 4)
-    b5 = Board(Loc(4,1), 5)
-    b6 = Board(Loc(5,1), 6)
-    b7 = Board(Loc(6,1), 7)
-    b8 = Board(Loc(7,1), 8)
-    b9 = Board(Loc(8,1), 9)
+    MAIN_Y = 2
+    B = b1 = Board(Loc(0,MAIN_Y), 1)
+    b2 = Board(Loc(1,MAIN_Y), 2)
+    b3 = Board(Loc(2,MAIN_Y), 3)
+    b4 = Board(Loc(3,MAIN_Y), 4)
+    b5 = Board(Loc(4,MAIN_Y), 5)
+    b6 = Board(Loc(5,MAIN_Y), 6)
+    b7 = Board(Loc(6,MAIN_Y), 7)
+    b8 = Board(Loc(7,MAIN_Y), 8)
+    b9 = Board(Loc(8,MAIN_Y), 9)
 
-    und1 = Board(Loc(0,0), 'und1')
+    und1 = Board(None, 'und1')
     sea1 = Board(None, 'sea1')
     objects[ID.sea_level1] = sea1
     landscape1 = Board(None, 'landscape1')
@@ -1754,28 +1756,30 @@ def main(stdscr):
     sea1.board_sea1()
     wtower.board_wtower()
 
-    b9 = Board(Loc(8,1), 9)
+    b9 = Board(Loc(8,MAIN_Y), 9)
     b9.board_9()
-    b10 = Board(Loc(9,1), 10)
+    b10 = Board(Loc(9,MAIN_Y), 10)
     b10.board_10()
-    b11 = Board(Loc(10,1), 11)
+    b11 = Board(Loc(10,MAIN_Y), 11)
     b11.board_11()
-    b12 = Board(Loc(11,1), 12)
+    b12 = Board(Loc(11,MAIN_Y), 12)
     b12.board_12()
 
-    top1 = Board(Loc(9,0), 'top1')
+    top1 = Board(Loc(9,MAIN_Y-1), 'top1')
     top1.board_top1()
 
-    top2 = Board(Loc(8,0), 'top2')
+    top2 = Board(Loc(8,MAIN_Y-1), 'top2')
     top2.board_top2()
-    top3 = Board(Loc(7,0), 'top3')
+    top3 = Board(Loc(7,MAIN_Y-1), 'top3')
     top3.board_top3()
-    top4 = Board(Loc(10,0), 'top4')
+    top4 = Board(Loc(8,MAIN_Y-1), 'top4')
     top4.board_top4()
 
-    boards[:] = ([None,None,None,None, None,None,None,top3, top2,top1, top4, None],
-                 [b1, b2,   b3, b4,    b5, b6,   b7, b8,    b9, b10, b11, b12],
-                 [und1,None,None,None, None,None,None,None, None,None, None, None])
+    boards[:] = (
+         [None,None,None,None, None,None,None,None, top4,None, None, None],
+         [None,None,None,None, None,None,None,top3, top2,top1, None, None],
+         [b1, b2,   b3, b4,    b5, b6,   b7, b8,    b9, b10, b11, b12],
+         [None,None,None,None, None,None,None,None, None,None, None, None])
 
     stdscr.clear()
     B.draw(win)
@@ -1839,27 +1843,27 @@ def main(stdscr):
         elif k == ' ':
             player.action()
         elif k == '4':
-            B = player.move_to_board( Loc(3,1), Loc(35, GROUND-5) )
+            B = player.move_to_board( Loc(3,MAIN_Y), Loc(35, GROUND-5) )
         elif k == '5':
-            B = player.move_to_board( Loc(4,1), Loc(35, GROUND) )
+            B = player.move_to_board( Loc(4,MAIN_Y), Loc(35, GROUND) )
         elif k == '6':
-            B = player.move_to_board( Loc(5,1), Loc(35, GROUND) )
+            B = player.move_to_board( Loc(5,MAIN_Y), Loc(35, GROUND) )
         elif k == '7':
-            B = player.move_to_board( Loc(6,1), Loc(72, GROUND) )
+            B = player.move_to_board( Loc(6,MAIN_Y), Loc(72, GROUND) )
         elif k == '8':
-            B = player.move_to_board( Loc(7,1), Loc(7, GROUND) )
+            B = player.move_to_board( Loc(7,MAIN_Y), Loc(7, GROUND) )
         elif k == '9':
-            B = player.move_to_board( Loc(9,1), Loc(59, 5) )
+            B = player.move_to_board( Loc(9,MAIN_Y), Loc(59, 5) )
 
         elif k == '0':
-            B = player.move_to_board( Loc(7,0), Loc(7, GROUND) )
+            B = player.move_to_board( Loc(7,MAIN_Y-1), Loc(7, GROUND) )
         # -----------------------------------------------------------------------------------------------
 
         elif k == 'u':
             player.use()
 
         elif k == 'U':
-            B = player.move_to_board( Loc(0,0), Loc(35, 10) )
+            B = player.move_to_board( None, Loc(35, 10) , B=und1)
         elif k == 'E':
             B.display(str(B.get_all(player.loc)))
         elif k == 'm':
