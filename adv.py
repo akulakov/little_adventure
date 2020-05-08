@@ -186,6 +186,8 @@ class ID:
     groboclone1 = 122
     locksmith = 123
     maurice = 124
+    clermont_ferrand2 = 125
+    clermont_ferrand3 = 126
 
     max1 = 200
     max2 = 201
@@ -242,6 +244,10 @@ conversations = {
                           "Ah, don't I know it! And I have no choice but drink tap water from this fountain!", "Why is that?",
                           "I wish I never went to my doctor - he is the one who told me I have to drink tap water!",
                           "If there's anything anyone could do, I would sure be very grateful!!"],
+
+    ID.clermont_ferrand2: ['Let me try the water first...'],
+
+    ID.clermont_ferrand3: ['Fantastic! It tastes like raspberries! I would have preferred a carrot flavor, but a promise is a promise.. follow me..'],
 
     ID.locksmith: ['Ahh! You know the secret passage! I know I can trust you...', 'I would like to see the Astronomer',
                    'Very well, I will open the door for you.'],
@@ -392,6 +398,7 @@ class Board:
         RoboBunny(self, specials[2], id=ID.chamonix, name='Mr. Chamonix')
         Being(self, specials[3], id=ID.agen, name='Agen', char=Blocks.monkey)
         Being(self, specials[4], id=ID.clermont_ferrand, name='Clermont-Ferrand', char=Blocks.monkey)
+        doors[0].type = Type.door3
 
     def board_11(self):
         self.load_map(self._map)
@@ -1034,7 +1041,7 @@ class Being(Mixin1):
             loc = self.loc
             self.put(r)
             ro.put(loc)
-            Windows.win2.addstr(1, 0, f'{self} moved past {ro}')
+            Windows.win2.addstr(1, 0, f'{self} moved past {ro.name}')
         elif isinstance(lo, Being):
             B.remove(lo)
             B.remove(self)
@@ -1054,6 +1061,7 @@ class Being(Mixin1):
         montbard = objects.get(ID.montbard)
         locksmith = objects.get(ID.locksmith)
         maurice = objects.get(ID.maurice)
+        clermont_ferrand = objects.get(ID.clermont_ferrand)
 
         if chk_oob(r): locs.append(r)
         if chk_oob(l): locs.append(l)
@@ -1080,18 +1088,32 @@ class Being(Mixin1):
 
         elif ID.anthony in B.get_ids(locs):
             BuyADrinkAnthony(B).go()
+
         elif ID.trick_guard in B.get_ids(locs):
             self.talk(objects[ID.guard2])
             B.remove(objects[ID.bars1])
             objects[ID.guard2].move('l')
+
         elif ID.talk_to_brenne in B.get_ids(locs):
             self.talk(objects[ID.brenne])
+
         elif ID.max_ in B.get_ids(locs):
             MaxQuest().go(self)
+
         elif ID.chamonix in B.get_ids(locs):
             self.talk(objects[ID.chamonix])
-        elif ID.clermont_ferrand in B.get_ids(locs) and objects[ID.clermont_ferrand].state==1:
+
+        elif is_near('clermont_ferrand') and clermont_ferrand.state==1:
             self.talk(objects[ID.clermont_ferrand])
+
+        elif is_near('clermont_ferrand') and clermont_ferrand.state==2:
+            self.talk(objects[ID.clermont_ferrand])
+            triggered_events.append(ClermontTriesWater)
+            clermont_ferrand.state = 3
+
+        # elif is_near('clermont_ferrand') and clermont_ferrand.state==3:
+        #     triggered_events.append(ClermontOpensSecretLibraryRoom)
+        #     clermont_ferrand.state = 4
 
         elif ID.morvan in B.get_ids(locs) and morvan.state==0:
             self.talk(morvan)
@@ -1181,7 +1203,7 @@ class Being(Mixin1):
             empty_bottle = Item(None, Blocks.bottle, 'empty bottle', None, id=ID.empty_bottle)
             self.inv[empty_bottle] += 1
             # a little hacky, would be better to add a water supply obj and update its state
-            objects[ID.clermont_ferrand].state = 1
+            objects[ID.clermont_ferrand].state = 2
         else:
             status('Nothing happens')
 
@@ -1286,6 +1308,18 @@ class TravelByCarEvent(Event):
             B = self.player.move_to_board(Loc(7,0), Loc(7, GROUND))
             B.put(car, Loc(6,GROUND))
         return B
+
+class ClermontTriesWater(Event):
+    def go(self):
+        clermont = objects[ID.clermont_ferrand]
+        clermont.move('h')
+        status('Clermont tries a bit of water from the from the fountain')
+        status('Clermont tries a bit more of the water')
+        self.player.talk(clermont, conversations[ID.clermont_ferrand3])
+        clermont.tele(Loc(61,4))
+        self.player.tele(Loc(59,5))
+        self.B.remove(self.B.doors[0])
+        status('Clermont opens the door')
 
 class TravelToPrincipalIslandEvent(Event):
     def go(self):
