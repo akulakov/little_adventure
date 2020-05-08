@@ -5,6 +5,8 @@ bugs
 TODO
     - update stairs on screen 2
     - fast move attacks 5x in one turn
+
+races: Spheros, Rabbibunnies, Quetches, Grobos
 """
 from curses import wrapper, newwin
 import curses
@@ -23,6 +25,7 @@ HEIGHT = 16
 GROUND = HEIGHT-2   # ground level
 LOAD_BOARD = 999
 SLP = 0.01
+SEQ_TYPES = (list, tuple)
 debug_log = open('debug', 'w')
 triggered_events = []
 done_events = set()
@@ -95,6 +98,7 @@ class Blocks:
     car = '🚗'
     blue_round = '🔵' # unused
     bottle = '℧'
+    box1 = '⊟'
 
     crates = (crate1, crate2, crate3, crate4)
 
@@ -160,6 +164,8 @@ class ID:
     drawing = 35
     car = 36
     empty_bottle = 37
+    car2 = 38
+    fuel = 39
 
     guard1 = 100
     technician1 = 101
@@ -188,6 +194,7 @@ class ID:
     maurice = 124
     clermont_ferrand2 = 125
     clermont_ferrand3 = 126
+    aubigny = 127
 
     max1 = 200
     max2 = 201
@@ -198,6 +205,9 @@ class ID:
     sea_level1 = 300
     landscape_level1 = 301
     water_tower_level = 302
+    port_beluga_level = 303
+
+    legend1 = 400
 
 
 items_by_id = {v:k for k,v in ID.__dict__.items()}
@@ -255,6 +265,8 @@ conversations = {
     ID.astronomer: ['Have you..', "I know that you are looking for your friend, but I haven't seen her. It's very odd that she was taken from Citadel island",
                     'I feel that Dr. Funfrock is afraid of something related to the Legend. If you find out what it is, you may be able to help your friend.', 'Go to port Beluga, and talk to my dear friend Maurice, he will help you get off the island.'
                    ],
+
+    ID.legend1: ['The secret of the Prophecy, which is now often called simply The Legend, can be found somewhere in the White Leaf Desert.'],
 }
 
 def mkcell():
@@ -305,6 +317,7 @@ class Board:
         self.trigger_locations = {}
         self.colors = []
         self.labels = []
+        self.misc = []
         self.loc = loc
         self._map = _map
 
@@ -393,11 +406,13 @@ class Board:
         self.load_map(self._map)
 
     def board_10(self):
+        """Library"""
         containers, crates, doors, specials = self.load_map(self._map)
         Grobo(self, specials[1], id=ID.wally, name='Wally')
         RoboBunny(self, specials[2], id=ID.chamonix, name='Mr. Chamonix')
         Being(self, specials[3], id=ID.agen, name='Agen', char=Blocks.monkey)
         Being(self, specials[4], id=ID.clermont_ferrand, name='Clermont-Ferrand', char=Blocks.monkey)
+        Item(self, Blocks.open_book, 'book', specials[5], id=ID.legend1)
         doors[0].type = Type.door3
 
     def board_11(self):
@@ -420,6 +435,7 @@ class Board:
         Being(self, specials[3], id=ID.astronomer, name='The Astronomer', char=Blocks.monkey)
         Being(self, specials[4], id=ID.groboclone1, name='Groboclone', char=Blocks.elephant)
         Being(self, specials[7], id=ID.locksmith, name='Locksmith', char=Blocks.elephant)
+        Being(self, specials[9], id=ID.aubigny, name='Aubigny', char=Blocks.rabbit)
 
         Item(self, Blocks.fountain, 'sink', specials[5], id=ID.sink)
         Item(self, Blocks.hexagon, 'A Drawing with a romantic view and a horse galloping at full speed across the plain', specials[6], id=ID.drawing)
@@ -431,6 +447,11 @@ class Board:
         self.colors = [(Loc(50,11), 1)]     # window
         containers, crates, doors, specials = self.load_map(self._map)
         Item(self, Blocks.car, 'Car', specials[1], id=ID.car)
+
+    def board_top4(self):
+        self.colors = [(Loc(41,6), 1)]     # window
+        containers, crates, doors, specials = self.load_map(self._map)
+        Item(self, Blocks.car, 'Car', specials[1], id=ID.car2)
 
     # -----------------------------------------------------------------------------------------------
     def board_und1(self):
@@ -687,9 +708,9 @@ class Board:
 
     def display(self, txt):
         w = max(len(l) for l in txt) + 1
-        win = newwin(len(txt), w, 5, 5)
+        win = newwin(len(txt)+2, w+2, 5, 5)
         for y, ln in enumerate(txt):
-            win.addstr(y,0, ln)
+            win.addstr(y+1,0, ' ' + ln)
         win.getkey()
         del win
 
@@ -801,6 +822,7 @@ class Being(Mixin1):
         self.add1(ID.key1)
         j=Item(None, Blocks.bottle, 'jar of syrup', None, id=ID.jar_syrup)
         self.inv[j] = 1
+        self.inv[objects[ID.fuel]] = 10
         self.kashes = 14
         if id:
             objects[id] = self
@@ -858,7 +880,7 @@ class Being(Mixin1):
                 del win
                 return k in 'Yy'
             elif multichoice:
-                for _ in range(10):
+                for _ in range(2):
                     k = win.getkey()
                     try:
                         k=int(k)
@@ -1062,6 +1084,7 @@ class Being(Mixin1):
         locksmith = objects.get(ID.locksmith)
         maurice = objects.get(ID.maurice)
         clermont_ferrand = objects.get(ID.clermont_ferrand)
+        aubigny = objects.get(ID.aubigny)
 
         if chk_oob(r): locs.append(r)
         if chk_oob(l): locs.append(l)
@@ -1111,10 +1134,6 @@ class Being(Mixin1):
             triggered_events.append(ClermontTriesWater)
             clermont_ferrand.state = 3
 
-        # elif is_near('clermont_ferrand') and clermont_ferrand.state==3:
-        #     triggered_events.append(ClermontOpensSecretLibraryRoom)
-        #     clermont_ferrand.state = 4
-
         elif ID.morvan in B.get_ids(locs) and morvan.state==0:
             self.talk(morvan)
             morvan.state = 1
@@ -1144,10 +1163,40 @@ class Being(Mixin1):
             self.talk(ID.astronomer)
             maurice.state = 1
 
-        elif is_near('car'):
-            y = self.talk(ID.car, 'Would you like to use the car?', yesno=1)
+        elif is_near('legend1'):
+            self.talk(self, conversations[ID.legend1])
+
+        elif is_near('aubigny'):
+            y = self.talk(aubigny, 'Would you like to buy some fuel for 5 kashes?', yesno=1)
             if y:
-                triggered_events.append(TravelByCarEvent)
+                if self.kashes>=5:
+                    self.inv[objects[ID.fuel]] += 5
+                    self.kashes -= 5
+                else:
+                    status("Looks like you don't have enough kashes!")
+
+        elif is_near('car'):
+            # if maurice and maurice.state == 1:
+            if 1:     # TODO use the commented line above
+                if B._map == 'top3':
+                    choices = ['Water Tower', 'Port Beluga']
+                elif B._map == 'wtower':
+                    choices = ['Old town', 'Port Beluga']
+                elif B._map == 'beluga':
+                    choices = ['Old town', 'Water Tower']
+            else:
+                if B._map == 'top3': choices = ['Water Tower']
+                elif B._map == 'wtower': choices = ['Old town']
+            ch = self.talk(ID.car, ['Where would you like to go?', choices])
+            if ch:
+                ch = choices[ch-1]
+                desc_to_map = {'Water Tower': 'wtower', 'Port Beluga': 'beluga', 'Old town': 'top3'}
+                ch = desc_to_map[ch]
+                if self.has(ID.fuel):
+                    triggered_events.append((TravelByCarEvent, dict(dest=ch)))
+                    self.remove1(ID.fuel)
+                else:
+                    status("It looks like you don't have any petrol!")
 
         elif ID.agen in B.get_ids(locs):
             agen = objects[ID.agen]
@@ -1185,7 +1234,7 @@ class Being(Mixin1):
         win = newwin(len(self.inv), 40, 2, 10)
         ascii_letters = string.ascii_letters
         for n, (item,qty) in enumerate(self.inv.items()):
-            win.addstr(f'{ascii_letters[n]}) {item.name:4} - {qty}')
+            win.addstr(n,0, f'{ascii_letters[n]}) {item.name:4} - {qty}')
         ch = win.getkey()
         item = None
         if ch in ascii_letters:
@@ -1252,9 +1301,10 @@ def pdb(*arg):
 class Event:
     done = False
     once = 1
-    def __init__(self, B):
+    def __init__(self, B, **kwargs):
         self.B = B
         self.player = objects[ID.player]
+        self.kwargs = kwargs
 
     def animate(self, item, dir, B=None):
         B = B or self.B
@@ -1287,11 +1337,11 @@ def status(msg):
 class TravelByCarEvent(Event):
     once = False
     def go(self):
+        dest = self.kwargs.get('dest')
         B = self.B
         car = objects[ID.car]
         B.remove(self.player)
         self.animate(car, 'h')
-        origB = B
 
         # switch to landscape map
         B = objects[ID.landscape_level1]
@@ -1299,13 +1349,17 @@ class TravelByCarEvent(Event):
         B.put(car, Loc(77,GROUND))
         self.animate(car, 'h')
 
-        if origB._map == 'top3':
+        if dest == 'wtower':
             status('You have driven the car to the Water tower')
             B = self.player.move_to_board(None, Loc(7, GROUND), B=objects[ID.water_tower_level])
             B.put(car, Loc(6,GROUND))
-        elif origB._map == 'wtower':
+        elif dest == 'top3':
             status('You have driven the car to the Empty Manor')
             B = self.player.move_to_board(Loc(7,0), Loc(7, GROUND))
+            B.put(car, Loc(6,GROUND))
+        elif dest == 'beluga':
+            status('You have driven the car to Port Beluga')
+            B = self.player.move_to_board(None, Loc(7, GROUND), B=objects[ID.port_beluga_level])
             B.put(car, Loc(6,GROUND))
         return B
 
@@ -1662,6 +1716,8 @@ def main(stdscr):
     coin = Item(None, Blocks.coin, 'coin', None, id=ID.coin)
     grn_heart = Item(None, Blocks.grn_heart, 'heart', None, id=ID.grn_heart)
     key1 = Item(None, Blocks.key, 'key', None, id=ID.key1)
+    fuel = Item(None, Blocks.box1, 'fuel', None, id=ID.fuel)
+    objects[ID.fuel] = fuel
     objects[ID.coin] = coin
     objects[ID.grn_heart] = grn_heart
     objects[ID.key1] = key1
@@ -1714,8 +1770,10 @@ def main(stdscr):
     top2.board_top2()
     top3 = Board(Loc(7,0), 'top3')
     top3.board_top3()
+    top4 = Board(Loc(10,0), 'top4')
+    top4.board_top4()
 
-    boards[:] = ([None,None,None,None, None,None,None,top3, top2,top1, None, None],
+    boards[:] = ([None,None,None,None, None,None,None,top3, top2,top1, top4, None],
                  [b1, b2,   b3, b4,    b5, b6,   b7, b8,    b9, b10, b11, b12],
                  [und1,None,None,None, None,None,None,None, None,None, None, None])
 
@@ -1791,7 +1849,7 @@ def main(stdscr):
         elif k == '8':
             B = player.move_to_board( Loc(7,1), Loc(7, GROUND) )
         elif k == '9':
-            B = player.move_to_board( Loc(9,1), Loc(7, GROUND) )
+            B = player.move_to_board( Loc(9,1), Loc(59, 5) )
 
         elif k == '0':
             B = player.move_to_board( Loc(7,0), Loc(7, GROUND) )
@@ -1809,9 +1867,8 @@ def main(stdscr):
                 MagicBallEvent(B).go(player, last_dir)
         elif k == 'i':
             txt = []
-            for k, n in player.inv.items():
-                item = descr_by_id[k]
-                txt.append(f'{item:20}{n}')
+            for item, n in player.inv.items():
+                txt.append(f'{item.name} {n}')
             B.display(txt)
 
         if k != '.':
@@ -1833,9 +1890,12 @@ def main(stdscr):
             player, B = Saves().load('start')
 
         for evt in triggered_events:
+            kwargs = {}
+            if isinstance(evt, SEQ_TYPES):
+                evt, kwargs = evt
             if evt in done_events and evt.once:
                 continue
-            rv = evt(B).go()
+            rv = evt(B, **kwargs).go()
             if isinstance(rv, Board):
                 B = rv
             try:
@@ -1871,6 +1931,12 @@ def editor(stdscr, _map):
     brush = None
     written = 0
     B = Board(Loc(0,0), _map)
+    import os
+    fname = f'maps/{_map}.map'
+    if not os.path.exists(fname):
+        with open(fname, 'w') as fp:
+            for _ in range(HEIGHT):
+                fp.write(blank*78 + '\n')
     B.load_map(_map, 1)
     B.draw(win)
 
