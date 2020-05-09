@@ -100,6 +100,7 @@ class Blocks:
     blue_round = '🔵' # unused
     bottle = '℧'
     box1 = '⊟'
+    cactus = '🌵'
 
     crates = (crate1, crate2, crate3, crate4)
 
@@ -463,12 +464,20 @@ class Board:
         Item(self, Blocks.ferry, 'Sailboat', specials[1], id=ID.sailboat)
 
     # -- White Leaf Desert --------------------------------------------------------------------------
+
     def board_desert1(self):
         lrange = lambda *x: list(range(*x))
         for x in [8,15] + lrange(23,27) + lrange(35,79):
             self.colors.append((Loc(x,GROUND+1), 2))
         containers, crates, doors, specials = self.load_map(self._map)
         Item(self, Blocks.ferry, 'Sailboat', specials[1], id=ID.sailboat)
+
+    def board_desert2(self):
+        lrange = lambda *x: list(range(*x))
+        for x in [8,15] + lrange(23,27) + lrange(35,60):
+            self.colors.append((Loc(x,GROUND+1), 2))
+        specials = self.load_map(self._map)[3]
+        # Item(self, Blocks.ferry, 'Sailboat', specials[1], id=ID.sailboat)
 
     # -----------------------------------------------------------------------------------------------
     def board_und1(self):
@@ -537,6 +546,9 @@ class Board:
 
                     elif char==Blocks.smoke_pipe:
                         Item(self, Blocks.smoke_pipe, 'smoke pipe', loc, type=Type.ladder)
+
+                    elif char==Blocks.cactus:
+                        Item(self, Blocks.cactus, 'cactus', loc)
 
                     elif char==Blocks.fireplace:
                         Item(self, Blocks.fireplace, 'fireplace', loc)
@@ -892,8 +904,8 @@ class Being(Mixin1):
             offset_y = lines if loc.y<8 else -lines
 
             y = max(0, loc.y+offset_y)
-            win = newwin(lines, w, y, x)
-            win.addstr(0,0, txt + (' [Y/N]' if yesno else ''))
+            win = newwin(lines+2, w+2, y, x)
+            win.addstr(1,1, txt + (' [Y/N]' if yesno else ''))
             if yesno:
                 # TODO in some one-time dialogs, may need to detect 'no' explicitly
                 k = win.getkey()
@@ -1335,8 +1347,6 @@ def pdb(*arg):
     import pdb; pdb.set_trace()
 
 class Event:
-    done = False
-    once = 1
     def __init__(self, B, **kwargs):
         self.B = B
         self.player = objects[ID.player]
@@ -1400,6 +1410,7 @@ class TravelByCarEvent(Event):
         return B
 
 class ClermontTriesWater(Event):
+    once=1
     def go(self):
         clermont = objects[ID.clermont_ferrand]
         clermont.move('h')
@@ -1412,6 +1423,7 @@ class ClermontTriesWater(Event):
         status('Clermont opens the door')
 
 class TravelToPrincipalIslandEvent(Event):
+    once=True
     def go(self):
         player = objects[ID.player]
         player.remove1(ID.ferry_ticket)
@@ -1422,6 +1434,7 @@ class TravelToPrincipalIslandEvent(Event):
         return player.move_to_board( Loc(7, self.B.loc[1]), Loc(7, GROUND) )
 
 class TravelBySailboat(Event):
+    once = False
     def go(self):
         dest = self.kwargs.get('dest')
         player = objects[ID.player]
@@ -1436,6 +1449,7 @@ class TravelBySailboat(Event):
             return player.move_to_board(None, Loc(7, GROUND), B=objects[ID.port_beluga_level])
 
 class GuardAttackEvent1(Event):
+    once=True
     def go(self):
         guard = objects[ID.guard1]
         if self.done: return
@@ -1474,6 +1488,7 @@ class GuardAttackEvent1(Event):
         self.done = True
 
 class PlatformEvent1(Event):
+    once=True
     def go(self):
         debug('PlatformEvent1 start')
         if self.done: return
@@ -1556,6 +1571,7 @@ class ClimbThroughGrillEvent3(Event):
         return player.move_to_board(b_loc, Loc(72, GROUND))
 
 class AlarmEvent1(Event):
+    once=True
     def go(self):
         if self.done: return
         tech = objects[ID.technician1]
@@ -1570,6 +1586,7 @@ class AlarmEvent1(Event):
             sleep(0.1)
 
 class GarbageTruckEvent(Event):
+    once=True
     def go(self):
         B=self.B
         if self.done: return
@@ -1591,6 +1608,7 @@ class GarbageTruckEvent(Event):
         return pl.move_to_board(Loc(3, B.loc.y), Loc(0,GROUND))
 
 class PlatformEvent2(Event):
+    once=True
     def go(self):
         B = self.B
         p = objects[ID.platform_top1]
@@ -1605,6 +1623,7 @@ class PlatformEvent2(Event):
             sleep(0.2)
 
 class ShopKeeperEvent1(Event):
+    once=True
     def go(self):
         pl = objects[ID.player]
         shk = objects[ID.shopkeeper1]
@@ -1612,16 +1631,19 @@ class ShopKeeperEvent1(Event):
         timers.append(Timer(10, ShopKeeperAlarmEvent))
 
 class ShopKeeperAlarmEvent(Event):
+    once=True
     def go(self):
         shk = objects[ID.shopkeeper1]
         if shk.health > 0:
             return Saves().load('start')
 
 class DieEvent(Event):
+    once=False
     def go(self):
         return Saves().load('start')
 
 class MagicBallEvent(Event):
+    once=False
     def go(self, player, last_dir):
         B = self.B
         mb = Item(self.B, Blocks.magic_ball, '', player.loc)
@@ -1643,6 +1665,7 @@ class MagicBallEvent(Event):
         B.remove(mb)
 
 class BuyADrinkAnthony(Event):
+    once=True
     def go(self):
         pl = objects[ID.player]
         yes = pl.talk(objects[ID.anthony], 'Would you like to buy a drink for two kashes?', yesno=1)
@@ -1655,11 +1678,13 @@ class BuyADrinkAnthony(Event):
                 Windows.win2.addstr(2,0, "OH NO! You don't have enough kashes.. ..")
 
 class MaxState1(Event):
+    once=True
     def go(self):
         objects[ID.max_].state = 1
 
 
 class SoldierEvent2(Event):
+    once=False
     def go(self):
         s = objects[ID.soldier2]
         pl = objects[ID.player]
@@ -1828,8 +1853,11 @@ def main(stdscr):
     desert1 = Board(Loc(0,MAIN_Y-3), 'desert1')
     desert1.board_desert1()
 
+    desert2 = Board(Loc(1,MAIN_Y-3), 'desert2')
+    desert2.board_desert2()
+
     boards[:] = (
-         [desert1,None,None,None, None,None,None,None, None,None, None, None],
+         [desert1,desert2,None,None, None,None,None,None, None,None, None, None],
 
          [None,None,None,None, None,None,None,None, None,None, None, None],
          [None,None,None,None, None,None,None,top3, top2,top1, None, None],
@@ -2089,6 +2117,8 @@ def editor(stdscr, _map):
             brush = Blocks.rock2
         elif k == 'X':
             B.put(Blocks.shelves, loc)
+        elif k == 'C':
+            B.put(Blocks.cactus, loc)
 
         elif k == 'o':
             cmds = 'gm gl gr l b ob f'.split()
