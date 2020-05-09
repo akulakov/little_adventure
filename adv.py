@@ -103,6 +103,7 @@ class Blocks:
     cactus = '🌵'
     lever = '⎆'
     statue = 'Ω'
+    sharp_rock = '⩕'
 
     crates = (crate1, crate2, crate3, crate4)
 
@@ -127,6 +128,7 @@ class Type:
     event_trigger = 12
     blocking = 13
     door3 = 14
+    deadly = 15
 
 BLOCKING = [rock, Type.door1, Type.door2, Type.door3, Blocks.block1, Blocks.steps_r, Blocks.steps_l, Type.platform_top,
             Type.door_top_block, Type.blocking]
@@ -304,7 +306,8 @@ class Loc:
         return str((self.x, self.y))
 
     def __eq__(self, l):
-        return (self.x, self.y) == (l.x, l.y)
+        if isinstance(l, Loc):
+            return (self.x, self.y) == (l.x, l.y)
 
     def mod(self, y, x):
         new = copy(self)
@@ -498,7 +501,7 @@ class Board:
         Item(self, Blocks.lever, 'lever', specials[2], id=ID.lever2)
         Item(self, Blocks.statue, 'statue', specials[3], id=ID.statue)
         Item(self, Blocks.platform_top, 'platform', specials[4], id=ID.platform3, type=Type.blocking)
-        TriggerEventLocation(self, specials[5], evt=StatueInPlace)
+        # TriggerEventLocation(self, specials[5], evt=StatueInPlace)
 
     # -----------------------------------------------------------------------------------------------
     def board_und1(self):
@@ -561,6 +564,9 @@ class Board:
 
                     elif char=='s':
                         Item(self, Blocks.sunflower, 'sunflower', loc)
+
+                    elif char==Blocks.sharp_rock:
+                        Item(self, Blocks.sharp_rock, 'sharp_rock', loc, type=Type.deadly)
 
                     elif char==Blocks.block1:
                         Item(self, Blocks.block1, 'block', loc, type=Type.door_top_block)
@@ -1011,7 +1017,7 @@ class Being(Mixin1):
                 triggered_events.append(ShopKeeperEvent1)
 
             new = self.fall(new)
-            if new[0] == LOAD_BOARD:
+            if new[0] == LOAD_BOARD or not new[0]:
                 return new
             pick_up = [ID.key1, ID.key2, ID.key3, ID.magic_ball]
             B.remove(self)
@@ -1041,9 +1047,11 @@ class Being(Mixin1):
             # this needs to be after previous block because the block looks at `top_obj` which would always be the being
             # instead of an event trigger item
             self.put(new)
-            if statue and statue.state:
-                # m = dict(h=(0,-1), l=(0,1), j=(1,0), k=(-1,0))[dir]
-                statue.move(dir)
+            if statue:
+                if statue.state:
+                    statue.move(dir)
+                if statue.loc == B.specials[5]:
+                    triggered_events.append(StatueInPlace)
 
             grills = set((ID.grill1, ID.grill2))
             if self.sneaky_stance:
@@ -1080,6 +1088,12 @@ class Being(Mixin1):
                     triggered_events.append(DieEvent)
                     Windows.win2.addstr(1, 0, 'You fall into the water and drown...')
                     return None, None
+
+                if getattr(B[new2], 'type', None) == Type.deadly:
+                    triggered_events.append(DieEvent)
+                    status('You fall down onto sharp rocks and die of sustained wounds...')
+                    return None, None
+
                 if chk_oob(new2) and B.avail(new2) and not Type.ladder in B.get_types(new2):
                     # ugly hack for the fall animation
                     Windows.win.addstr(new2.y, new2.x, str(self))
@@ -1505,11 +1519,13 @@ class MovePlatform3Event(Event):
         p = objects[ID.platform3]
         a,b = B.specials[4], B.specials[5]
         i = B[p.loc.mod_u()]
-        if i==p: i=None
+        if i==p or i is blank: i=None
         self.animate_arc(p, to_loc=(a if p.loc==b else b), carry_item=i)
 
 class StatueInPlace(Event):
     once=True
+    def go(self):
+        self.B.remove(self.B.doors[0])
 
 class TravelBySailboat(Event):
     once = False
@@ -2232,6 +2248,7 @@ def editor(stdscr, _map):
 
                 elif cmd == 'm': B.put(BL.monkey, loc)
                 elif cmd == 'v': B.put(BL.lever, loc)
+                elif cmd == 's': B.put(BL.sharp_rock, loc)
                 elif cmd == 'd': B.put(BL.hexagon, loc)     # drawing
 
                 elif any(c.startswith(cmd) for c in cmds):
