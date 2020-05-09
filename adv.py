@@ -171,6 +171,10 @@ class ID:
     car2 = 38
     fuel = 39
     sailboat = 40
+    lever1 = 41
+    lever2 = 42
+    statue = 43
+    platform3 = 44
 
     guard1 = 100
     technician1 = 101
@@ -214,6 +218,7 @@ class ID:
     port_beluga_level = 303
 
     legend1 = 400
+    fall = 401  # move that falls through to the map below
 
 
 items_by_id = {v:k for k,v in ID.__dict__.items()}
@@ -483,11 +488,17 @@ class Board:
             self.colors.append((Loc(x,GROUND+1), 2))
         specials = self.load_map(self._map)[3]
         Being(self, specials[1], id=ID.olivet, name='Olivet', char=Blocks.rabbit)
-        # Item(self, '', '', specials[2], id=ID.entrance_bu)
-        # TriggerEventLocation(self, specials[2], evt=EnterBu)
 
     def board_des_und(self):
-        specials = self.load_map(self._map)[3]
+        containers, crates, doors, specials = self.load_map(self._map)
+        doors[0].type = Type.door3
+        doors[1].type = Type.door3
+
+        Item(self, Blocks.lever, 'lever', specials[1], id=ID.lever1)
+        Item(self, Blocks.lever, 'lever', specials[2], id=ID.lever2)
+        Item(self, Blocks.statue, 'statue', specials[3], id=ID.statue)
+        Item(self, Blocks.platform_top, 'platform', specials[4], id=ID.platform3)
+        TriggerEventLocation(self, specials[5], evt=StatueInPlace)
 
     # -----------------------------------------------------------------------------------------------
     def board_und1(self):
@@ -997,29 +1008,9 @@ class Being(Mixin1):
             if B.loc and B.loc.x==3 and new==Loc(23,8):   # TODO use trigger event location
                 triggered_events.append(ShopKeeperEvent1)
 
-            objs = [o.type for o in B.get_all_obj(new)]
-            if not fly and not Type.ladder in objs:
-                # fall
-                new2 = new
-                while 1:
-                    # TODO: these may overdraw non-blocking items; it's an ugly hack but creates a nice fall animation
-                    # for now
-                    Windows.win.addstr(self.loc.y, self.loc.x, ' ')
-                    Windows.win.addstr(new2.y, new2.x, ' ')
-                    new2 = new2.mod(1,0)
-                    if getattr(B[new2], 'type', None) == Type.water:
-                        triggered_events.append(DieEvent)
-                        Windows.win2.addstr(1, 0, 'You fall into the water and drown...')
-                        return None, None
-                    if chk_oob(new2) and B.avail(new2) and not Type.ladder in B.get_types(new2):
-                        # ugly hack for the fall animation
-                        Windows.win.addstr(new2.y, new2.x, str(self))
-                        sleep(0.05)
-                        Windows.win.refresh()
-                        new = new2
-                    else:
-                        break
-
+            new = self.fall(new)
+            if new[0] == LOAD_BOARD:
+                return new
             pick_up = [ID.key1, ID.key2, ID.key3, ID.magic_ball]
             B.remove(self)
             self.loc = new
@@ -1048,8 +1039,6 @@ class Being(Mixin1):
             # this needs to be after previous block because the block looks at `top_obj` which would always be the being
             # instead of an event trigger item
             self.put(new)
-            # if ID.door1 in B.get_ids(self.loc):
-            #     triggered_events.append(AlarmEvent1)
             grills = set((ID.grill1, ID.grill2))
             if self.sneaky_stance:
                 if (grills & set(B.get_ids(self.loc))):
@@ -1064,6 +1053,36 @@ class Being(Mixin1):
             Windows.win2.refresh()
             return True, True
         return None, None
+
+    def fall(self, new):
+        fly=False
+        B=self.B
+        objs = [o.type for o in B.get_all_obj(new)]
+        if not fly and not Type.ladder in objs:
+            new2 = new
+            while 1:
+                # TODO: these may overdraw non-blocking items; it's an ugly hack but creates a nice fall animation
+                # for now
+                Windows.win.addstr(self.loc.y, self.loc.x, ' ')
+                Windows.win.addstr(new2.y, new2.x, ' ')
+                new2 = new2.mod(1,0)
+                if chk_oob(new2) is False:
+                    self.loc = new
+                    return LOAD_BOARD, ID.fall
+
+                if getattr(B[new2], 'type', None) == Type.water:
+                    triggered_events.append(DieEvent)
+                    Windows.win2.addstr(1, 0, 'You fall into the water and drown...')
+                    return None, None
+                if chk_oob(new2) and B.avail(new2) and not Type.ladder in B.get_types(new2):
+                    # ugly hack for the fall animation
+                    Windows.win.addstr(new2.y, new2.x, str(self))
+                    sleep(0.05)
+                    Windows.win.refresh()
+                    new = new2
+                else:
+                    break
+        return new
 
     def attack(self, obj):
         if abs(self.loc.x - obj.loc.x) <= 1 and \
@@ -1235,6 +1254,12 @@ class Being(Mixin1):
         elif is_near('olivet'):
             self.talk(olivet)
 
+        elif is_near('lever1'):
+            B.remove(B.doors[1])
+
+        elif is_near('lever2'):
+            triggered_events.append(MovePlatform3Event)
+
         elif is_near('car'):
             # if maurice and maurice.state == 1:
             if 1:     # TODO use the commented line above
@@ -1364,9 +1389,19 @@ class Event:
         self.player = objects[ID.player]
         self.kwargs = kwargs
 
-    def animate(self, item, dir, B=None):
+    def animate_arc(self, item, to_loc, height=3):
+        B=self.B
+        for _ in range(height):
+            self.animate(item, 'k', n=height)
+        a,b = item.loc, to_loc
+        dir = 'h' if a.x>b.x else 'l'
+        self.animate(item, dir, n=abs(a.x-b.x))
+        for _ in range(height):
+            self.animate(item, 'j', n=height)
+
+    def animate(self, item, dir, B=None, n=999):
         B = B or self.B
-        while 1:
+        for _ in range(n):
             item.move(dir)
             B.draw(Windows.win)
             sleep(SLP)
@@ -1444,6 +1479,17 @@ class TravelToPrincipalIslandEvent(Event):
         self.animate(f, 'h', B=B)
         status('You have taken the ferry to Principal island.')
         return player.move_to_board( Loc(7, self.B.loc[1]), Loc(7, GROUND) )
+
+class MovePlatform3Event(Event):
+    once=False
+    def go(self):
+        B = self.B
+        p = objects[ID.platform3]
+        a,b = B.specials[4], B.specials[5]
+        self.animate_arc(p, to_loc=(a if p.loc==b else b))
+
+class StatueInPlace(Event):
+    once=True
 
 class TravelBySailboat(Event):
     once = False
@@ -1873,7 +1919,7 @@ def main(stdscr):
     boards[:] = (
          [desert1,desert2,None,None, None,None,None,None, None,None, None, None],
 
-         [None,None,None,None, None,None,None,None, None,None, None, None],
+         [None,des_und,None,None, None,None,None,None, None,None, None, None],
          [None,None,None,None, None,None,None,top3, top2,top1, None, None],
          [b1, b2,   b3, b4,    b5, b6,   b7, b8,    b9, b10, b11, b12],
          [None,None,None,None, None,None,None,None, None,None, None, None])
@@ -1915,13 +1961,22 @@ def main(stdscr):
                 rv = player.move(k)
             if rv[0] == LOAD_BOARD:
                 loc = rv[1]
+                if loc==ID.fall:
+                    # a bit ugly, handle fall as explicit 'move' down
+                    k = 'j'
+                    loc = B.loc.mod(1,0)
                 x, y = player.loc
                 if k=='l': x = 0
                 if k=='h': x = 78
                 if k=='k': y = 15
                 if k=='j': y = 0
+
+                # ugly but....
                 p_loc = Loc(x, y)
                 B = player.move_to_board(loc, p_loc)
+                B.remove(player)
+                player.loc = player.fall(player.loc)
+                B.put(player)
 
         elif k == '.':
             if last_cmd=='.':
@@ -1934,9 +1989,10 @@ def main(stdscr):
         elif k == 'S':
             player.stance = Stance.sneaky
             win2.addstr(1, 0, 'stance: sneaky')
-        elif k == 'L':
-            player, B = Saves().load('start')
-            objects[ID.player] = player
+        elif k == 'v':
+            status(str(player.loc))
+            # player, B = Saves().load('start')
+            # objects[ID.player] = player
         elif k == ' ':
             player.action()
         elif k == '4':
@@ -1956,7 +2012,7 @@ def main(stdscr):
             print(B.B[int(k)])
             status(f'printed row {k} to debug')
         elif k == '6':
-            B = player.move_to_board( Loc(5,MAIN_Y), Loc(35, GROUND) )
+            B = player.move_to_board( Loc(1,0), Loc(35, GROUND) )
         elif k == '7':
             B = player.move_to_board( Loc(6,MAIN_Y), Loc(72, GROUND) )
         elif k == '8':
