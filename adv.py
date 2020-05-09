@@ -101,6 +101,8 @@ class Blocks:
     bottle = '℧'
     box1 = '⊟'
     cactus = '🌵'
+    lever = '⎆'
+    statue = 'Ω'
 
     crates = (crate1, crate2, crate3, crate4)
 
@@ -198,6 +200,7 @@ class ID:
     clermont_ferrand2 = 125
     clermont_ferrand3 = 126
     aubigny = 127
+    olivet = 128
 
     max1 = 200
     max2 = 201
@@ -270,6 +273,8 @@ conversations = {
                    ],
 
     ID.legend1: ['The secret of the Prophecy, which is now often called simply The Legend, can be found somewhere in the White Leaf Desert.'],
+
+    ID.olivet: ['Can you tell me anything about the Legend?', 'Yes, I do know some details that may interest you.. but I can only tell you in exchange for the book of knowledge that I am sorely missing. You can find the book of knowledge in the Temple of Bu. The entrance is right here....'],
 }
 
 def mkcell():
@@ -477,7 +482,12 @@ class Board:
         for x in [8,15] + lrange(23,27) + lrange(35,60):
             self.colors.append((Loc(x,GROUND+1), 2))
         specials = self.load_map(self._map)[3]
-        # Item(self, Blocks.ferry, 'Sailboat', specials[1], id=ID.sailboat)
+        Being(self, specials[1], id=ID.olivet, name='Olivet', char=Blocks.rabbit)
+        # Item(self, '', '', specials[2], id=ID.entrance_bu)
+        # TriggerEventLocation(self, specials[2], evt=EnterBu)
+
+    def board_des_und(self):
+        specials = self.load_map(self._map)[3]
 
     # -----------------------------------------------------------------------------------------------
     def board_und1(self):
@@ -1118,15 +1128,14 @@ class Being(Mixin1):
         maurice = objects.get(ID.maurice)
         clermont_ferrand = objects.get(ID.clermont_ferrand)
         aubigny = objects.get(ID.aubigny)
+        olivet = objects.get(ID.olivet)
 
         if chk_oob(r): locs.append(r)
         if chk_oob(l): locs.append(l)
         if chk_oob(rd): locs.append(rd)
         if chk_oob(ld): locs.append(ld)
-        print('###', self.loc,' ',r,l,' ',rd,ld)
 
         def is_near(id):
-            print("B.get_ids(locs)", B.get_ids(locs))
             return getattr(ID, id) in B.get_ids(locs)
 
         if c:
@@ -1222,6 +1231,9 @@ class Being(Mixin1):
                     self.kashes -= 5
                 else:
                     status("Looks like you don't have enough kashes!")
+
+        elif is_near('olivet'):
+            self.talk(olivet)
 
         elif is_near('car'):
             # if maurice and maurice.state == 1:
@@ -1855,6 +1867,8 @@ def main(stdscr):
 
     desert2 = Board(Loc(1,MAIN_Y-3), 'desert2')
     desert2.board_desert2()
+    des_und = Board(Loc(1,MAIN_Y-2), 'des_und')
+    des_und.board_des_und()
 
     boards[:] = (
          [desert1,desert2,None,None, None,None,None,None, None,None, None, None],
@@ -2141,6 +2155,7 @@ def editor(stdscr, _map):
                 elif cmd == 'oc':  B.put(BL.car, loc)
 
                 elif cmd == 'm': B.put(BL.monkey, loc)
+                elif cmd == 'v': B.put(BL.lever, loc)
                 elif cmd == 'd': B.put(BL.hexagon, loc)     # drawing
 
                 elif any(c.startswith(cmd) for c in cmds):
