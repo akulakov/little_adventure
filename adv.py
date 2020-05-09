@@ -89,8 +89,9 @@ class Blocks:
     monkey = '🐵'
     antitank = '⋇'
     red_circle = '🔴'
-    rock2 = '║'
+    # rock2 = '║'
     rock2 = '▧'
+    rock3 = '▓'
     platform2 = '▭'
     angled1 = '╱'
     angled2 = '╲'
@@ -177,6 +178,13 @@ class ID:
     lever2 = 42
     statue = 43
     platform3 = 44
+    lever3 = 45
+    lever4 = 46
+    lever5 = 47
+    platform4 = 48
+    platform5 = 49
+    platform6 = 50
+    book_of_bu = 51
 
     guard1 = 100
     technician1 = 101
@@ -207,6 +215,7 @@ class ID:
     clermont_ferrand3 = 126
     aubigny = 127
     olivet = 128
+    olivet2 = 129
 
     max1 = 200
     max2 = 201
@@ -282,6 +291,8 @@ conversations = {
     ID.legend1: ['The secret of the Prophecy, which is now often called simply The Legend, can be found somewhere in the White Leaf Desert.'],
 
     ID.olivet: ['Can you tell me anything about the Legend?', 'Yes, I do know some details that may interest you.. but I can only tell you in exchange for the book of knowledge that I am sorely missing. You can find the book of knowledge in the Temple of Bu. The entrance is right here....'],
+
+    ID.olivet2: ['I now see that you are the chosen one. You can keep the Book of Bu. It will let you decipher runes and speak to the animals.', 'I do not know how you can defeat Dr. FunFrock, but I know that you must. I wish I could help you.', 'Something tells me your parents must have left a clue or a direction at your home to help you along. Perhaps it is a good time to return home.'],
 }
 
 def mkcell():
@@ -342,6 +353,7 @@ class Board:
         self.misc = []
         self.loc = loc
         self._map = _map
+        self.state = 0
         map_to_loc[str(_map)] = loc, self
 
     def __repr__(self):
@@ -501,7 +513,18 @@ class Board:
         Item(self, Blocks.lever, 'lever', specials[2], id=ID.lever2)
         Item(self, Blocks.statue, 'statue', specials[3], id=ID.statue)
         Item(self, Blocks.platform_top, 'platform', specials[4], id=ID.platform3, type=Type.blocking)
-        # TriggerEventLocation(self, specials[5], evt=StatueInPlace)
+
+    def board_des_und2(self):
+        containers, crates, doors, specials = self.load_map(self._map)
+        Item(self, Blocks.lever, 'lever', specials[1], id=ID.lever3)
+        Item(self, Blocks.lever, 'lever', specials[2], id=ID.lever4)
+        Item(self, Blocks.lever, 'lever', specials[3], id=ID.lever5)
+
+        Item(self, Blocks.platform_top, 'platform', specials[4], id=ID.platform4, type=Type.blocking)
+        Item(self, Blocks.platform_top, 'platform', specials[5], id=ID.platform5, type=Type.blocking)
+        Item(self, Blocks.platform_top, 'platform', specials[6], id=ID.platform6, type=Type.blocking)
+        Item(self, Blocks.open_book, 'Book of Bu', specials[7], id=ID.book_of_bu)
+        TriggerEventLocation(self, specials[8], evt=LeaveBu)
 
     # -----------------------------------------------------------------------------------------------
     def board_und1(self):
@@ -567,6 +590,9 @@ class Board:
 
                     elif char==Blocks.sharp_rock:
                         Item(self, Blocks.sharp_rock, 'sharp_rock', loc, type=Type.deadly)
+
+                    elif char==Blocks.rock3:
+                        Item(self, Blocks.rock3, 'rock', loc, type=Type.blocking)
 
                     elif char==Blocks.block1:
                         Item(self, Blocks.block1, 'block', loc, type=Type.door_top_block)
@@ -899,6 +925,12 @@ class Being(Mixin1):
         self.loc = loc
         B.put(self)
         self.B = B
+
+        # update references in `objects` in case there was a game load from a save
+        for loc, cell in B:
+            for obj in B.get_all_obj(loc):
+                if obj.id in objects:
+                    objects[obj.id] = obj
         return B
 
     @property
@@ -1017,7 +1049,7 @@ class Being(Mixin1):
                 triggered_events.append(ShopKeeperEvent1)
 
             new = self.fall(new)
-            if new[0] == LOAD_BOARD or not new[0]:
+            if new[0] == LOAD_BOARD or new[0] is None:
                 return new
             pick_up = [ID.key1, ID.key2, ID.key3, ID.magic_ball]
             B.remove(self)
@@ -1050,7 +1082,7 @@ class Being(Mixin1):
             if statue:
                 if statue.state:
                     statue.move(dir)
-                if statue.loc == B.specials[5]:
+                if statue.loc == B.specials[6]:
                     triggered_events.append(StatueInPlace)
 
             grills = set((ID.grill1, ID.grill2))
@@ -1169,6 +1201,13 @@ class Being(Mixin1):
         aubigny = objects.get(ID.aubigny)
         olivet = objects.get(ID.olivet)
         statue = objects.get(ID.statue)
+        lever3 = objects.get(ID.lever3)
+        lever4 = objects.get(ID.lever4)
+        lever5 = objects.get(ID.lever5)
+        platform4 = objects.get(ID.platform4)
+        platform5 = objects.get(ID.platform5)
+        platform6 = objects.get(ID.platform6)
+        book_of_bu = objects.get(ID.book_of_bu)
 
         if chk_oob(r): locs.append(r)
         if chk_oob(l): locs.append(l)
@@ -1273,13 +1312,40 @@ class Being(Mixin1):
                     status("Looks like you don't have enough kashes!")
 
         elif is_near('olivet'):
-            self.talk(olivet)
+            self.talk(olivet, conversations[ID.olivet2 if self.inv[book_of_bu] else ID.olivet])
+
+        elif is_near('book_of_bu'):
+            self.inv[book_of_bu] = 1
+            B.remove(book_of_bu)
+            status('You have found the Book of Bu.')
+            # status('You have found the Book of Bu. It gives you the power to decipher the runes and speak to the animals.')
 
         elif is_near('lever1'):
             B.remove(B.doors[1])
 
         elif is_near('lever2'):
             triggered_events.append(MovePlatform3Event)
+
+        elif is_near('lever3'):
+            if lever3.state==0 and lever5.state==0 and lever4.state==1:
+                dir = 'k' if platform6.loc.y>5 else 'j'
+                platform4.move(dir)
+                platform6.move(dir)
+                platform6.move(dir)
+                platform6.move(dir)
+
+        elif is_near('lever4'):
+            if lever3.state==0 and lever5.state==0 and lever4.state==0:
+                lever4.state = 1
+                dir = 'k' if platform5.loc.y>5 else 'j'
+                platform5.move(dir)
+                platform5.move(dir)
+
+        elif is_near('lever5'):
+            dir = 'k' if platform4.loc.y>5 else 'j'
+            platform4.move(dir)
+            platform4.move(dir)
+            lever4.state=1
 
         elif is_near('statue'):
             if not statue.state:
@@ -1510,7 +1576,7 @@ class TravelToPrincipalIslandEvent(Event):
         f = objects[ID.ferry]
         self.animate(f, 'h', B=B)
         status('You have taken the ferry to Principal island.')
-        return player.move_to_board( Loc(7, self.B.loc[1]), Loc(7, GROUND) )
+        return player.move_to_board( Loc(7, self.B.loc.y), Loc(7, GROUND) )
 
 class MovePlatform3Event(Event):
     once=False
@@ -1526,6 +1592,11 @@ class StatueInPlace(Event):
     once=True
     def go(self):
         self.B.remove(self.B.doors[0])
+
+class LeaveBu(Event):
+    once=False
+    def go(self):
+        return self.player.move_to_board( Loc(1, self.B.loc.y-1), Loc(7, GROUND) )
 
 class TravelBySailboat(Event):
     once = False
@@ -1849,6 +1920,7 @@ class Saves:
         s['cur_brd'] = cur_brd
         player = objects[ID.player]
         s['player'] = deepcopy(objects[ID.player])
+        s['objects'] = deepcopy(objects)
         bl = cur_brd
         B = boards[bl.y][bl.x]
         print("B.get_all(player.loc)", B.get_all(player.loc))
@@ -1858,6 +1930,8 @@ class Saves:
     def load(self, name):
         s = self.saves[name]
         boards[:] = s['boards']
+        global objects
+        objects = s['objects']
         loc = s['player'].loc
         print("load, player loc", loc)
         bl = s['cur_brd']
@@ -1951,11 +2025,14 @@ def main(stdscr):
     desert2.board_desert2()
     des_und = Board(Loc(1,MAIN_Y-2), 'des_und')
     des_und.board_des_und()
+    des_und2 = Board(Loc(0,MAIN_Y-2), 'des_und2')
+    des_und2.board_des_und2()
 
     boards[:] = (
          [desert1,desert2,None,None, None,None,None,None, None,None, None, None],
 
-         [None,des_und,None,None, None,None,None,None, None,None, None, None],
+         [des_und2,des_und,None,None, None,None,None,None, None,None, None, None],
+
          [None,None,None,None, None,None,None,top3, top2,top1, None, None],
          [b1, b2,   b3, b4,    b5, b6,   b7, b8,    b9, b10, b11, b12],
          [None,None,None,None, None,None,None,None, None,None, None, None])
@@ -2040,6 +2117,8 @@ def main(stdscr):
                 if mp in map_to_loc:
                     loc,b = map_to_loc[mp]
                     B = player.move_to_board(loc, Loc(7, GROUND), B=b)
+                    if B._map=='des_und': player.tele(Loc(7,7))
+                    if B._map=='des_und2': player.tele(Loc(70,7))
                 if not any(m.startswith(mp) for m in map_to_loc):
                     break
         elif k == '5':
@@ -2249,6 +2328,7 @@ def editor(stdscr, _map):
                 elif cmd == 'm': B.put(BL.monkey, loc)
                 elif cmd == 'v': B.put(BL.lever, loc)
                 elif cmd == 's': B.put(BL.sharp_rock, loc)
+                elif cmd == 'r': B.put(BL.rock3, loc)
                 elif cmd == 'd': B.put(BL.hexagon, loc)     # drawing
 
                 elif any(c.startswith(cmd) for c in cmds):
