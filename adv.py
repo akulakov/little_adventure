@@ -497,7 +497,7 @@ class Board:
         Item(self, Blocks.lever, 'lever', specials[1], id=ID.lever1)
         Item(self, Blocks.lever, 'lever', specials[2], id=ID.lever2)
         Item(self, Blocks.statue, 'statue', specials[3], id=ID.statue)
-        Item(self, Blocks.platform_top, 'platform', specials[4], id=ID.platform3)
+        Item(self, Blocks.platform_top, 'platform', specials[4], id=ID.platform3, type=Type.blocking)
         TriggerEventLocation(self, specials[5], evt=StatueInPlace)
 
     # -----------------------------------------------------------------------------------------------
@@ -804,6 +804,7 @@ class Mixin1:
 
 
 class Item(Mixin1):
+    state = 0
     def __init__(self, B, char, name, loc=None, put=True, id=None, type=None):
         self.B, self.char, self.name, self.loc, self.id, self.type = B, char, name, loc, id, type
         self.inv = defaultdict(int)
@@ -998,6 +999,7 @@ class Being(Mixin1):
                     triggered_events.append(GuardAttackEvent1)
 
         if new:
+            statue = objects.get(ID.statue)
             if ID.grill5 in B.get_ids(new):
                 new = new.mod(0,-3)
                 Windows.win2.addstr(1, 0, 'You climb through the window covered by a grill and escape to a small nook under the stairs')
@@ -1039,6 +1041,10 @@ class Being(Mixin1):
             # this needs to be after previous block because the block looks at `top_obj` which would always be the being
             # instead of an event trigger item
             self.put(new)
+            if statue and statue.state:
+                # m = dict(h=(0,-1), l=(0,1), j=(1,0), k=(-1,0))[dir]
+                statue.move(dir)
+
             grills = set((ID.grill1, ID.grill2))
             if self.sneaky_stance:
                 if (grills & set(B.get_ids(self.loc))):
@@ -1148,6 +1154,7 @@ class Being(Mixin1):
         clermont_ferrand = objects.get(ID.clermont_ferrand)
         aubigny = objects.get(ID.aubigny)
         olivet = objects.get(ID.olivet)
+        statue = objects.get(ID.statue)
 
         if chk_oob(r): locs.append(r)
         if chk_oob(l): locs.append(l)
@@ -1259,6 +1266,13 @@ class Being(Mixin1):
 
         elif is_near('lever2'):
             triggered_events.append(MovePlatform3Event)
+
+        elif is_near('statue'):
+            if not statue.state:
+                status('You prepare to move the statue')
+            else:
+                status('You leave the statue in place')
+            statue.state = not statue.state
 
         elif is_near('car'):
             # if maurice and maurice.state == 1:
@@ -1389,24 +1403,28 @@ class Event:
         self.player = objects[ID.player]
         self.kwargs = kwargs
 
-    def animate_arc(self, item, to_loc, height=3):
+    def animate_arc(self, item, to_loc, height=1, carry_item=None):
         B=self.B
         for _ in range(height):
-            self.animate(item, 'k', n=height)
+            self.animate(item, 'k', n=height, carry_item=carry_item)
         a,b = item.loc, to_loc
         dir = 'h' if a.x>b.x else 'l'
-        self.animate(item, dir, n=abs(a.x-b.x))
+        self.animate(item, dir, n=abs(a.x-b.x), carry_item=carry_item)
         for _ in range(height):
-            self.animate(item, 'j', n=height)
+            self.animate(item, 'j', n=height, carry_item=carry_item)
 
-    def animate(self, item, dir, B=None, n=999):
+    def animate(self, item, dir, B=None, n=999, carry_item=None):
         B = B or self.B
         for _ in range(n):
             item.move(dir)
+            if carry_item:
+                carry_item.move(dir)
             B.draw(Windows.win)
-            sleep(SLP)
+            sleep(SLP*4)
             if item.loc.x in (0, 78):
                 B.remove(item)
+                if carry_item:
+                    B.remove(carry_item)
                 return
 
 class JailEvent(Event):
@@ -1486,7 +1504,9 @@ class MovePlatform3Event(Event):
         B = self.B
         p = objects[ID.platform3]
         a,b = B.specials[4], B.specials[5]
-        self.animate_arc(p, to_loc=(a if p.loc==b else b))
+        i = B[p.loc.mod_u()]
+        if i==p: i=None
+        self.animate_arc(p, to_loc=(a if p.loc==b else b), carry_item=i)
 
 class StatueInPlace(Event):
     once=True
