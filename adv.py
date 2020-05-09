@@ -487,6 +487,7 @@ class Board:
         self.colors = [(Loc(41,6), 1)]     # window
         containers, crates, doors, specials = self.load_map(self._map)
         Item(self, Blocks.ferry, 'Sailboat', specials[1], id=ID.sailboat)
+        Item(self, Blocks.car, 'Car', specials[2], id=ID.car)
 
     # -- White Leaf Desert --------------------------------------------------------------------------
 
@@ -826,7 +827,7 @@ class Mixin1:
             triggered_events.append(PlatformEvent1)
 
     def has(self, id):
-        return self.inv[objects[id]]
+        return self.inv[objects.get(id)]
 
     def remove1(self, id):
         self.inv[objects[id]] -= 1
@@ -907,6 +908,7 @@ class Being(Mixin1):
         if Misc.is_game: # not editor
             self.add1(ID.key1)
             self.inv[objects[ID.fuel]] = 10
+            self.inv[objects[ID.ferry_ticket]] = 10
         j=Item(None, Blocks.bottle, 'jar of syrup', None, id=ID.jar_syrup)
         self.inv[j] = 1
         self.kashes = 54
@@ -1400,8 +1402,11 @@ class Being(Mixin1):
                 if self.kashes>=10:
                     self.add1(ID.ferry_ticket)
                     self.kashes -= 10
+
         elif ID.ferry in B.get_ids(locs) and self.has(ID.ferry_ticket):
-            triggered_events.append(TravelToPrincipalIslandEvent)
+            dest = 8 if B._map==7 else 7
+            triggered_events.append((TravelByFerry, dict(dest=dest)))
+
         else:
             loc = self.loc.mod(1,0)
             x = B[loc] # TODO won't work if something is in the platform tile
@@ -1545,8 +1550,8 @@ class TravelByCarEvent(Event):
             B = self.player.move_to_board(None, Loc(7, GROUND), B=objects[ID.water_tower_level])
             B.put(car, Loc(6,GROUND))
         elif dest == 'top3':
-            status('You have driven the car to the Empty Manor')
-            B = self.player.move_to_board(Loc(7,0), Loc(7, GROUND))
+            status('You have driven the car to Old Town')
+            B = self.player.move_to_board(map_to_loc['top3'][0], Loc(7, GROUND))
             B.put(car, Loc(6,GROUND))
         elif dest == 'beluga':
             status('You have driven the car to Port Beluga')
@@ -1566,17 +1571,6 @@ class ClermontTriesWater(Event):
         self.player.tele(Loc(59,5))
         self.B.remove(self.B.doors[0])
         status('Clermont opens the door')
-
-class TravelToPrincipalIslandEvent(Event):
-    once=True
-    def go(self):
-        player = objects[ID.player]
-        player.remove1(ID.ferry_ticket)
-        B = objects[ID.sea_level1]
-        f = objects[ID.ferry]
-        self.animate(f, 'h', B=B)
-        status('You have taken the ferry to Principal island.')
-        return player.move_to_board( Loc(7, self.B.loc.y), Loc(7, GROUND) )
 
 class MovePlatform3Event(Event):
     once=False
@@ -1598,6 +1592,21 @@ class LeaveBu(Event):
     def go(self):
         return self.player.move_to_board( Loc(1, self.B.loc.y-1), Loc(7, GROUND) )
 
+class TravelByFerry(Event):
+    once=False
+    def go(self):
+        dest = self.kwargs.get('dest')
+        player = objects[ID.player]
+        B = objects[ID.sea_level1]
+        f = objects[ID.ferry]
+        B.put(f, Loc(78,GROUND))
+        self.animate(f, 'h', B=B)
+        status('The ferry took you to ' + ('Principal Island' if dest=='8' else 'Citadel Island'))
+        if dest == 8:
+            return player.move_to_board( map_to_loc['8'][0], Loc(7, GROUND) )
+        elif dest == 7:
+            return player.move_to_board( map_to_loc['7'][0], Loc(7, GROUND) )
+
 class TravelBySailboat(Event):
     once = False
     def go(self):
@@ -1611,7 +1620,7 @@ class TravelBySailboat(Event):
         if dest == 'desert1':
             return player.move_to_board( Loc(0, 0), Loc(7, GROUND) )
         elif dest == 'beluga':
-            return player.move_to_board(None, Loc(7, GROUND), B=objects[ID.port_beluga_level])
+            return player.move_to_board(None, Loc(72, GROUND-1), B=objects[ID.port_beluga_level])
 
 class GuardAttackEvent1(Event):
     once=True
@@ -1960,6 +1969,9 @@ def main(stdscr):
     grn_heart = Item(None, Blocks.grn_heart, 'heart', None, id=ID.grn_heart)
     key1 = Item(None, Blocks.key, 'key', None, id=ID.key1)
     fuel = Item(None, Blocks.box1, 'fuel', None, id=ID.fuel)
+    ft = Item(None, Blocks.ferry_ticket, 'ferry ticket', None, id=ID.ferry_ticket)
+
+    objects[ID.ferry_ticket] = ft
     objects[ID.fuel] = fuel
     objects[ID.coin] = coin
     objects[ID.grn_heart] = grn_heart
