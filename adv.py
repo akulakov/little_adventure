@@ -32,6 +32,7 @@ done_events = set()
 boards = []
 objects = {}
 timers = []
+map_to_loc = {}
 
 
 class Blocks:
@@ -327,6 +328,7 @@ class Board:
         self.misc = []
         self.loc = loc
         self._map = _map
+        map_to_loc[str(_map)] = loc, self
 
     def __repr__(self):
         return f'<B: {self._map}'
@@ -455,7 +457,7 @@ class Board:
         containers, crates, doors, specials = self.load_map(self._map)
         Item(self, Blocks.car, 'Car', specials[1], id=ID.car)
 
-    def board_top4(self):
+    def board_beluga(self):
         self.colors = [(Loc(41,6), 1)]     # window
         containers, crates, doors, specials = self.load_map(self._map)
         Item(self, Blocks.ferry, 'Sailboat', specials[1], id=ID.sailboat)
@@ -841,7 +843,7 @@ class Being(Mixin1):
             self.inv[objects[ID.fuel]] = 10
         j=Item(None, Blocks.bottle, 'jar of syrup', None, id=ID.jar_syrup)
         self.inv[j] = 1
-        self.kashes = 14
+        self.kashes = 54
         if id:
             objects[id] = self
         if put:
@@ -1109,8 +1111,10 @@ class Being(Mixin1):
         if chk_oob(l): locs.append(l)
         if chk_oob(rd): locs.append(rd)
         if chk_oob(ld): locs.append(ld)
+        print('###', self.loc,' ',r,l,' ',rd,ld)
 
         def is_near(id):
+            print("B.get_ids(locs)", B.get_ids(locs))
             return getattr(ID, id) in B.get_ids(locs)
 
         if c:
@@ -1190,7 +1194,7 @@ class Being(Mixin1):
         elif is_near('sailboat'):
             dests = [('White Leaf Desert', 'desert1'), ('Port Beluga', 'beluga')]
             dest = dests[0] if B._map == 'beluga' else dests[1]
-            y = self.talk(self, 'Would you like to use the sailboat for 10 kashes, to go to {dest[0]}?', yesno=1)
+            y = self.talk(self, f'Would you like to use the sailboat for 10 kashes, to go to {dest[0]}?', yesno=1)
             if y:
                 if self.kashes>=10:
                     self.kashes-=10
@@ -1679,7 +1683,7 @@ class Timer:
 
 class Player(Being):
     char = '🙍'
-    health = 10
+    health = 50
     is_player = 1
     stance = Stance.sneaky
 
@@ -1741,7 +1745,6 @@ class Saves:
         B = boards[bl.y][bl.x]
         print("B.get_all(loc)", B.get_all(loc))
         player = B[loc]
-        # pdb(B, loc)
         player.B = B
         objects[ID.player] = player
         return player, B
@@ -1788,6 +1791,9 @@ def main(stdscr):
     wtower = Board(None, 'wtower')
     objects[ID.landscape_level1] = landscape1
     objects[ID.water_tower_level] = wtower
+    beluga = Board(None, 'beluga')
+    beluga.board_beluga()
+    objects[ID.port_beluga_level] = beluga
 
     player = b1.board_1()
     b2.board_2()
@@ -1819,16 +1825,13 @@ def main(stdscr):
     top3 = Board(Loc(7,MAIN_Y-1), 'top3')
     top3.board_top3()
 
-    top4 = Board(Loc(8,MAIN_Y-1), 'top4')
-    top4.board_top4()
-
     desert1 = Board(Loc(0,MAIN_Y-3), 'desert1')
     desert1.board_desert1()
 
     boards[:] = (
          [desert1,None,None,None, None,None,None,None, None,None, None, None],
 
-         [None,None,None,None, None,None,None,None, top4,None, None, None],
+         [None,None,None,None, None,None,None,None, None,None, None, None],
          [None,None,None,None, None,None,None,top3, top2,top1, None, None],
          [b1, b2,   b3, b4,    b5, b6,   b7, b8,    b9, b10, b11, b12],
          [None,None,None,None, None,None,None,None, None,None, None, None])
@@ -1895,9 +1898,21 @@ def main(stdscr):
         elif k == ' ':
             player.action()
         elif k == '4':
-            B = player.move_to_board( Loc(3,MAIN_Y), Loc(35, GROUND-5) )
+            mp = ''
+            while 1:
+                mp += win.getkey()
+                status(mp)
+                Windows.win2.refresh()
+                if mp in map_to_loc:
+                    loc,b = map_to_loc[mp]
+                    B = player.move_to_board(loc, Loc(7, GROUND), B=b)
+                if not any(m.startswith(mp) for m in map_to_loc):
+                    break
         elif k == '5':
-            B = player.move_to_board( Loc(4,MAIN_Y), Loc(35, GROUND) )
+            k = win.getkey()
+            k+= win.getkey()
+            print(B.B[int(k)])
+            status(f'printed row {k} to debug')
         elif k == '6':
             B = player.move_to_board( Loc(5,MAIN_Y), Loc(35, GROUND) )
         elif k == '7':
