@@ -108,6 +108,7 @@ class Blocks:
     runes = '⩰'
     cow = '🐮'
     hair_dryer = 'D'
+    proto_pack = 'P'
 
     crates = (crate1, crate2, crate3, crate4)
 
@@ -190,6 +191,7 @@ class ID:
     book_of_bu = 51
     runes = 52
     hair_dryer = 53
+    proto_pack = 54
 
     guard1 = 100
     technician1 = 101
@@ -231,6 +233,8 @@ class ID:
     baldino = 137
     fenioux = 138
     salesman = 139
+    baldino2 = 140
+    baldino3 = 141
 
     max1 = 200
     max2 = 201
@@ -326,6 +330,10 @@ conversations = {
     ID.ruffec: ["Can you tell me about DeForge's treasure?", ''],
 
     ID.baldino: ["Can you tell me about pirate DeForge?", "No.. I've been working on my invention -- the jetpack. I'm afraid I've had a little disaster last week in the garden and broke the wall and the door to my house and had to make a temporary ladder to get in.. If you could only find me a hair dryer, I would use spare parts to make the jetpack more stable in flight!"],
+
+    ID.baldino2: ["I see that you found the hair dryer!! Excellent. If you come back in a bit, I should be done with the Proto-pack..",
+                  ".......", "...", "..", '.',],
+    ID.baldino3: ["And now I'm done! Would you be so kind as to test the proto pack for 10 kashes? It can be used to fly over the level of water, but make sure you don't jump in it from height. Do you agree?"],
 
     ID.fenioux: ["Wait, how did you get in here? Who are you??", "I'm the heir, just like in the Prophecy... You know, the Legend! It's true!", "I'm happy for you, Twinsen! My brother is being held in Dr. FunFrock's headquarters, but his window is facing outside. If you can talk to him and find out how he's doing, I will give you the red card as a small token of gratitude."],
 }
@@ -977,6 +985,8 @@ class Being(Mixin1):
             self.inv[objects[ID.fuel]] = 10
             self.inv[objects[ID.ferry_ticket]] = 10
         j=Item(None, Blocks.bottle, 'jar of syrup', None, id=ID.jar_syrup)
+        # hd=Item(None, 'H', 'hd', None, id=ID.hair_dryer)
+        # self.inv[hd] = 1
         self.inv[j] = 1
         self.kashes = 54
         if id:
@@ -1368,8 +1378,21 @@ class Being(Mixin1):
             self.talk(self, conversations[ID.legend1])
 
         elif is_near('baldino'):
-            self.talk(baldino)
-            objects[ID.salesman].state=1
+            if baldino.state==0:
+                self.talk(baldino)
+                objects[ID.salesman].state=1
+                baldino.state = 1
+            elif baldino.state==1 and self.has(ID.hair_dryer):
+                self.talk(baldino, conversations[ID.baldino2])
+                baldino.state = 2
+            elif baldino.state==2:
+                y = self.talk(baldino, conversations[ID.baldino3], yesno=1)
+                if y:
+                    self.remove1(ID.hair_dryer)
+                    self.kashes+=10
+                    baldino.state=3
+                    pp = Item(None, Blocks.proto_pack, 'Proto-pack', None, id=ID.proto_pack)
+                    self.inv[pp] = 1
 
         elif is_near('buzancais') and sailboat.state==1:
             y = self.talk(buzancais, yesno=1)
@@ -1386,7 +1409,8 @@ class Being(Mixin1):
             if y:
                 if self.kashes>=20:
                     self.kashes-=20
-                    self.add1(ID.hair_dryer)
+                    hd = Item(None, Blocks.hair_dryer, 'Hair dryer', None, id=ID.hair_dryer)
+                    self.inv[hd] = 1
                 else:
                     status('You do not have enough kashes!')
 
@@ -1395,7 +1419,6 @@ class Being(Mixin1):
             if sailboat.state==1:
                 dests.append(('Proxima Island', 'proxima1'))
             dests = [(n,m) for n,m in dests if m!=B._map]
-            print("dests", dests)
             lnames = [n for n,m in dests]
             y = self.talk(self, f'Would you like to use the sailboat for 10 kashes?', yesno=1)
             if y:
@@ -2195,6 +2218,8 @@ def main(stdscr):
     proxima3.board_proxima3()
 
     # for debugging
+    hd=Item(None, 'H', 'hd', None, id=ID.hair_dryer)
+    player.inv[objects[ID.hair_dryer]] = 1
     player.inv[objects[ID.book_of_bu]] = 1
     objects[ID.sailboat].state=1
 
@@ -2343,8 +2368,9 @@ def main(stdscr):
             txt = []
             for item, n in player.inv.items():
                 if item:
-                    txt.append(f'{item} {id(item)} {item.name} {n}')
-            txt.append(f'obj bb: {id(objects[ID.book_of_bu])}')
+                    # txt.append(f'{item} {id(item)} {item.name} {n}')
+                    txt.append(f'{item.name} {n}')
+            # txt.append(f'obj bb: {id(objects[ID.book_of_bu])}')
             B.display(txt)
 
         if k != '.':
