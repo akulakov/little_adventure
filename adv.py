@@ -230,6 +230,7 @@ class ID:
     landscape_level1 = 301
     water_tower_level = 302
     port_beluga_level = 303
+    und1_level = 304
 
     legend1 = 400
     fall = 401  # move that falls through to the map below
@@ -914,12 +915,11 @@ class Being(Mixin1):
         self.inv = defaultdict(int)
         if Misc.is_game: # not editor
             self.add1(ID.key1)
+            self.add1(ID.key1)
             self.inv[objects[ID.fuel]] = 10
             self.inv[objects[ID.ferry_ticket]] = 10
         j=Item(None, Blocks.bottle, 'jar of syrup', None, id=ID.jar_syrup)
-        bb=Item(None, '', 'book of bu', None, id=ID.book_of_bu)
         self.inv[j] = 1
-        self.inv[bb] = 1
         self.kashes = 54
         if id:
             objects[id] = self
@@ -1329,7 +1329,6 @@ class Being(Mixin1):
             self.inv[book_of_bu] = 1
             B.remove(book_of_bu)
             status('You have found the Book of Bu.')
-            # status('You have found the Book of Bu. It gives you the power to decipher the runes and speak to the animals.')
 
         elif is_near('lever1'):
             B.remove(B.doors[1])
@@ -1366,9 +1365,13 @@ class Being(Mixin1):
             statue.state = not statue.state
 
         elif is_near('runes'):
-            if self.has('book_of_bu'):
+            if self.has(ID.book_of_bu):
                 self.talk(self, conversations[ID.runes])
             else:
+                bb=objects[ID.book_of_bu]
+                print("bb,id(bb)", bb,id(bb))
+                for x in self.inv:
+                    print("x,id(x)", x,id(x))
                 status('You see some runes written on a slab of granite.. but what is their meaning??!')
 
         elif is_near('car'):
@@ -1734,16 +1737,14 @@ class ClimbThroughGrillEvent2(Event):
     once = False
     def go(self):
         player = objects[ID.player]
-        x, y = self.B.loc
-        if x==5:
-            y-=1
-        else:
-            y+=1
-        x = 0 if x==5 else 5
-        b_loc = Loc(x, y)
-        Windows.win2.addstr(2,0, 'You climb through the grill ' +
-                            ('into a strange underground area' if x==5 else 'back into your home'))
-        return player.move_to_board(b_loc, Loc(62,10))
+        B=self.B
+        dest = 'und1' if B._map==6 else 6
+        status('You climb through the grill ' +
+                            ('into a strange underground area' if dest=='und1' else 'back into your home'))
+        if dest=='und1':
+            return player.move_to_board(None, Loc(62,10), B=objects[ID.und1_level])
+        elif dest==6:
+            return player.move_to_board(map_to_loc['6'][0], Loc(62,10))
 
 class ClimbThroughGrillEvent3(Event):
     once = False
@@ -2005,6 +2006,7 @@ def main(stdscr):
     b9 = Board(Loc(8,MAIN_Y), 9)
 
     und1 = Board(None, 'und1')
+    objects[ID.und1_level] = und1
     sea1 = Board(None, 'sea1')
     objects[ID.sea_level1] = sea1
     landscape1 = Board(None, 'landscape1')
@@ -2017,6 +2019,7 @@ def main(stdscr):
     objects[ID.port_beluga_level] = beluga
 
     player = b1.board_1()
+
     b2.board_2()
     b3.board_3()
     b4.board_4()
@@ -2055,6 +2058,9 @@ def main(stdscr):
     des_und.board_des_und()
     des_und2 = Board(Loc(0,MAIN_Y-2), 'des_und2')
     des_und2.board_des_und2()
+
+    # for debugging
+    player.inv[objects[ID.book_of_bu]] = 1
 
     boards[:] = (
          [desert1,desert2,None,None, None,None,None,None, None,None, None, None],
@@ -2163,6 +2169,7 @@ def main(stdscr):
             B = player.move_to_board( Loc(9,MAIN_Y), Loc(59, 5) )
 
         elif k == 't':
+            # debug teleport
             k = ''
             while 1:
                 k+=win.getkey()
@@ -2187,6 +2194,8 @@ def main(stdscr):
             B = player.move_to_board( None, Loc(35, 10) , B=und1)
         elif k == 'E':
             B.display(str(B.get_all(player.loc)))
+        elif k == 'b':
+            status('has bu? ' + str(player.has(ID.book_of_bu)))
         elif k == 'm':
             if player.has(ID.magic_ball):
                 MagicBallEvent(B).go(player, last_dir)
@@ -2194,7 +2203,8 @@ def main(stdscr):
             txt = []
             for item, n in player.inv.items():
                 if item:
-                    txt.append(f'{item.name} {n}')
+                    txt.append(f'{item} {id(item)} {item.name} {n}')
+            txt.append(f'obj bb: {id(objects[ID.book_of_bu])}')
             B.display(txt)
 
         if k != '.':
