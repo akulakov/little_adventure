@@ -106,6 +106,7 @@ class Blocks:
     statue = 'Ω'
     sharp_rock = '⩕'
     runes = '⩰'
+    cow = '🐮'
 
     crates = (crate1, crate2, crate3, crate4)
 
@@ -223,6 +224,7 @@ class ID:
     wally2 = 132
     wally3 = 133
     aubigny2 = 134
+    buzancais = 135
 
     max1 = 200
     max2 = 201
@@ -312,6 +314,8 @@ conversations = {
     ID.wally2: ["Pirate Pasta: Penne, green olives, mushrooms. Cook until soft but not too soft. Yields 4 to 6 servings, the boatswain gets the lion's share."],
 
     ID.wally3: ["You must go to the Proxima Island to find the pirate treasure; house with green gables contains what you seek within."],
+
+    ID.buzancais: ["I'm retiring! Going to be a land-lubber, how about that! Would you like to buy my sailboat for 200 kashes?"],
 }
 
 def mkcell():
@@ -508,6 +512,7 @@ class Board:
         containers, crates, doors, specials = self.load_map(self._map)
         Item(self, Blocks.ferry, 'Sailboat', specials[1], id=ID.sailboat)
         Item(self, Blocks.car, 'Car', specials[2], id=ID.car)
+        Being(self, specials[3], id=ID.buzancais, name='Buzancais', char=Blocks.cow)
 
     # -- White Leaf Desert --------------------------------------------------------------------------
 
@@ -1233,6 +1238,7 @@ class Being(Mixin1):
         platform6 = objects.get(ID.platform6)
         book_of_bu = objects.get(ID.book_of_bu)
         wally = objects.get(ID.wally)
+        buzancais = objects.get(ID.buzancais)
 
         if chk_oob(r): locs.append(r)
         if chk_oob(l): locs.append(l)
@@ -1316,6 +1322,9 @@ class Being(Mixin1):
         elif is_near('legend1'):
             self.talk(self, conversations[ID.legend1])
 
+        elif is_near('buzancais') and sailboat.state==1:
+            y = self.talk(buzancais, yesno=1)
+
         elif is_near('sailboat'):
             dests = [('White Leaf Desert', 'desert1'), ('Port Beluga', 'beluga')]
             dest = dests[0] if B._map == 'beluga' else dests[1]
@@ -1397,6 +1406,7 @@ class Being(Mixin1):
                 self.talk(wally, conversations[ID.wally2])
             elif ch==2:
                 self.talk(wally, conversations[ID.wally3])
+                objects[ID.sailboat].state = 1
 
         elif is_near('car'):
             # if maurice and maurice.state == 1:
