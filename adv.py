@@ -107,6 +107,7 @@ class Blocks:
     sharp_rock = '⩕'
     runes = '⩰'
     cow = '🐮'
+    hair_dryer = 'D'
 
     crates = (crate1, crate2, crate3, crate4)
 
@@ -188,6 +189,7 @@ class ID:
     platform6 = 50
     book_of_bu = 51
     runes = 52
+    hair_dryer = 53
 
     guard1 = 100
     technician1 = 101
@@ -228,6 +230,7 @@ class ID:
     ruffec = 136
     baldino = 137
     fenioux = 138
+    salesman = 139
 
     max1 = 200
     max2 = 201
@@ -583,6 +586,10 @@ class Board:
         doors[1].type = Type.door3
         TriggerEventLocation(self, specials[2], evt=RoboCloneAppearEvent)
         Being(self, specials[3], id=ID.fenioux, name='Fenioux', char=Blocks.cow)
+
+    def board_proxima3(self):
+        containers, crates, doors, specials = self.load_map(self._map)
+        Being(self, specials[1], id=ID.salesman, name='Salesman', char=Blocks.rabbit)
 
     # -----------------------------------------------------------------------------------------------
 
@@ -1274,6 +1281,8 @@ class Being(Mixin1):
         buzancais = objects.get(ID.buzancais)
         sailboat = objects.get(ID.sailboat)
         baldino = objects.get(ID.baldino)
+        salesman = objects.get(ID.salesman)
+        fenioux = objects.get(ID.fenioux)
 
         if chk_oob(r): locs.append(r)
         if chk_oob(l): locs.append(l)
@@ -1310,6 +1319,7 @@ class Being(Mixin1):
 
         elif ID.talk_to_brenne in B.get_ids(locs):
             self.talk(objects[ID.brenne])
+            objects[ID.fenioux].state = 1
 
         elif ID.max_ in B.get_ids(locs):
             MaxQuest().go(self)
@@ -1359,9 +1369,26 @@ class Being(Mixin1):
 
         elif is_near('baldino'):
             self.talk(baldino)
+            objects[ID.salesman].state=1
 
         elif is_near('buzancais') and sailboat.state==1:
             y = self.talk(buzancais, yesno=1)
+
+        elif is_near('fenioux'):
+            self.talk(fenioux)
+            if fenioux.state==1:
+                self.talk(fenioux, ['I spoke to your brother.. he told me to mention the word "Amos" to you..', 'Very well, here is the red card..'])
+                rc = Item(None, 'R', 'red magnetic card', None, id=ID.red_card)
+                self.inv[rc] = 1
+
+        elif is_near('salesman') and salesman.state==1:
+            y = self.talk(salesman, "Would you like to buy a hair dryer? It's only 20 kashes!", yesno=1)
+            if y:
+                if self.kashes>=20:
+                    self.kashes-=20
+                    self.add1(ID.hair_dryer)
+                else:
+                    status('You do not have enough kashes!')
 
         elif is_near('sailboat'):
             dests = [('White Leaf Desert', 'desert1'), ('Port Beluga', 'beluga')]
@@ -1997,6 +2024,7 @@ class Player(Being):
     health = 50
     is_player = 1
     stance = Stance.sneaky
+    name = 'Player'
 
 class Guard(Being):
     char = 'g'
@@ -2163,6 +2191,9 @@ def main(stdscr):
     proxima2 = Board(Loc(1,MAIN_Y+2), 'proxima2')
     proxima2.board_proxima2()
 
+    proxima3 = Board(Loc(0, MAIN_Y+3), 'proxima3')
+    proxima3.board_proxima3()
+
     # for debugging
     player.inv[objects[ID.book_of_bu]] = 1
     objects[ID.sailboat].state=1
@@ -2177,6 +2208,7 @@ def main(stdscr):
          [None,None,None,None, None,None,None,None, None,None, None, None],
 
          [proxima1,proxima2,None,None, None,None,None,None, None,None, None, None],
+         [proxima3,None,None,None, None,None,None,None, None,None, None, None],
     )
 
     stdscr.clear()
