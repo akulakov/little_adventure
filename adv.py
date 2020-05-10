@@ -510,7 +510,9 @@ class Board:
     def board_beluga(self):
         self.colors = [(Loc(41,6), 1)]     # window
         containers, crates, doors, specials = self.load_map(self._map)
-        Item(self, Blocks.ferry, 'Sailboat', specials[1], id=ID.sailboat)
+        s=Item(self, Blocks.ferry, 'Sailboat', specials[1], id=ID.sailboat)
+        s.state=1
+
         Item(self, Blocks.car, 'Car', specials[2], id=ID.car)
         Being(self, specials[3], id=ID.buzancais, name='Buzancais', char=Blocks.cow)
 
@@ -553,6 +555,12 @@ class Board:
         TriggerEventLocation(self, specials[8], evt=LeaveBu)
 
     # -----------------------------------------------------------------------------------------------
+    def board_proxima1(self):
+        containers, crates, doors, specials = self.load_map(self._map)
+        Item(self, Blocks.ferry, 'Sailboat', specials[1], id=ID.sailboat)
+
+    # -----------------------------------------------------------------------------------------------
+
     def board_und1(self):
         containers, crates, doors, specials = self.load_map(self._map)
         Item(self, Blocks.grill, 'grill', specials[1], id=ID.grill3)
@@ -1239,6 +1247,7 @@ class Being(Mixin1):
         book_of_bu = objects.get(ID.book_of_bu)
         wally = objects.get(ID.wally)
         buzancais = objects.get(ID.buzancais)
+        sailboat = objects.get(ID.sailboat)
 
         if chk_oob(r): locs.append(r)
         if chk_oob(l): locs.append(l)
@@ -1327,12 +1336,21 @@ class Being(Mixin1):
 
         elif is_near('sailboat'):
             dests = [('White Leaf Desert', 'desert1'), ('Port Beluga', 'beluga')]
-            dest = dests[0] if B._map == 'beluga' else dests[1]
-            y = self.talk(self, f'Would you like to use the sailboat for 10 kashes, to go to {dest[0]}?', yesno=1)
+            if sailboat.state==1:
+                dests.append(('Proxima Island', 'proxima1'))
+            dests = [(n,m) for n,m in dests if m!=B._map]
+            print("dests", dests)
+            lnames = [n for n,m in dests]
+            y = self.talk(self, f'Would you like to use the sailboat for 10 kashes?', yesno=1)
             if y:
                 if self.kashes>=10:
                     self.kashes-=10
-                    triggered_events.append((TravelBySailboat, dict(dest=dest[1])))
+                    ch = self.talk(self, [f'Where would you like to go?', lnames])
+                    if ch:
+                        dest = dests[ch-1]
+                        print("ch", ch)
+                        print("dest", dest)
+                        triggered_events.append((TravelBySailboat, dict(dest=dest[1])))
                 else:
                     status("Looks like you don't have enough kashes!")
 
@@ -1677,6 +1695,8 @@ class TravelBySailboat(Event):
             return player.move_to_board( Loc(0, 0), Loc(7, GROUND) )
         elif dest == 'beluga':
             return player.move_to_board(None, Loc(72, GROUND-1), B=objects[ID.port_beluga_level])
+        elif dest == 'proxima1':
+            return player.move_to_board(map_to_loc[dest][0], Loc(9, GROUND))
 
 class GuardAttackEvent1(Event):
     once=True
@@ -2096,8 +2116,12 @@ def main(stdscr):
     des_und2 = Board(Loc(0,MAIN_Y-2), 'des_und2')
     des_und2.board_des_und2()
 
+    proxima1 = Board(Loc(0,MAIN_Y+2), 'proxima1')
+    proxima1.board_proxima1()
+
     # for debugging
     player.inv[objects[ID.book_of_bu]] = 1
+    objects[ID.sailboat].state=1
 
     boards[:] = (
          [desert1,desert2,None,None, None,None,None,None, None,None, None, None],
@@ -2106,7 +2130,10 @@ def main(stdscr):
 
          [None,None,None,None, None,None,None,top3, top2,top1, None, None],
          [b1, b2,   b3, b4,    b5, b6,   b7, b8,    b9, b10, b11, b12],
-         [None,None,None,None, None,None,None,None, None,None, None, None])
+         [None,None,None,None, None,None,None,None, None,None, None, None],
+
+         [proxima1,None,None,None, None,None,None,None, None,None, None, None],
+    )
 
     stdscr.clear()
     B.draw(win)
@@ -2187,7 +2214,7 @@ def main(stdscr):
                 Windows.win2.refresh()
                 if mp in map_to_loc:
                     loc,b = map_to_loc[mp]
-                    B = player.move_to_board(loc, Loc(7, GROUND), B=b)
+                    B = player.move_to_board(loc, Loc(8, GROUND), B=b)
                     if B._map=='des_und': player.tele(Loc(7,7))
                     if B._map=='des_und2': player.tele(Loc(70,7))
                 if not any(m.startswith(mp) for m in map_to_loc):
