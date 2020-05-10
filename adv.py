@@ -226,6 +226,8 @@ class ID:
     aubigny2 = 134
     buzancais = 135
     ruffec = 136
+    baldino = 137
+    fenioux = 138
 
     max1 = 200
     max2 = 201
@@ -319,6 +321,10 @@ conversations = {
     ID.buzancais: ["I'm retiring! Going to be a land-lubber, how about that! Would you like to buy my sailboat for 200 kashes?"],
 
     ID.ruffec: ["Can you tell me about DeForge's treasure?", ''],
+
+    ID.baldino: ["Can you tell me about pirate DeForge?", "No.. I've been working on my invention -- the jetpack. I'm afraid I've had a little disaster last week in the garden and broke the wall and the door to my house and had to make a temporary ladder to get in.. If you could only find me a hair dryer, I would use spare parts to make the jetpack more stable in flight!"],
+
+    ID.fenioux: ["Wait, how did you get in here? Who are you??", "I'm the heir, just like in the Prophecy... You know, the Legend! It's true!", "I'm happy for you, Twinsen! My brother is being held in Dr. FunFrock's headquarters, but his window is facing outside. If you can talk to him and find out how he's doing, I will give you the red card as a small token of gratitude."],
 }
 
 def mkcell():
@@ -555,7 +561,7 @@ class Board:
         Item(self, Blocks.platform_top, 'platform', specials[5], id=ID.platform5, type=Type.blocking)
         Item(self, Blocks.platform_top, 'platform', specials[6], id=ID.platform6, type=Type.blocking)
         Item(self, Blocks.open_book, 'Book of Bu', specials[7], id=ID.book_of_bu)
-        TriggerEventLocation(self, specials[8], evt=LeaveBu)
+        TriggerEventLocation(self, specials[8], evt=LeaveBuEvent)
 
     # -----------------------------------------------------------------------------------------------
     def color_line(self, a, b, col):
@@ -569,6 +575,14 @@ class Board:
         containers, crates, doors, specials = self.load_map(self._map)
         Item(self, Blocks.ferry, 'Sailboat', specials[1], id=ID.sailboat)
         Being(self, specials[2], id=ID.ruffec, name='Ruffec', char=Blocks.cow)
+
+    def board_proxima2(self):
+        containers, crates, doors, specials = self.load_map(self._map)
+        Being(self, specials[1], id=ID.baldino, name='James Baldino', char=Blocks.rabbit)
+        doors[0].type = Type.door2
+        doors[1].type = Type.door3
+        TriggerEventLocation(self, specials[2], evt=RoboCloneAppearEvent)
+        Being(self, specials[3], id=ID.fenioux, name='Fenioux', char=Blocks.cow)
 
     # -----------------------------------------------------------------------------------------------
 
@@ -1198,7 +1212,7 @@ class Being(Mixin1):
         if obj.health:
             obj.health -= 1
             Windows.win2.addstr(1, 0, f'{self} hits {obj} for 1pt')
-            if obj.is_being:
+            if obj.is_being and not obj.is_player:
                 obj.hostile = 1
             if obj.health <=0:
                 self.B.remove(obj)
@@ -1259,6 +1273,7 @@ class Being(Mixin1):
         wally = objects.get(ID.wally)
         buzancais = objects.get(ID.buzancais)
         sailboat = objects.get(ID.sailboat)
+        baldino = objects.get(ID.baldino)
 
         if chk_oob(r): locs.append(r)
         if chk_oob(l): locs.append(l)
@@ -1341,6 +1356,9 @@ class Being(Mixin1):
 
         elif is_near('legend1'):
             self.talk(self, conversations[ID.legend1])
+
+        elif is_near('baldino'):
+            self.talk(baldino)
 
         elif is_near('buzancais') and sailboat.state==1:
             y = self.talk(buzancais, yesno=1)
@@ -1615,6 +1633,13 @@ class JailEvent(Event):
 def status(msg):
     Windows.win2.addstr(2,0,msg)
 
+class RoboCloneAppearEvent(Event):
+    once=1
+    def go(self):
+        c = Clone(self.B, self.B.specials[4], hostile=1)
+        c.add1(ID.key2)
+        self.B.guards.append(c)
+
 class TravelByCarEvent(Event):
     once = False
     def go(self):
@@ -1672,7 +1697,7 @@ class StatueInPlace(Event):
     def go(self):
         self.B.remove(self.B.doors[0])
 
-class LeaveBu(Event):
+class LeaveBuEvent(Event):
     once=False
     def go(self):
         return self.player.move_to_board( Loc(1, self.B.loc.y-1), Loc(7, GROUND) )
@@ -1705,9 +1730,11 @@ class TravelBySailboat(Event):
         if dest == 'desert1':
             return player.move_to_board( Loc(0, 0), Loc(7, GROUND) )
         elif dest == 'beluga':
-            return player.move_to_board(None, Loc(72, GROUND-1), B=objects[ID.port_beluga_level])
+            b = objects[ID.port_beluga_level]
+            return player.move_to_board(None, b.specials[9], B=b)
         elif dest == 'proxima1':
-            return player.move_to_board(map_to_loc[dest][0], Loc(9, GROUND))
+            b_loc, b = map_to_loc[dest]
+            return player.move_to_board(b_loc, b.specials[9])
 
 class GuardAttackEvent1(Event):
     once=True
@@ -2054,6 +2081,7 @@ def main(stdscr):
     coin = Item(None, Blocks.coin, 'coin', None, id=ID.coin)
     grn_heart = Item(None, Blocks.grn_heart, 'heart', None, id=ID.grn_heart)
     key1 = Item(None, Blocks.key, 'key', None, id=ID.key1)
+    key2 = Item(None, Blocks.key, 'key', None, id=ID.key2)
     fuel = Item(None, Blocks.box1, 'fuel', None, id=ID.fuel)
     ft = Item(None, Blocks.ferry_ticket, 'ferry ticket', None, id=ID.ferry_ticket)
 
@@ -2062,6 +2090,7 @@ def main(stdscr):
     objects[ID.coin] = coin
     objects[ID.grn_heart] = grn_heart
     objects[ID.key1] = key1
+    objects[ID.key2] = key2
 
     MAIN_Y = 3
     B = b1 = Board(Loc(0,MAIN_Y), 1)
@@ -2131,6 +2160,9 @@ def main(stdscr):
     proxima1 = Board(Loc(0,MAIN_Y+2), 'proxima1')
     proxima1.board_proxima1()
 
+    proxima2 = Board(Loc(1,MAIN_Y+2), 'proxima2')
+    proxima2.board_proxima2()
+
     # for debugging
     player.inv[objects[ID.book_of_bu]] = 1
     objects[ID.sailboat].state=1
@@ -2144,7 +2176,7 @@ def main(stdscr):
          [b1, b2,   b3, b4,    b5, b6,   b7, b8,    b9, b10, b11, b12],
          [None,None,None,None, None,None,None,None, None,None, None, None],
 
-         [proxima1,None,None,None, None,None,None,None, None,None, None, None],
+         [proxima1,proxima2,None,None, None,None,None,None, None,None, None, None],
     )
 
     stdscr.clear()
