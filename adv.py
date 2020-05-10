@@ -225,6 +225,7 @@ class ID:
     wally3 = 133
     aubigny2 = 134
     buzancais = 135
+    ruffec = 136
 
     max1 = 200
     max2 = 201
@@ -316,6 +317,8 @@ conversations = {
     ID.wally3: ["You must go to the Proxima Island to find the pirate treasure; house with green gables contains what you seek within."],
 
     ID.buzancais: ["I'm retiring! Going to be a land-lubber, how about that! Would you like to buy my sailboat for 200 kashes?"],
+
+    ID.ruffec: ["Can you tell me about DeForge's treasure?", ''],
 }
 
 def mkcell():
@@ -555,9 +558,17 @@ class Board:
         TriggerEventLocation(self, specials[8], evt=LeaveBu)
 
     # -----------------------------------------------------------------------------------------------
+    def color_line(self, a, b, col):
+        l=[]
+        for x in range(a.x,b.x+1):
+            l.append((Loc(x,a.y),col))
+        return l
+
     def board_proxima1(self):
+        self.colors = self.color_line(Loc(61,7), Loc(67,7), 3)
         containers, crates, doors, specials = self.load_map(self._map)
         Item(self, Blocks.ferry, 'Sailboat', specials[1], id=ID.sailboat)
+        Being(self, specials[2], id=ID.ruffec, name='Ruffec', char=Blocks.cow)
 
     # -----------------------------------------------------------------------------------------------
 
@@ -2033,6 +2044,7 @@ def main(stdscr):
     Misc.is_game = 1
     curses.init_pair(1, curses.COLOR_BLUE, curses.COLOR_WHITE)
     curses.init_pair(2, curses.COLOR_YELLOW, curses.COLOR_WHITE)
+    curses.init_pair(3, curses.COLOR_GREEN, curses.COLOR_WHITE)
     begin_x = 0; begin_y = 0; width = 80
     win = Windows.win = newwin(HEIGHT, width, begin_y, begin_x)
     begin_x = 0; begin_y = 16; height = 6; width = 80
