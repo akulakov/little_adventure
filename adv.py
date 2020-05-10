@@ -134,6 +134,7 @@ class Type:
     blocking = 13
     door3 = 14
     deadly = 15
+    pressure_sensor = 16
 
 BLOCKING = [rock, Type.door1, Type.door2, Type.door3, Blocks.block1, Blocks.steps_r, Blocks.steps_l, Type.platform_top,
             Type.door_top_block, Type.blocking]
@@ -192,6 +193,7 @@ class ID:
     runes = 52
     hair_dryer = 53
     proto_pack = 54
+    museum_alarm = 55
 
     guard1 = 100
     technician1 = 101
@@ -235,6 +237,7 @@ class ID:
     salesman = 139
     baldino2 = 140
     baldino3 = 141
+    alarm_tech = 142
 
     max1 = 200
     max2 = 201
@@ -336,6 +339,8 @@ conversations = {
     ID.baldino3: ["And now I'm done! Would you be so kind as to test the proto pack for 10 kashes? It can be used to fly over the level of water, but make sure you don't jump in it from height. Do you agree?"],
 
     ID.fenioux: ["Wait, how did you get in here? Who are you??", "I'm the heir, just like in the Prophecy... You know, the Legend! It's true!", "I'm happy for you, Twinsen! My brother is being held in Dr. FunFrock's headquarters, but his window is facing outside. If you can talk to him and find out how he's doing, I will give you the red card as a small token of gratitude."],
+
+    ID.alarm_tech: ['I am almost done setting up the alarm system for the museum! Once it is activated, the Marine Museum is evacuated and the doors are locked. But that is not all! There will be pressure sensitive tiles before the most valuable exhibits, anyone who steps on one of them, will summon plenty of GroboClones who will make quick handywork of the intruder,  he-he, heh heh, HA!'],
 }
 
 def mkcell():
@@ -598,6 +603,17 @@ class Board:
     def board_proxima3(self):
         containers, crates, doors, specials = self.load_map(self._map)
         Being(self, specials[1], id=ID.salesman, name='Salesman', char=Blocks.rabbit)
+
+    def board_museum(self):
+        self.colors = [(Loc(60,8), 2)]
+        containers, crates, doors, specials = self.load_map(self._map)
+        Item(self, Blocks.lever, 'Museum Alarm', specials[1], id=ID.museum_alarm)
+        Being(self, specials[2], id=ID.alarm_tech, name='Alarm Technician', char=Blocks.elephant)
+        for loc in self.line(specials[3], specials[4]):
+            Item(self, rock, '', loc, type=Type.pressure_sensor)
+
+    def board_prox_und(self):
+        containers, crates, doors, specials = self.load_map(self._map)
 
     # -----------------------------------------------------------------------------------------------
 
@@ -2217,6 +2233,12 @@ def main(stdscr):
     proxima3 = Board(Loc(0, MAIN_Y+3), 'proxima3')
     proxima3.board_proxima3()
 
+    museum = Board(Loc(2, MAIN_Y+2), 'museum')
+    museum.board_museum()
+
+    prox_und = Board(Loc(2, MAIN_Y+3), 'prox_und')
+    prox_und.board_prox_und()
+
     # for debugging
     hd=Item(None, 'H', 'hd', None, id=ID.hair_dryer)
     player.inv[objects[ID.hair_dryer]] = 1
@@ -2232,8 +2254,8 @@ def main(stdscr):
          [b1, b2,   b3, b4,    b5, b6,   b7, b8,    b9, b10, b11, b12],
          [None,None,None,None, None,None,None,None, None,None, None, None],
 
-         [proxima1,proxima2,None,None, None,None,None,None, None,None, None, None],
-         [proxima3,None,None,None, None,None,None,None, None,None, None, None],
+         [proxima1,proxima2,    museum,None, None,None,None,None, None,None, None, None],
+         [proxima3,None,        prox_und,None, None,None,None,None, None,None, None, None],
     )
 
     stdscr.clear()
