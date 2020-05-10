@@ -137,7 +137,7 @@ class Type:
     pressure_sensor = 16
 
 BLOCKING = [rock, Type.door1, Type.door2, Type.door3, Blocks.block1, Blocks.steps_r, Blocks.steps_l, Type.platform_top,
-            Type.door_top_block, Type.blocking]
+            Type.door_top_block, Type.blocking, Type.pressure_sensor]
 
 class ID:
     platform1 = 1
@@ -194,6 +194,7 @@ class ID:
     hair_dryer = 53
     proto_pack = 54
     museum_alarm = 55
+    museum_door = 56
 
     guard1 = 100
     technician1 = 101
@@ -340,7 +341,7 @@ conversations = {
 
     ID.fenioux: ["Wait, how did you get in here? Who are you??", "I'm the heir, just like in the Prophecy... You know, the Legend! It's true!", "I'm happy for you, Twinsen! My brother is being held in Dr. FunFrock's headquarters, but his window is facing outside. If you can talk to him and find out how he's doing, I will give you the red card as a small token of gratitude."],
 
-    ID.alarm_tech: ['I am almost done setting up the alarm system for the museum! Once it is activated, the Marine Museum is evacuated and the doors are locked. But that is not all! There will be pressure sensitive tiles before the most valuable exhibits, anyone who steps on one of them, will summon plenty of GroboClones who will make quick handywork of the intruder,  he-he, heh heh, HA!'],
+    ID.alarm_tech: ['I am almost done setting up the alarm system for the museum! Whenever it is activated, the Marine Museum would be evacuated and the doors are locked. But that is not all! There will be pressure sensitive tiles before the most valuable exhibits, anyone who steps on one of them, will summon plenty of GroboClones who will make quick handywork of the intruder,  he-he, heh heh, HA!'],
 }
 
 def mkcell():
@@ -580,10 +581,14 @@ class Board:
         TriggerEventLocation(self, specials[8], evt=LeaveBuEvent)
 
     # -----------------------------------------------------------------------------------------------
+    def line(self, a, b):
+        for x in range(a.x,b.x+1):
+            yield Loc(x,a.y)
+
     def color_line(self, a, b, col):
         l=[]
-        for x in range(a.x,b.x+1):
-            l.append((Loc(x,a.y),col))
+        for loc in self.line(a,b):
+            l.append((loc,col))
         return l
 
     def board_proxima1(self):
@@ -608,9 +613,15 @@ class Board:
         self.colors = [(Loc(60,8), 2)]
         containers, crates, doors, specials = self.load_map(self._map)
         Item(self, Blocks.lever, 'Museum Alarm', specials[1], id=ID.museum_alarm)
+        Item(self, Blocks.door, '', specials[5], id=ID.museum_door, type=Type.door1)
         Being(self, specials[2], id=ID.alarm_tech, name='Alarm Technician', char=Blocks.elephant)
         for loc in self.line(specials[3], specials[4]):
             Item(self, rock, '', loc, type=Type.pressure_sensor)
+
+        Being(self, specials[6], name='Museum patron', char=Blocks.elephant)
+        Being(self, specials[7], name='Museum patron', char=Blocks.rabbit)
+        Being(self, specials[8], name='Museum patron', char=Blocks.monkey)
+        Being(self, specials[9], name='Museum patron', char=Blocks.cow)
 
     def board_prox_und(self):
         containers, crates, doors, specials = self.load_map(self._map)
@@ -1174,6 +1185,16 @@ class Being(Mixin1):
             # this needs to be after previous block because the block looks at `top_obj` which would always be the being
             # instead of an event trigger item
             self.put(new)
+
+            if chk_oob(new.mod_d()) and Type.pressure_sensor in B.get_types(new.mod_d()):
+                if B.state==1:
+                    if self.has(ID.proto_pack) and objects[ID.proto_pack].state:
+                        status('You float above a panel that looks slightly different and emits a low humming noise.')
+                    else:
+                        status('You step on a creaky panel, a shrill alarm sounds and you are surrounded by GroboClones. They take you back to the jail cell on Citadel Island.')
+                        triggered_events.append(DieEvent)
+                        return None,None
+
             if statue:
                 if statue.state:
                     statue.move(dir)
@@ -1309,6 +1330,8 @@ class Being(Mixin1):
         baldino = objects.get(ID.baldino)
         salesman = objects.get(ID.salesman)
         fenioux = objects.get(ID.fenioux)
+        alarm_tech = objects.get(ID.alarm_tech)
+        museum_door = objects.get(ID.museum_door)
 
         if chk_oob(r): locs.append(r)
         if chk_oob(l): locs.append(l)
@@ -1331,6 +1354,7 @@ class Being(Mixin1):
             Windows.win2.addstr(2,0, 'You found {}'.format(', '.join(lst)))
             if not items:
                 Windows.win2.addstr(2,0, f'{c.name} is empty')
+
         elif len(objs)>1 and objs[-2].id == ID.crate1:
             objs[-2].move('l')
             Item(B, Blocks.grill, 'grill', self.loc, id=ID.grill3)
@@ -1352,6 +1376,9 @@ class Being(Mixin1):
 
         elif ID.chamonix in B.get_ids(locs):
             self.talk(objects[ID.chamonix])
+
+        elif is_near('alarm_tech'):
+            self.talk(alarm_tech)
 
         elif is_near('clermont_ferrand') and clermont_ferrand.state==1:
             self.talk(objects[ID.clermont_ferrand])
@@ -1413,6 +1440,16 @@ class Being(Mixin1):
         elif is_near('buzancais') and sailboat.state==1:
             y = self.talk(buzancais, yesno=1)
 
+        elif is_near('museum_alarm'):
+            if B[museum_door.loc] is blank:
+                B.put(museum_door)
+            museum_door.type=Type.door3
+
+            for n in (6,7,8,9):
+                B.remove(B[B.specials[n]])
+            status('The alarm sounds. you hear the noise of the grand oak door being shut and locked.')
+            B.state = 1
+
         elif is_near('fenioux'):
             self.talk(fenioux)
             if fenioux.state==1:
@@ -1443,8 +1480,6 @@ class Being(Mixin1):
                     ch = self.talk(self, [f'Where would you like to go?', lnames])
                     if ch:
                         dest = dests[ch-1]
-                        print("ch", ch)
-                        print("dest", dest)
                         triggered_events.append((TravelBySailboat, dict(dest=dest[1])))
                 else:
                     status("Looks like you don't have enough kashes!")
@@ -1599,7 +1634,11 @@ class Being(Mixin1):
         def is_near(id):
             return getattr(ID, id) in B.get_ids(locs)
 
-        if is_near('water_supply') and item.id == ID.jar_syrup:
+        if item.id == ID.proto_pack:
+            pp = objects[ID.proto_pack]
+            pp.state = not pp.state
+            status('Proto-pack is ' + ('on' if pp.state else 'off'))
+        elif is_near('water_supply') and item.id == ID.jar_syrup:
             status('You add raspberry syrup to the water supply')
             self.inv[item] -=1
             empty_bottle = Item(None, Blocks.bottle, 'empty bottle', None, id=ID.empty_bottle)
@@ -2240,8 +2279,10 @@ def main(stdscr):
     prox_und.board_prox_und()
 
     # for debugging
-    hd=Item(None, 'H', 'hd', None, id=ID.hair_dryer)
-    player.inv[objects[ID.hair_dryer]] = 1
+    hd=Item(None, 'H', 'hair dryer', None, id=ID.hair_dryer)
+    pp=Item(None, 'P', 'proto pack', None, id=ID.proto_pack)
+    player.inv[pp] = 1
+    player.inv[hd] = 1
     player.inv[objects[ID.book_of_bu]] = 1
     objects[ID.sailboat].state=1
 
@@ -2331,9 +2372,11 @@ def main(stdscr):
             player.action()
         elif k == '4':
             mp = ''
+            status('> ')
+            Windows.win2.refresh()
             while 1:
                 mp += win.getkey()
-                status(mp)
+                status('> '+mp)
                 Windows.win2.refresh()
                 if mp in map_to_loc:
                     loc,b = map_to_loc[mp]
