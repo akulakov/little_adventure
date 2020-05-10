@@ -105,6 +105,7 @@ class Blocks:
     lever = '⎆'
     statue = 'Ω'
     sharp_rock = '⩕'
+    runes = '⩰'
 
     crates = (crate1, crate2, crate3, crate4)
 
@@ -185,6 +186,7 @@ class ID:
     platform5 = 49
     platform6 = 50
     book_of_bu = 51
+    runes = 52
 
     guard1 = 100
     technician1 = 101
@@ -216,6 +218,7 @@ class ID:
     aubigny = 127
     olivet = 128
     olivet2 = 129
+    julien2 = 130
 
     max1 = 200
     max2 = 201
@@ -249,6 +252,7 @@ conversations = {
     ID.max1: ['Have you seen a young girl being led by two clones?', 'I think I have seen her and I will tell you more if you buy me a drink.'],
     ID.max2: ["I've seen them near the port, it looked like they were getting away from the island, which is strange, because usually prisoners stay in the citadel", 'Thank you!'],
     ID.julien: ['Have you seen a young girl being led by two Groboclones?', 'Yes, they were here earlier today, they got on a speedboat and were off. Destination unknown.'],
+    ID.julien2: ['Do you know anything about the notorious pirate DeForge?', 'I know he had a log where he wrote down every minutae of every day. Wish I had it, it would be sure to be a fascinating read! But it is lost to time. However, the barkeep at Principal island might know how to track it down.'],
     ID.soldier2: ['Wait! How did you get here, and who are you?',
                   ["I'm Twinsen, I'm escaping!", "Fixing the antenna.", "Santa Claus."]],
     ID.guard2: ['Hey! I think the stone is loose in my cell! I might escape..', "Hmm, that's odd, I remember checking the camera earlier.. I guess there's no harm in checking again!"],
@@ -293,6 +297,8 @@ conversations = {
     ID.olivet: ['Can you tell me anything about the Legend?', 'Yes, I do know some details that may interest you.. but I can only tell you in exchange for the book of knowledge that I am sorely missing. You can find the book of knowledge in the Temple of Bu. The entrance is right here....'],
 
     ID.olivet2: ['I now see that you are the chosen one. You can keep the Book of Bu. It will let you decipher runes and speak to the animals.', 'I do not know how you can defeat Dr. FunFrock, but I know that you must. I wish I could help you.', 'Something tells me your parents must have left a clue or a direction at your home to help you along. Perhaps it is a good time to return home.'],
+
+    ID.runes: ['This room contains information and weapons that will help against the future Tyrant. Unfortunately, the ship carrying the golden key was waylaid by the notorious and unreasonably violent pirate DeForge. It may now be with his treasure, wherever it is to be found. If you wish to defeat the Tyrant, finding treasure of DeForge might be a nice idea!'],
 }
 
 def mkcell():
@@ -531,6 +537,7 @@ class Board:
     def board_und1(self):
         containers, crates, doors, specials = self.load_map(self._map)
         Item(self, Blocks.grill, 'grill', specials[1], id=ID.grill3)
+        Item(self, Blocks.runes, 'Runes', specials[2], id=ID.runes)
 
     def board_sea1(self):
         specials = self.load_map(self._map)[3]
@@ -910,7 +917,9 @@ class Being(Mixin1):
             self.inv[objects[ID.fuel]] = 10
             self.inv[objects[ID.ferry_ticket]] = 10
         j=Item(None, Blocks.bottle, 'jar of syrup', None, id=ID.jar_syrup)
+        bb=Item(None, '', 'book of bu', None, id=ID.book_of_bu)
         self.inv[j] = 1
+        self.inv[bb] = 1
         self.kashes = 54
         if id:
             objects[id] = self
@@ -1356,6 +1365,12 @@ class Being(Mixin1):
                 status('You leave the statue in place')
             statue.state = not statue.state
 
+        elif is_near('runes'):
+            if self.has('book_of_bu'):
+                self.talk(self, conversations[ID.runes])
+            else:
+                status('You see some runes written on a slab of granite.. but what is their meaning??!')
+
         elif is_near('car'):
             # if maurice and maurice.state == 1:
             if 1:     # TODO use the commented line above
@@ -1395,8 +1410,9 @@ class Being(Mixin1):
                 self.talk(seller, 'Here is your ticket... Wait a second... Alarm! The prisoner escaped!!')
                 c = Clone(B, self.loc.mod(0,1), hostile=1, health=20)
                 B.guards.append(c)
-        elif ID.julien in B.get_ids(locs):
-            self.talk(objects[ID.julien])
+        elif is_near('julien'):
+            c = ID.julien if not self.has('book_of_bu') else ID.julien2
+            self.talk(objects[ID.julien], conversations[c])
             y = self.talk(objects[ID.julien], 'You may be able to find out more on Principal Island. I wanted to use this ferry ticket myself but I can guess I can sell it to you for some 10 kashes and buy some candy..', yesno=1)
             if y:
                 if self.kashes>=10:
@@ -2136,7 +2152,6 @@ def main(stdscr):
         elif k == '5':
             k = win.getkey()
             k+= win.getkey()
-            print(B.B[int(k)])
             status(f'printed row {k} to debug')
         elif k == '6':
             B = player.move_to_board( Loc(1,0), Loc(35, GROUND) )
@@ -2146,6 +2161,20 @@ def main(stdscr):
             B = player.move_to_board( Loc(7,MAIN_Y), Loc(7, GROUND) )
         elif k == '9':
             B = player.move_to_board( Loc(9,MAIN_Y), Loc(59, 5) )
+
+        elif k == 't':
+            k = ''
+            while 1:
+                k+=win.getkey()
+                status(k)
+                win2.refresh()
+                if k.endswith('.'):
+                    try:
+                        x,y=k[:-1].split(',')
+                        player.tele(Loc(int(x), int(y)))
+                    except Exception as e:
+                        print(e)
+                    break
 
         elif k == '0':
             B = player.move_to_board( Loc(0,0), Loc(7, GROUND) )
@@ -2164,7 +2193,8 @@ def main(stdscr):
         elif k == 'i':
             txt = []
             for item, n in player.inv.items():
-                txt.append(f'{item.name} {n}')
+                if item:
+                    txt.append(f'{item.name} {n}')
             B.display(txt)
 
         if k != '.':
