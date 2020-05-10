@@ -253,7 +253,7 @@ conversations = {
     ID.max1: ['Have you seen a young girl being led by two clones?', 'I think I have seen her and I will tell you more if you buy me a drink.'],
     ID.max2: ["I've seen them near the port, it looked like they were getting away from the island, which is strange, because usually prisoners stay in the citadel", 'Thank you!'],
     ID.julien: ['Have you seen a young girl being led by two Groboclones?', 'Yes, they were here earlier today, they got on a speedboat and were off. Destination unknown.'],
-    ID.julien2: ['Do you know anything about the notorious pirate DeForge?', 'I know he had a log where he wrote down every minutae of every day. Wish I had it, it would be sure to be a fascinating read! But it is lost to time. However, the barkeep at Principal island might know how to track it down.'],
+    ID.julien2: ['Do you know anything about the notorious pirate DeForge?', 'I know he had a log where he wrote down every minutae of every day. Wish I had it, it would be sure to be a fascinating read! But it is lost to time. However, the shopkeeper on Principal island might know how to track it down.'],
     ID.soldier2: ['Wait! How did you get here, and who are you?',
                   ["I'm Twinsen, I'm escaping!", "Fixing the antenna.", "Santa Claus."]],
     ID.guard2: ['Hey! I think the stone is loose in my cell! I might escape..', "Hmm, that's odd, I remember checking the camera earlier.. I guess there's no harm in checking again!"],
@@ -300,6 +300,14 @@ conversations = {
     ID.olivet2: ['I now see that you are the chosen one. You can keep the Book of Bu. It will let you decipher runes and speak to the animals.', 'I do not know how you can defeat Dr. FunFrock, but I know that you must. I wish I could help you.', 'Something tells me your parents must have left a clue or a direction at your home to help you along. Perhaps it is a good time to return home.'],
 
     ID.runes: ['This room contains information and weapons that will help against the future Tyrant. Unfortunately, the ship carrying the golden key was waylaid by the notorious and unreasonably violent pirate DeForge. It may now be with his treasure, wherever it is to be found. If you wish to defeat the Tyrant, finding treasure of DeForge might be a nice idea!'],
+
+    ID.aubigny: ['Can you tell me anything about the notorious pirate DeForge?', 'I have had an old book by him for many years! Just as your luck would have it, this morning a customer came in and bought it. He works at the library, I believe..'],
+
+    ID.wally: ['Can you tell me anything about the notorious pirate DeForge?', 'Ok, I can read you an excerpt from his log book if you leave me alone.', ['Pirate recipes', 'The Treasure']],
+
+    ID.wally2: ["Pirate Pasta: Penne, green olives, mushrooms. Cook until soft but not too soft. Yields 4 to 6 servings, the boatswain gets the lion's share."]
+
+    ID.wally3: ["You must go to the Proxima Island to find the pirate treasure; house with green gables contains what you seek within."]
 }
 
 def mkcell():
@@ -1314,6 +1322,8 @@ class Being(Mixin1):
                     status("Looks like you don't have enough kashes!")
 
         elif is_near('aubigny'):
+            if aubigny.state==1:
+                self.talk(aubigny, conversations[ID.aubigny2])
             y = self.talk(aubigny, 'Would you like to buy some fuel for 5 kashes?', yesno=1)
             if y:
                 if self.kashes>=5:
@@ -1414,8 +1424,11 @@ class Being(Mixin1):
                 c = Clone(B, self.loc.mod(0,1), hostile=1, health=20)
                 B.guards.append(c)
         elif is_near('julien'):
-            c = ID.julien if not self.has('book_of_bu') else ID.julien2
+            have_bb = self.has('book_of_bu')
+            c = ID.julien if not have_bb else ID.julien2
             self.talk(objects[ID.julien], conversations[c])
+            if have_bb:
+                aubigny.state = 1
             y = self.talk(objects[ID.julien], 'You may be able to find out more on Principal Island. I wanted to use this ferry ticket myself but I can guess I can sell it to you for some 10 kashes and buy some candy..', yesno=1)
             if y:
                 if self.kashes>=10:
