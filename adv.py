@@ -219,6 +219,10 @@ class ID:
     olivet = 128
     olivet2 = 129
     julien2 = 130
+    wally = 131
+    wally2 = 132
+    wally3 = 133
+    aubigny2 = 134
 
     max1 = 200
     max2 = 201
@@ -305,9 +309,9 @@ conversations = {
 
     ID.wally: ['Can you tell me anything about the notorious pirate DeForge?', 'Ok, I can read you an excerpt from his log book if you leave me alone.', ['Pirate recipes', 'The Treasure']],
 
-    ID.wally2: ["Pirate Pasta: Penne, green olives, mushrooms. Cook until soft but not too soft. Yields 4 to 6 servings, the boatswain gets the lion's share."]
+    ID.wally2: ["Pirate Pasta: Penne, green olives, mushrooms. Cook until soft but not too soft. Yields 4 to 6 servings, the boatswain gets the lion's share."],
 
-    ID.wally3: ["You must go to the Proxima Island to find the pirate treasure; house with green gables contains what you seek within."]
+    ID.wally3: ["You must go to the Proxima Island to find the pirate treasure; house with green gables contains what you seek within."],
 }
 
 def mkcell():
@@ -485,7 +489,8 @@ class Board:
         Being(self, specials[3], id=ID.astronomer, name='The Astronomer', char=Blocks.monkey)
         Being(self, specials[4], id=ID.groboclone1, name='Groboclone', char=Blocks.elephant)
         Being(self, specials[7], id=ID.locksmith, name='Locksmith', char=Blocks.elephant)
-        Being(self, specials[9], id=ID.aubigny, name='Aubigny', char=Blocks.rabbit)
+        a=Being(self, specials[9], id=ID.aubigny, name='Aubigny', char=Blocks.rabbit)
+        # a.state=1 # TODO testing
 
         Item(self, Blocks.fountain, 'sink', specials[5], id=ID.sink)
         Item(self, Blocks.hexagon, 'A Drawing with a romantic view and a horse galloping at full speed across the plain', specials[6], id=ID.drawing)
@@ -1227,6 +1232,7 @@ class Being(Mixin1):
         platform5 = objects.get(ID.platform5)
         platform6 = objects.get(ID.platform6)
         book_of_bu = objects.get(ID.book_of_bu)
+        wally = objects.get(ID.wally)
 
         if chk_oob(r): locs.append(r)
         if chk_oob(l): locs.append(l)
@@ -1323,7 +1329,8 @@ class Being(Mixin1):
 
         elif is_near('aubigny'):
             if aubigny.state==1:
-                self.talk(aubigny, conversations[ID.aubigny2])
+                self.talk(aubigny)
+                wally.state = 1
             y = self.talk(aubigny, 'Would you like to buy some fuel for 5 kashes?', yesno=1)
             if y:
                 if self.kashes>=5:
@@ -1383,6 +1390,13 @@ class Being(Mixin1):
                 for x in self.inv:
                     print("x,id(x)", x,id(x))
                 status('You see some runes written on a slab of granite.. but what is their meaning??!')
+
+        elif is_near('wally') and wally.state==1:
+            ch = self.talk(wally)
+            if ch==1:
+                self.talk(wally, conversations[ID.wally2])
+            elif ch==2:
+                self.talk(wally, conversations[ID.wally3])
 
         elif is_near('car'):
             # if maurice and maurice.state == 1:
