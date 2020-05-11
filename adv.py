@@ -115,6 +115,7 @@ class Blocks:
     horn = '📯'
     medallion = '◉'
     seal = '⏣'
+    special_stone = '⏢'
 
     crates = (crate1, crate2, crate3, crate4)
 
@@ -210,6 +211,9 @@ class ID:
     seal_sendell = 63
     blue_card = 64
     grill9 = 65
+    seal_sendell2 = 66
+    marked_stone = 67
+    eclipse_stone = 68
 
     guard1 = 100
     technician1 = 101
@@ -261,6 +265,7 @@ class ID:
     trick_guard = 202
     talk_to_brenne = 203
     water_supply = 204
+    mstone2_exit = 205
 
     sea_level1 = 300
     landscape_level1 = 301
@@ -268,6 +273,7 @@ class ID:
     port_beluga_level = 303
     und1_level = 304
     elf_lab_level = 305
+    mstone2_level = 306
 
     legend1 = 400
     fall = 401  # move that falls through to the map below
@@ -650,9 +656,16 @@ class Board:
 
     def board_mstone(self):
         containers, crates, doors, specials = self.load_map(self._map)
+        Item(self, Blocks.seal, 'Strange Seal', specials[1], id=ID.seal_sendell2)
+
+    def board_mstone2(self):
+        containers, crates, doors, specials = self.load_map(self._map)
+        Item(self, Blocks.platform2, 'passage', specials[1], id=ID.mstone2_exit)
+        Item(self, Blocks.special_stone, 'Strange Stone', specials[2], id=ID.marked_stone)
 
     def board_estone(self):
         containers, crates, doors, specials = self.load_map(self._map)
+        Item(self, Blocks.special_stone, 'Strange Stone', specials[1], id=ID.eclipse_stone)
 
     def board_museum(self):
         self.colors = [(Loc(60,8), 4)]
@@ -1363,6 +1376,7 @@ class Being(Mixin1):
         alarm_tech = objects.get(ID.alarm_tech)
         museum_door = objects.get(ID.museum_door)
         elf = objects.get(ID.elf)
+        seal2 = objects.get(ID.seal_sendell2)
 
         if chk_oob(r): locs.append(r)
         if chk_oob(l): locs.append(l)
@@ -1413,11 +1427,17 @@ class Being(Mixin1):
         elif ID.chamonix in B.get_ids(locs):
             self.talk(objects[ID.chamonix])
 
+        elif is_near('seal_sendell2') and seal2.state==1:
+            triggered_events.append((PortalEvent, dict(level_id=ID.mstone2_level, spawn_specials_ind=1)))
+
+        elif is_near('mstone2_exit'):
+            triggered_events.append((PortalEvent, dict(map='marked_stone', spawn_specials_ind=1)))
+
         elif is_near('alarm_tech'):
             self.talk(alarm_tech)
 
         elif is_near('grill9') and self.has(ID.blue_card):
-            triggered_events.append(ExitToElfMapEvent)
+            triggered_events.append(ExitElfMapEvent)
 
         elif is_near('clermont_ferrand') and clermont_ferrand.state==1:
             self.talk(objects[ID.clermont_ferrand])
@@ -1682,10 +1702,16 @@ class Being(Mixin1):
         locs = [self.loc]
         def is_near(id):
             return getattr(ID, id) in B.get_ids(locs)
+        seal2 = objects.get(ID.seal_sendell2)
 
         if item.id == ID.gawley_horn and is_near('seal_sendell'):
             seal = objects[ID.seal_sendell]
             triggered_events.append(GoToElfMapEvent)
+
+        elif item.id == ID.gawley_horn and is_near('seal_sendell2') and seal2.state==0:
+            seal = objects[ID.seal_sendell2]
+            status('You see a passage opening up in the seal stone.')
+            seal.state = 1
 
         elif item.id == ID.proto_pack:
             pp = objects[ID.proto_pack]
@@ -1797,13 +1823,32 @@ class RoboCloneAppearEvent(Event):
         c.add1(ID.key2)
         self.B.guards.append(c)
 
-class ExitToElfMapEvent(Event):
+class PortalEvent(Event):
+    once = False
+    def go(self):
+        bloc = None
+        board = None
+        _map = self.kwargs.get('map')
+        level_id = self.kwargs.get('level_id')
+        spawn_specials_ind = self.kwargs.get('spawn_specials_ind')
+        if _map:
+            bloc, board = map_to_loc[_map]
+        elif level_id:
+            board = objects[level_id]
+        return self.player.move_to_board(bloc, board.specials[spawn_specials_ind], B=board)
+
+class OneTimePortalEvent(PortalEvent):
+    once = True
+
+class ExitElfMapEvent(Event):
+    # TODO: conver to PortalEvent
     once = True
     def go(self):
         bloc, b = map_to_loc['desert2']
         return self.player.move_to_board(bloc, b.specials[2])
 
 class GoToElfMapEvent(Event):
+    # TODO: conver to PortalEvent
     once = True
     def go(self):
         b = objects[ID.elf_lab_level]
@@ -2343,13 +2388,17 @@ def main(stdscr):
     proxima4 = Board(Loc(3, MAIN_Y+2), 'proxima4')
     proxima4.board_proxima4()
 
-    mstone = Board(Loc(4, MAIN_Y+2), 'mstone')
+    mstone = Board(Loc(4, MAIN_Y+2), 'marked_stone')
     mstone.board_mstone()
+
+    mstone2 = Board(None, 'marked_stone2')
+    mstone2.board_mstone2()
+    objects[ID.mstone2_level] = mstone2
 
     proxima5 = Board(Loc(3, MAIN_Y+3), 'proxima5')
     proxima5.board_proxima5()
 
-    estone = Board(Loc(4, MAIN_Y+3), 'estone')
+    estone = Board(Loc(4, MAIN_Y+3), 'eclipse_stone')
     estone.board_estone()
 
     prox_und = Board(Loc(2, MAIN_Y+3), 'prox_und')
