@@ -114,6 +114,7 @@ class Blocks:
     steering_wheel = '⎈'
     horn = '📯'
     medallion = '◉'
+    seal = '⏣'
 
     crates = (crate1, crate2, crate3, crate4)
 
@@ -205,6 +206,10 @@ class ID:
     treasure_chest = 59
     gawley_horn = 60
     sendell_medallion = 61
+    gold_door = 62
+    seal_sendell = 63
+    blue_card = 64
+    grill9 = 65
 
     guard1 = 100
     technician1 = 101
@@ -249,6 +254,7 @@ class ID:
     baldino2 = 140
     baldino3 = 141
     alarm_tech = 142
+    elf = 143
 
     max1 = 200
     max2 = 201
@@ -261,6 +267,7 @@ class ID:
     water_tower_level = 302
     port_beluga_level = 303
     und1_level = 304
+    elf_lab_level = 305
 
     legend1 = 400
     fall = 401  # move that falls through to the map below
@@ -353,6 +360,8 @@ conversations = {
     ID.fenioux: ["Wait, how did you get in here? Who are you??", "I'm the heir, just like in the Prophecy... You know, the Legend! It's true!", "I'm happy for you, Twinsen! My brother is being held in Dr. FunFrock's headquarters, but his window is facing outside. If you can talk to him and find out how he's doing, I will give you the red card as a small token of gratitude."],
 
     ID.alarm_tech: ['I am almost done setting up the alarm system for the museum! Whenever it is activated, the Marine Museum would be evacuated and the doors are locked. But that is not all! There will be pressure sensitive tiles before the most valuable exhibits, anyone who steps on one of them, will summon plenty of GroboClones who will make quick handywork of the intruder,  he-he, heh heh, HA!'],
+
+    ID.elf: ["So glad you are here! I was stuck behind the seal for no less than 4 thousand and not more than 400 million years! (I have lost count at some point).", "I'm sure you'll find this blue card useful in your travels.."],
 }
 
 def mkcell():
@@ -575,6 +584,12 @@ class Board:
             self.colors.append((Loc(x,GROUND+1), 2))
         specials = self.load_map(self._map)[3]
         Being(self, specials[1], id=ID.olivet, name='Olivet', char=Blocks.rabbit)
+        Item(self, Blocks.seal, 'A strange seal', specials[2], id=ID.seal_sendell)
+
+    def board_elf_lab(self):
+        containers, crates, doors, specials = self.load_map(self._map)
+        Item(self, Blocks.grill, 'grill', specials[1], id=ID.grill9)
+        Being(self, specials[2], id=ID.elf, name='Lege-cap-ferret the Elf', char=Blocks.rabbit)
 
     def board_des_und(self):
         containers, crates, doors, specials = self.load_map(self._map)
@@ -652,8 +667,13 @@ class Board:
 
     def board_und1(self):
         containers, crates, doors, specials = self.load_map(self._map)
+        d = doors[0]
+        d.type = Type.door3
+        d.id = ID.gold_door
         Item(self, Blocks.grill, 'grill', specials[1], id=ID.grill3)
         Item(self, Blocks.runes, 'Runes', specials[2], id=ID.runes)
+        Item(self, Blocks.horn, "Gawley's Horn", specials[3], id=ID.gawley_horn)
+        Item(self, Blocks.medallion, "Sendell Medallion", specials[4], id=ID.sendell_medallion)
 
     def board_sea1(self):
         specials = self.load_map(self._map)[3]
@@ -1151,7 +1171,7 @@ class Being(Mixin1):
             new = self.fall(new)
             if new[0] == LOAD_BOARD or new[0] is None:
                 return new
-            pick_up = [ID.key1, ID.key2, ID.key3, ID.magic_ball, ID.pirate_flag]
+            pick_up = [ID.key1, ID.key2, ID.key3, ID.magic_ball, ID.pirate_flag, ID.gawley_horn, ID.sendell_medallion]
             B.remove(self)
             self.loc = new
 
@@ -1167,6 +1187,10 @@ class Being(Mixin1):
                         self.health = min(15, self.health+1)
                         B.remove(x)
                     elif x.id in pick_up:
+                        if x.id==ID.sendell_medallion:
+                            status('You have found Sendell Medallion')
+                        if x.id==ID.gawley_horn:
+                            status("You have found Gawley's Horn")
                         self.inv[x] += 1
                         B.remove(x)
                 names = [i.name for i in B.get_all_obj(new) if i.name]
@@ -1326,6 +1350,7 @@ class Being(Mixin1):
         fenioux = objects.get(ID.fenioux)
         alarm_tech = objects.get(ID.alarm_tech)
         museum_door = objects.get(ID.museum_door)
+        elf = objects.get(ID.elf)
 
         if chk_oob(r): locs.append(r)
         if chk_oob(l): locs.append(l)
@@ -1416,6 +1441,11 @@ class Being(Mixin1):
             self.talk(ID.astronomer)
             maurice.state = 1
 
+        elif is_near('elf'):
+            self.talk(elf)
+            self.inv[Item(None, 'B', 'blue card', id=ID.blue_card)]
+            status('The elf gives you the blue magnetic card!')
+
         elif is_near('legend1'):
             self.talk(self, conversations[ID.legend1])
 
@@ -1438,6 +1468,10 @@ class Being(Mixin1):
 
         elif is_near('buzancais') and sailboat.state==1:
             y = self.talk(buzancais, yesno=1)
+
+        elif is_near('gold_door') and self.has(ID.golden_key):
+            B.remove(B.doors[0])
+            status('You have used the golden key to open the door.')
 
         elif is_near('museum_alarm'):
             if B[museum_door.loc] is blank:
@@ -1633,7 +1667,10 @@ class Being(Mixin1):
         def is_near(id):
             return getattr(ID, id) in B.get_ids(locs)
 
-        if item.id == ID.proto_pack:
+        if item.id == ID.gawley_horn and is_near(ID.seal_sendell):
+            seal = objects[ID.seal_sendell]
+
+        elif item.id == ID.proto_pack:
             pp = objects[ID.proto_pack]
             pp.state = not pp.state
             status('Proto-pack is ' + ('on' if pp.state else 'off'))
@@ -2217,6 +2254,9 @@ def main(stdscr):
     beluga = Board(None, 'beluga')
     beluga.board_beluga()
     objects[ID.port_beluga_level] = beluga
+    elf_lab = Board(None, 'elf_lab')
+    elf_lab.board_elf_lab()
+    objects[ID.elf_lab_level] = elf_lab
 
     player = b1.board_1()
 
@@ -2279,6 +2319,7 @@ def main(stdscr):
     pp=Item(None, 'P', 'proto pack', id=ID.proto_pack)
     player.inv[pp] = 1
     player.inv[hd] = 1
+    player.inv[Item(None,'g','gk',id=ID.golden_key)] = 1
     player.inv[objects[ID.book_of_bu]] = 1
     objects[ID.sailboat].state=1
 
@@ -2378,6 +2419,7 @@ def main(stdscr):
                     loc,b = map_to_loc[mp]
                     B = player.move_to_board(loc, Loc(8, GROUND), B=b)
                     if B._map=='des_und': player.tele(Loc(7,7))
+                    if B._map=='und1': player.tele(Loc(65,7))
                     if B._map=='des_und2': player.tele(Loc(70,7))
                 if not any(m.startswith(mp) for m in map_to_loc):
                     break
