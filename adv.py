@@ -6,6 +6,7 @@ TODO
     - update stairs on screen 2
     - fast move attacks 5x in one turn
     - fix jumping up one level
+    - at the ferry, RoboClone attacks even though should stay near the jail door
 
 races: Spheros, Rabbibunnies, Quetches, Grobos
 """
@@ -937,6 +938,10 @@ class Item(Mixin1):
         self.loc = new
         self.B.put(self)
 
+# class UnlocatedItem(Item):
+#     """Item that is never placed on the ground, so doesn't require board/loc args."""
+#     def __init__(self, *args, **kwargs):
+#         super().__init__(None, *args, loc=None)
 
 class TriggerEventLocation(Item):
     """Location that triggers an event."""
@@ -987,10 +992,10 @@ class Being(Mixin1):
             self.add1(ID.key1, n=2)
             self.inv[objects[ID.fuel]] = 10
             self.inv[objects[ID.ferry_ticket]] = 10
-        j=Item(None, Blocks.bottle, 'jar of syrup', None, id=ID.jar_syrup)
-        # hd=Item(None, 'H', 'hd', None, id=ID.hair_dryer)
+        # j=Item(None, Blocks.bottle, 'jar of syrup', id=ID.jar_syrup)
+        # self.inv[j] = 1
+        # hd=Item(None, 'H', 'hair dryer', id=ID.hair_dryer)
         # self.inv[hd] = 1
-        self.inv[j] = 1
         self.kashes = 54
         if id:
             objects[id] = self
@@ -1410,7 +1415,7 @@ class Being(Mixin1):
                     self.remove1(ID.hair_dryer)
                     self.kashes+=10
                     baldino.state=3
-                    pp = Item(None, Blocks.proto_pack, 'Proto-pack', None, id=ID.proto_pack)
+                    pp = Item(None, Blocks.proto_pack, 'Proto-pack', id=ID.proto_pack)
                     self.inv[pp] = 1
 
         elif is_near('buzancais') and sailboat.state==1:
@@ -1430,7 +1435,7 @@ class Being(Mixin1):
             self.talk(fenioux)
             if fenioux.state==1:
                 self.talk(fenioux, ['I spoke to your brother.. he told me to mention the word "Amos" to you..', 'Very well, here is the red card..'])
-                rc = Item(None, 'R', 'red magnetic card', None, id=ID.red_card)
+                rc = Item(None, 'R', 'red magnetic card', id=ID.red_card)
                 self.inv[rc] = 1
 
         elif is_near('salesman') and salesman.state==1:
@@ -1438,7 +1443,7 @@ class Being(Mixin1):
             if y:
                 if self.kashes>=20:
                     self.kashes-=20
-                    hd = Item(None, Blocks.hair_dryer, 'Hair dryer', None, id=ID.hair_dryer)
+                    hd = Item(None, Blocks.hair_dryer, 'Hair dryer', id=ID.hair_dryer)
                     self.inv[hd] = 1
                 else:
                     status('You do not have enough kashes!')
@@ -1617,7 +1622,7 @@ class Being(Mixin1):
         elif is_near('water_supply') and item.id == ID.jar_syrup:
             status('You add raspberry syrup to the water supply')
             self.inv[item] -=1
-            empty_bottle = Item(None, Blocks.bottle, 'empty bottle', None, id=ID.empty_bottle)
+            empty_bottle = Item(None, Blocks.bottle, 'empty bottle', id=ID.empty_bottle)
             self.inv[empty_bottle] += 1
             # a little hacky, would be better to add a water supply obj and update its state
             objects[ID.clermont_ferrand].state = 2
@@ -2156,12 +2161,12 @@ def main(stdscr):
     win2 = Windows.win2 = newwin(height, width, begin_y, begin_x)
 
     # generatable items
-    coin = Item(None, Blocks.coin, 'coin', None, id=ID.coin)
-    grn_heart = Item(None, Blocks.grn_heart, 'heart', None, id=ID.grn_heart)
-    key1 = Item(None, Blocks.key, 'key', None, id=ID.key1)
-    key2 = Item(None, Blocks.key, 'key', None, id=ID.key2)
-    fuel = Item(None, Blocks.box1, 'fuel', None, id=ID.fuel)
-    ft = Item(None, Blocks.ferry_ticket, 'ferry ticket', None, id=ID.ferry_ticket)
+    coin = Item(None, Blocks.coin, 'coin', id=ID.coin)
+    grn_heart = Item(None, Blocks.grn_heart, 'heart', id=ID.grn_heart)
+    key1 = Item(None, Blocks.key, 'key', id=ID.key1)
+    key2 = Item(None, Blocks.key, 'key', id=ID.key2)
+    fuel = Item(None, Blocks.box1, 'fuel', id=ID.fuel)
+    ft = Item(None, Blocks.ferry_ticket, 'ferry ticket', id=ID.ferry_ticket)
 
     objects[ID.ferry_ticket] = ft
     objects[ID.fuel] = fuel
@@ -2251,8 +2256,8 @@ def main(stdscr):
     prox_und.board_prox_und()
 
     # for debugging
-    hd=Item(None, 'H', 'hair dryer', None, id=ID.hair_dryer)
-    pp=Item(None, 'P', 'proto pack', None, id=ID.proto_pack)
+    hd=Item(None, 'H', 'hair dryer', id=ID.hair_dryer)
+    pp=Item(None, 'P', 'proto pack', id=ID.proto_pack)
     player.inv[pp] = 1
     player.inv[hd] = 1
     player.inv[objects[ID.book_of_bu]] = 1
