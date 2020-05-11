@@ -5,6 +5,7 @@ bugs
 TODO
     - update stairs on screen 2
     - fast move attacks 5x in one turn
+    - fix jumping up one level
 
 races: Spheros, Rabbibunnies, Quetches, Grobos
 """
@@ -18,7 +19,6 @@ from collections import defaultdict
 from textwrap import wrap
 import string
 
-start_x_loc = 30
 rock = '█'
 blank = ' '
 HEIGHT = 16
@@ -337,6 +337,7 @@ conversations = {
 
     ID.baldino2: ["I see that you found the hair dryer!! Excellent. If you come back in a bit, I should be done with the Proto-pack..",
                   ".......", "...", "..", '.',],
+
     ID.baldino3: ["And now I'm done! Would you be so kind as to test the proto pack for 10 kashes? It can be used to fly over the level of water, but make sure you don't jump in it from height. Do you agree?"],
 
     ID.fenioux: ["Wait, how did you get in here? Who are you??", "I'm the heir, just like in the Prophecy... You know, the Legend! It's true!", "I'm happy for you, Twinsen! My brother is being held in Dr. FunFrock's headquarters, but his window is facing outside. If you can talk to him and find out how he's doing, I will give you the red card as a small token of gratitude."],
@@ -407,6 +408,14 @@ class Board:
 
     def __repr__(self):
         return f'<B: {self._map}'
+
+    def __getitem__(self, loc):
+        return self.B[loc.y][loc.x][-1]
+
+    def __iter__(self):
+        for y, row in enumerate(self.B):
+            for x, cell in enumerate(row):
+                yield Loc(x,y), cell
 
     def board_1(self):
         containers, crates, doors, specials = self.load_map(self._map)
@@ -519,8 +528,7 @@ class Board:
         Being(self, specials[3], id=ID.astronomer, name='The Astronomer', char=Blocks.monkey)
         Being(self, specials[4], id=ID.groboclone1, name='Groboclone', char=Blocks.elephant)
         Being(self, specials[7], id=ID.locksmith, name='Locksmith', char=Blocks.elephant)
-        a=Being(self, specials[9], id=ID.aubigny, name='Aubigny', char=Blocks.rabbit)
-        # a.state=1 # TODO testing
+        Being(self, specials[9], id=ID.aubigny, name='Aubigny', char=Blocks.rabbit)
 
         Item(self, Blocks.fountain, 'sink', specials[5], id=ID.sink)
         Item(self, Blocks.hexagon, 'A Drawing with a romantic view and a horse galloping at full speed across the plain', specials[6], id=ID.drawing)
@@ -788,42 +796,11 @@ class Board:
                             self.put(char, loc)
         return containers, crates, doors, specials
 
-    def make_steps(self, start, mod, to_height, char=Blocks.steps_r):
-        n = start.y - to_height
-        newx = None
-        for x in range(n):
-            row = self.B[start.y-x]
-            newx = start.x+(mod*x)
-            row[newx].append(char)
-        return Loc(newx, n+2)
 
     def locs_rectangle(self, a, b):
         for y in range(a.y, b.y+1):
             for x in range(a.x, b.x+1):
                 yield Loc(x,y)
-
-    def rectangle(self, a, b, exc=None):
-        row = self.B[a.y]
-        for cell in row[a.x:b.x+1]:
-            cell.append(rock)
-        row = self.B[b.y]
-        for cell in row[a.x:b.x+1]:
-            cell.append(rock)
-        for y in range(a.y+1, b.y):
-            self.put(rock, Loc(a.x, y))
-        for y in range(a.y+1, b.y):
-            self.put(rock, Loc(b.x, y))
-        exc = exc or []
-        for loc in exc:
-            self.remove(rock, loc)
-
-    def __getitem__(self, loc):
-        return self.B[loc.y][loc.x][-1]
-
-    def __iter__(self):
-        for y, row in enumerate(self.B):
-            for x, cell in enumerate(row):
-                yield Loc(x,y), cell
 
     def get_all(self, loc):
         return [n for n in self.B[loc.y][loc.x] if n!=blank]
@@ -933,8 +910,8 @@ class Mixin1:
     def remove1(self, id):
         self.inv[objects[id]] -= 1
 
-    def add1(self, id):
-        self.inv[objects[id]] += 1
+    def add1(self, id, n=1):
+        self.inv[objects[id]] += n
 
 
 class Item(Mixin1):
@@ -1007,8 +984,7 @@ class Being(Mixin1):
         self.char = self.char or char
         self.inv = defaultdict(int)
         if Misc.is_game: # not editor
-            self.add1(ID.key1)
-            self.add1(ID.key1)
+            self.add1(ID.key1, n=2)
             self.inv[objects[ID.fuel]] = 10
             self.inv[objects[ID.ferry_ticket]] = 10
         j=Item(None, Blocks.bottle, 'jar of syrup', None, id=ID.jar_syrup)
@@ -1697,7 +1673,6 @@ class Event:
         self.kwargs = kwargs
 
     def animate_arc(self, item, to_loc, height=1, carry_item=None):
-        B=self.B
         for _ in range(height):
             self.animate(item, 'k', n=height, carry_item=carry_item)
         a,b = item.loc, to_loc
@@ -2029,6 +2004,7 @@ class ShopKeeperAlarmEvent(Event):
             return Saves().load('start')
 
 class DieEvent(Event):
+    """Die or get arrested and sent back to jail."""
     once=False
     def go(self):
         return Saves().load('start')
@@ -2127,10 +2103,6 @@ class ShopKeeper(Being):
 class Grobo(Being):
     char = Blocks.elephant
 
-class NPCs:
-    pass
-class OtherBeings:
-    pass
 class Windows:
     win = win2 = None
 class Misc:
@@ -2143,7 +2115,6 @@ class Saves:
     def save(self, name, cur_brd):
         s = {}
         s['boards'] = deepcopy(boards)
-        s['beings'] = deepcopy(OtherBeings)
         s['cur_brd'] = cur_brd
         player = objects[ID.player]
         s['player'] = deepcopy(objects[ID.player])
@@ -2174,6 +2145,7 @@ def dist(a,b):
                abs(a.loc.y - b.loc.y))
 
 def main(stdscr):
+    # Misc.is_game = 1
     Misc.is_game = 1
     curses.init_pair(1, curses.COLOR_BLUE, curses.COLOR_WHITE)
     curses.init_pair(2, curses.COLOR_YELLOW, curses.COLOR_WHITE)
