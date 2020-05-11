@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """
 bugs
+    - jolly roger flag in the museum???
 
 TODO
     - update stairs on screen 2
@@ -116,6 +117,7 @@ class Blocks:
     medallion = '◉'
     seal = '⏣'
     special_stone = '⏢'
+    flute = 'f'
 
     crates = (crate1, crate2, crate3, crate4)
 
@@ -214,6 +216,7 @@ class ID:
     seal_sendell2 = 66
     marked_stone = 67
     eclipse_stone = 68
+    magic_flute = 69
 
     guard1 = 100
     technician1 = 101
@@ -683,8 +686,6 @@ class Board:
         containers[0].id = ID.treasure_chest
         containers[0].inv[Item(None, Blocks.key, 'Golden Key', id=ID.golden_key)] = 1
 
-        # Being(self, specials[9], name='Museum patron', char=Blocks.cow)
-
     def board_prox_und(self):
         containers, crates, doors, specials = self.load_map(self._map)
 
@@ -1086,7 +1087,7 @@ class Being(Mixin1):
     def sneaky_stance(self):
         return self.stance==Stance.sneaky
 
-    def talk(self, being, dialog=None, yesno=False):
+    def talk(self, being, dialog=None, yesno=False, resp=False):
         being = objects.get(being) or being
         loc = being.loc
         if isinstance(dialog, str):
@@ -1094,7 +1095,7 @@ class Being(Mixin1):
         dialog = dialog or conversations[being.id]
         x = min(loc.x, 60)
         multichoice = 0
-        for txt in dialog:
+        for m, txt in enumerate(dialog):
             lst = []
             if isinstance(txt, (list,tuple)):
                 multichoice = len(txt)
@@ -1126,6 +1127,18 @@ class Being(Mixin1):
                     if k in range(1, multichoice+1):
                         del win
                         return k
+
+            if resp and m==len(dialog)-1:
+                i=''
+                for _ in range(10):
+                    k=win.getkey()
+                    if k=='\n': break
+                    i+=k
+                    status(i)
+                    Windows.win2.refresh()
+                del win
+                return i
+
             win.getkey()
             del win
             self.B.draw(Windows.win)
@@ -1377,6 +1390,8 @@ class Being(Mixin1):
         museum_door = objects.get(ID.museum_door)
         elf = objects.get(ID.elf)
         seal2 = objects.get(ID.seal_sendell2)
+        marked_stone = objects.get(ID.marked_stone)
+        eclipse_stone = objects.get(ID.eclipse_stone)
 
         if chk_oob(r): locs.append(r)
         if chk_oob(l): locs.append(l)
@@ -1432,6 +1447,19 @@ class Being(Mixin1):
 
         elif is_near('mstone2_exit'):
             triggered_events.append((PortalEvent, dict(map='marked_stone', spawn_specials_ind=1)))
+
+        elif is_near('marked_stone'):
+            resp = self.talk(self, ['To free the Eclipse stone, speak the word DAX', 'Which word will free me?'], resp=True)
+            if resp.lower()=='odos':
+                status('You see the mighty stone disappear and countless hearts appear at your feet!')
+                for _ in range(7):
+                    B.put(objects[ID.grn_heart], self.loc)
+
+        elif is_near('eclipse_stone'):
+            resp = self.talk(self, ['To free the Marked stone, speak the word ODOS', 'Which word will free me?'], resp=True)
+            if resp.lower()=='dax':
+                status('You see the mighty stone disappear and a magic flute floats into your hand!')
+                self.inv[Item(None, Blocks.flute, 'Magic Flute', id=ID.magic_flute)] = 1
 
         elif is_near('alarm_tech'):
             self.talk(alarm_tech)
