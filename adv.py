@@ -642,6 +642,18 @@ class Board:
         containers, crates, doors, specials = self.load_map(self._map)
         Being(self, specials[1], id=ID.salesman, name='Salesman', char=Blocks.rabbit)
 
+    def board_proxima4(self):
+        containers, crates, doors, specials = self.load_map(self._map)
+
+    def board_proxima5(self):
+        containers, crates, doors, specials = self.load_map(self._map)
+
+    def board_mstone(self):
+        containers, crates, doors, specials = self.load_map(self._map)
+
+    def board_estone(self):
+        containers, crates, doors, specials = self.load_map(self._map)
+
     def board_museum(self):
         self.colors = [(Loc(60,8), 4)]
         containers, crates, doors, specials = self.load_map(self._map)
@@ -2328,6 +2340,18 @@ def main(stdscr):
     museum = Board(Loc(2, MAIN_Y+2), 'museum')
     museum.board_museum()
 
+    proxima4 = Board(Loc(3, MAIN_Y+2), 'proxima4')
+    proxima4.board_proxima4()
+
+    mstone = Board(Loc(4, MAIN_Y+2), 'mstone')
+    mstone.board_mstone()
+
+    proxima5 = Board(Loc(3, MAIN_Y+3), 'proxima5')
+    proxima5.board_proxima5()
+
+    estone = Board(Loc(4, MAIN_Y+3), 'estone')
+    estone.board_estone()
+
     prox_und = Board(Loc(2, MAIN_Y+3), 'prox_und')
     prox_und.board_prox_und()
 
@@ -2350,8 +2374,8 @@ def main(stdscr):
          [b1, b2,   b3, b4,    b5, b6,   b7, b8,    b9, b10, b11, b12],
          [None,None,None,None, None,None,None,None, None,None, None, None],
 
-         [proxima1,proxima2,    museum,None, None,None,None,None, None,None, None, None],
-         [proxima3,None,        prox_und,None, None,None,None,None, None,None, None, None],
+         [proxima1,proxima2,    museum,   proxima4, mstone,None,None,None, None,None, None, None],
+         [proxima3,None,        prox_und, proxima5, estone,None,None,None, None,None, None, None],
     )
 
     stdscr.clear()
