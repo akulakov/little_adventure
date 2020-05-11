@@ -110,6 +110,10 @@ class Blocks:
     cow = '🐮'
     hair_dryer = 'D'
     proto_pack = 'P'
+    flag = '▶'
+    steering_wheel = '⎈'
+    horn = '📯'
+    medallion = '◉'
 
     crates = (crate1, crate2, crate3, crate4)
 
@@ -196,6 +200,11 @@ class ID:
     proto_pack = 54
     museum_alarm = 55
     museum_door = 56
+    pirate_flag = 57
+    golden_key = 58
+    treasure_chest = 59
+    gawley_horn = 60
+    sendell_medallion = 61
 
     guard1 = 100
     technician1 = 101
@@ -619,10 +628,11 @@ class Board:
         Being(self, specials[1], id=ID.salesman, name='Salesman', char=Blocks.rabbit)
 
     def board_museum(self):
-        self.colors = [(Loc(60,8), 2)]
+        self.colors = [(Loc(60,8), 4)]
         containers, crates, doors, specials = self.load_map(self._map)
         Item(self, Blocks.lever, 'Museum Alarm', specials[1], id=ID.museum_alarm)
         Item(self, Blocks.door, '', specials[5], id=ID.museum_door, type=Type.door1)
+        Item(self, Blocks.flag, 'Jolly Roger', specials[9], id=ID.pirate_flag)
         Being(self, specials[2], id=ID.alarm_tech, name='Alarm Technician', char=Blocks.elephant)
         for loc in self.line(specials[3], specials[4]):
             Item(self, rock, '', loc, type=Type.pressure_sensor)
@@ -630,7 +640,10 @@ class Board:
         Being(self, specials[6], name='Museum patron', char=Blocks.elephant)
         Being(self, specials[7], name='Museum patron', char=Blocks.rabbit)
         Being(self, specials[8], name='Museum patron', char=Blocks.monkey)
-        Being(self, specials[9], name='Museum patron', char=Blocks.cow)
+        containers[0].id = ID.treasure_chest
+        containers[0].inv[Item(None, Blocks.key, 'Golden Key', id=ID.golden_key)] = 1
+
+        # Being(self, specials[9], name='Museum patron', char=Blocks.cow)
 
     def board_prox_und(self):
         containers, crates, doors, specials = self.load_map(self._map)
@@ -1138,7 +1151,7 @@ class Being(Mixin1):
             new = self.fall(new)
             if new[0] == LOAD_BOARD or new[0] is None:
                 return new
-            pick_up = [ID.key1, ID.key2, ID.key3, ID.magic_ball]
+            pick_up = [ID.key1, ID.key2, ID.key3, ID.magic_ball, ID.pirate_flag]
             B.remove(self)
             self.loc = new
 
@@ -1323,9 +1336,14 @@ class Being(Mixin1):
             return getattr(ID, id) in B.get_ids(locs)
 
         if c:
+            if c.id==ID.treasure_chest and B.state==0:
+                status('You do not dare open the treasure chest with so many museum guards around')
+                return
             items = {k:v for k,v in c.inv.items() if v}
             lst = []
             for x in items:
+                if x.id==ID.golden_key:
+                    status('You have found the Golden Key that the runes at cave under your home spoke of!')
                 if x.id==ID.coin:
                     self.kashes+=1
                 else:
@@ -1426,7 +1444,7 @@ class Being(Mixin1):
                 B.put(museum_door)
             museum_door.type=Type.door3
 
-            for n in (6,7,8,9):
+            for n in (6,7,8):
                 B.remove(B[B.specials[n]])
             status('The alarm sounds. you hear the noise of the grand oak door being shut and locked.')
             B.state = 1
@@ -2155,6 +2173,7 @@ def main(stdscr):
     curses.init_pair(1, curses.COLOR_BLUE, curses.COLOR_WHITE)
     curses.init_pair(2, curses.COLOR_YELLOW, curses.COLOR_WHITE)
     curses.init_pair(3, curses.COLOR_GREEN, curses.COLOR_WHITE)
+    curses.init_pair(4, curses.COLOR_YELLOW, curses.COLOR_BLACK)
     begin_x = 0; begin_y = 0; width = 80
     win = Windows.win = newwin(HEIGHT, width, begin_y, begin_x)
     begin_x = 0; begin_y = 16; height = 6; width = 80
