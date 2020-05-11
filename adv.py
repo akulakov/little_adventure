@@ -584,7 +584,7 @@ class Board:
             self.colors.append((Loc(x,GROUND+1), 2))
         specials = self.load_map(self._map)[3]
         Being(self, specials[1], id=ID.olivet, name='Olivet', char=Blocks.rabbit)
-        Item(self, Blocks.seal, 'A strange seal', specials[2], id=ID.seal_sendell)
+        Item(self, Blocks.seal, 'strange seal', specials[2], id=ID.seal_sendell)
 
     def board_elf_lab(self):
         containers, crates, doors, specials = self.load_map(self._map)
@@ -1404,6 +1404,9 @@ class Being(Mixin1):
         elif is_near('alarm_tech'):
             self.talk(alarm_tech)
 
+        elif is_near('grill9') and self.has(ID.blue_card):
+            triggered_events.append(ExitToElfMapEvent)
+
         elif is_near('clermont_ferrand') and clermont_ferrand.state==1:
             self.talk(objects[ID.clermont_ferrand])
 
@@ -1443,7 +1446,7 @@ class Being(Mixin1):
 
         elif is_near('elf'):
             self.talk(elf)
-            self.inv[Item(None, 'B', 'blue card', id=ID.blue_card)]
+            self.inv[Item(None, 'B', 'blue card', id=ID.blue_card)] = 1
             status('The elf gives you the blue magnetic card!')
 
         elif is_near('legend1'):
@@ -1662,13 +1665,15 @@ class Being(Mixin1):
             try:
                 item = list(self.inv.keys())[string.ascii_letters.index(ch)]
             except IndexError:
-                pass
+                return
+        if not item: return
         locs = [self.loc]
         def is_near(id):
             return getattr(ID, id) in B.get_ids(locs)
 
-        if item.id == ID.gawley_horn and is_near(ID.seal_sendell):
+        if item.id == ID.gawley_horn and is_near('seal_sendell'):
             seal = objects[ID.seal_sendell]
+            triggered_events.append(GoToElfMapEvent)
 
         elif item.id == ID.proto_pack:
             pp = objects[ID.proto_pack]
@@ -1779,6 +1784,18 @@ class RoboCloneAppearEvent(Event):
         c = Clone(self.B, self.B.specials[4], hostile=1)
         c.add1(ID.key2)
         self.B.guards.append(c)
+
+class ExitToElfMapEvent(Event):
+    once = True
+    def go(self):
+        bloc, b = map_to_loc['desert2']
+        return self.player.move_to_board(bloc, b.specials[2])
+
+class GoToElfMapEvent(Event):
+    once = True
+    def go(self):
+        b = objects[ID.elf_lab_level]
+        return self.player.move_to_board(None, b.specials[1], B=b)
 
 class TravelByCarEvent(Event):
     once = False
@@ -2320,6 +2337,7 @@ def main(stdscr):
     player.inv[pp] = 1
     player.inv[hd] = 1
     player.inv[Item(None,'g','gk',id=ID.golden_key)] = 1
+    player.inv[Item(None,'h','gawley_horn',id=ID.gawley_horn)] = 1
     player.inv[objects[ID.book_of_bu]] = 1
     objects[ID.sailboat].state=1
 
