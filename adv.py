@@ -279,6 +279,7 @@ class ID:
     elf = 143
     sever = 144
     dynofly = 145
+    tartas = 146
 
     max1 = 200
     max2 = 201
@@ -294,6 +295,7 @@ class ID:
     und1_level = 304
     elf_lab_level = 305
     mstone2_level = 306
+    f_island_level = 307    # fortress island
 
     legend1 = 400
     fall = 401  # move that falls through to the map below
@@ -686,6 +688,10 @@ class Board:
         Item(self, Blocks.platform2, 'passage', specials[1], id=ID.mstone2_exit)
         Item(self, Blocks.special_stone, 'Strange Stone', specials[2], id=ID.marked_stone)
 
+    def board_f_island(self):
+        containers, crates, doors, specials = self.load_map(self._map)
+        Being(self, specials[1], id=ID.tartas, name='Tartas', char=Blocks.rabbit)
+
     def board_estone(self):
         containers, crates, doors, specials = self.load_map(self._map)
         Item(self, Blocks.special_stone, 'Strange Stone', specials[1], id=ID.eclipse_stone)
@@ -728,7 +734,7 @@ class Board:
 
     def board_dynofly(self):
         containers, crates, doors, specials = self.load_map(self._map)
-        Being(self, specials[1], name='Dynofly', char=Blocks.dynofly)
+        Being(self, specials[1], name='Dynofly', char=Blocks.dynofly, id=ID.dynofly)
 
     # -----------------------------------------------------------------------------------------------
 
@@ -1415,38 +1421,6 @@ class Being(Mixin1):
         r,l = self.loc.mod_r(), self.loc.mod_l()
         rd, ld = r.mod_d(), l.mod_d()
         locs = [self.loc]
-
-        # morvan = objects.get(ID.morvan)
-        # montbard = objects.get(ID.montbard)
-        # locksmith = objects.get(ID.locksmith)
-        # maurice = objects.get(ID.maurice)
-        # clermont_ferrand = objects.get(ID.clermont_ferrand)
-        # aubigny = objects.get(ID.aubigny)
-        # olivet = objects.get(ID.olivet)
-        # statue = objects.get(ID.statue)
-        # lever3 = objects.get(ID.lever3)
-        # lever4 = objects.get(ID.lever4)
-        # lever5 = objects.get(ID.lever5)
-        # platform4 = objects.get(ID.platform4)
-        # platform5 = objects.get(ID.platform5)
-        # platform6 = objects.get(ID.platform6)
-        # book_of_bu = objects.get(ID.book_of_bu)
-        # wally = objects.get(ID.wally)
-        # buzancais = objects.get(ID.buzancais)
-        # sailboat = objects.get(ID.sailboat)
-        # baldino = objects.get(ID.baldino)
-        # salesman = objects.get(ID.salesman)
-        # fenioux = objects.get(ID.fenioux)
-        # alarm_tech = objects.get(ID.alarm_tech)
-        # museum_door = objects.get(ID.museum_door)
-        # elf = objects.get(ID.elf)
-        # seal2 = objects.get(ID.seal_sendell2)
-        # marked_stone = objects.get(ID.marked_stone)
-        # eclipse_stone = objects.get(ID.eclipse_stone)
-        # red_door = objects.get(ID.red_door)
-        # blue_door = objects.get(ID.blue_door)
-        # sever = objects.get(ID.sever)
-
         obj = obj_by_attr
 
         if chk_oob(r): locs.append(r)
@@ -1632,6 +1606,15 @@ class Being(Mixin1):
                 else:
                     status('You do not have enough kashes!')
 
+        elif is_near('dynofly'):
+            dests = [('Fortress Island', 'f_island'), ('Himalayi mountains', 'dynofly')]
+            dests = [(n,m) for n,m in dests if m!=B._map]
+            lnames = [n for n,m in dests]
+            ch = self.talk(self, [f'Where would you like to fly?', lnames])
+            if ch:
+                dest = dests[ch-1]
+                triggered_events.append((TravelByDynofly, dict(dest=dest[1], dests=dests)))
+
         elif is_near('sailboat'):
             dests = [('White Leaf Desert', 'desert1'), ('Port Beluga', 'beluga')]
             if obj.sailboat.state==1:
@@ -1646,7 +1629,7 @@ class Being(Mixin1):
                     ch = self.talk(self, [f'Where would you like to go?', lnames])
                     if ch:
                         dest = dests[ch-1]
-                        triggered_events.append((TravelBySailboat, dict(dest=dest[1])))
+                        triggered_events.append((TravelBySailboat, dict(dest=dest[1], dests=dests)))
                 else:
                     status("Looks like you don't have enough kashes!")
 
@@ -2048,12 +2031,15 @@ class TravelBySailboat(Event):
     once = False
     def go(self):
         dest = self.kwargs.get('dest')
+        dests = self.kwargs.get('dests')
+        lname = first([ln for ln,m in dests if m==dest])
         player = objects[ID.player]
         B = objects[ID.sea_level1]
         s = objects[ID.sailboat]
         B.put(s, Loc(78,GROUND))
         self.animate(s, 'h', B=B)
-        status('The sailboat took you to ' + ('the White Leaf Desert' if dest=='desert1' else 'Port Beluga'))
+        status(f'The sailboat took you to {lname}')
+
         if dest == 'desert1':
             b_loc, b = map_to_loc[dest]
             return player.move_to_board( b_loc, Loc(7, GROUND) )
@@ -2066,6 +2052,24 @@ class TravelBySailboat(Event):
         elif dest == 'himalaya1':
             b_loc, b = map_to_loc[dest]
             return player.move_to_board(b_loc, b.specials[9])
+
+class TravelByDynofly(Event):
+    once = False
+    def go(self):
+        dest = self.kwargs.get('dest')
+        dests = self.kwargs.get('dests')
+        lname = first([ln for ln,m in dests if m==dest])
+        obj = obj_by_attr
+        status(f'Dynofly took you to {lname}')
+
+        if dest == 'f_island':
+            B = obj_by_attr.f_island_level
+            obj.dynofly.move_to_board(None, B.specials[8], B=B)
+            return obj.player.move_to_board(None, B.specials[9], B=B)
+        elif dest == 'dynofly':
+            b_loc, b = map_to_loc[dest]
+            obj.dynofly.move_to_board(b_loc, b.specials[1])
+            return obj.player.move_to_board(b_loc, b.specials[9])
 
 class GuardAttackEvent1(Event):
     once=True
@@ -2534,6 +2538,10 @@ def main(stdscr):
     dynofly_board = Board(Loc(0, MAIN_Y+5), 'dynofly')
     dynofly_board.board_dynofly()
 
+    f_island = Board(None, 'f_island')
+    f_island.board_f_island()   # this needs to be after `board_dynofly()`
+    objects[ID.f_island_level] = f_island
+
     # for debugging
     hd=Item(None, 'H', 'hair dryer', id=ID.hair_dryer)
     pp=Item(None, 'P', 'proto pack', id=ID.proto_pack)
@@ -2662,7 +2670,7 @@ def main(stdscr):
             except:
                 status('try again')
         elif k == '6':
-            B = player.move_to_board( Loc(1,0), Loc(35, GROUND) )
+            B = player.move_to_board( map_to_loc['dynofly'][0], Loc(25, 5) )
         elif k == '7':
             B = player.move_to_board( Loc(6,MAIN_Y), Loc(72, GROUND) )
         elif k == '8':
@@ -2677,7 +2685,7 @@ def main(stdscr):
                 k+=win.getkey()
                 status(k)
                 win2.refresh()
-                if k.endswith('.'):
+                if k.endswith(' '):
                     try:
                         x,y=k[:-1].split(',')
                         player.tele(Loc(int(x), int(y)))
