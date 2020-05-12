@@ -1329,8 +1329,12 @@ class Being(Mixin1):
                     return LOAD_BOARD, ID.fall
 
                 if getattr(B[new2], 'type', None) == Type.water:
+                    proto_pack = objects.get(ID.proto_pack)
+                    if self.has(ID.proto_pack) and proto_pack.state:
+                        status('You float gently above the surface of water.')
+                        return new
                     triggered_events.append(DieEvent)
-                    Windows.win2.addstr(1, 0, 'You fall into the water and drown...')
+                    status('You fall into the water and drown...')
                     return None, None
 
                 if getattr(B[new2], 'type', None) == Type.deadly:
