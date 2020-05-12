@@ -2603,6 +2603,9 @@ def main(stdscr):
                     # a bit ugly, handle fall as explicit 'move' down
                     k = 'j'
                     loc = B.loc.mod(1,0)
+                    if not chk_b_oob(loc):
+                        status('You fall down and die.....')
+                        triggered_events.append(DieEvent)
                 x, y = player.loc
                 if k=='l': x = 0
                 if k=='h': x = 78
@@ -2611,10 +2614,11 @@ def main(stdscr):
 
                 # ugly but....
                 p_loc = Loc(x, y)
-                B = player.move_to_board(loc, p_loc)
-                B.remove(player)
-                player.loc = player.fall(player.loc)
-                B.put(player)
+                if chk_b_oob(loc):
+                    B = player.move_to_board(loc, p_loc)
+                    B.remove(player)
+                    player.loc = player.fall(player.loc)
+                    B.put(player)
 
         elif k == '.':
             if last_cmd=='.':
