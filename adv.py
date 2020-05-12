@@ -120,6 +120,7 @@ class Blocks:
     flute = 'f'
     snowman = '☃'
     snowflake = '❄'
+    dynofly = 'D'
 
     crates = (crate1, crate2, crate3, crate4)
 
@@ -224,6 +225,7 @@ class ID:
     clear_water_lake = 72
     bottle_clear_water = 73
     guitar = 74
+    stone1 = 75
 
     guard1 = 100
     technician1 = 101
@@ -269,6 +271,8 @@ class ID:
     baldino3 = 141
     alarm_tech = 142
     elf = 143
+    sever = 144
+    dynofly = 145
 
     max1 = 200
     max2 = 201
@@ -378,6 +382,8 @@ conversations = {
     ID.alarm_tech: ['I am almost done setting up the alarm system for the museum! Whenever it is activated, the Marine Museum would be evacuated and the doors are locked. But that is not all! There will be pressure sensitive tiles before the most valuable exhibits, anyone who steps on one of them, will summon plenty of GroboClones who will make quick handywork of the intruder,  he-he, heh heh, HA!'],
 
     ID.elf: ["So glad you are here! I was stuck behind the seal for no less than 4 thousand and not more than 400 million years! (I have lost count at some point).", "I'm sure you'll find this blue card useful in your travels.."],
+
+    ID.sever: ["This dance night is going nowhere..... fast! The luck has it that the accompanist stored his guitar for a year without a case, and it got so dusty that he began sneezing like a fou, and dropped the guitar. Now it has a crack in it. If you could only bring me a guitar.. I would help you find your way!"]
 }
 
 def mkcell():
@@ -708,6 +714,15 @@ class Board:
         Item(self, '', '', specials[3], id=ID.clear_water_lake)
         d=doors[0]
         d.id = ID.blue_door; d.type=Type.door3
+
+    def board_bar(self):
+        containers, crates, doors, specials = self.load_map(self._map)
+        Being(self, specials[1], name='Sever', char=Blocks.elephant, id=ID.sever)
+        Item(self, rock, '', specials[2], id=ID.stone1, type=Type.blocking)
+
+    def board_dynofly(self):
+        containers, crates, doors, specials = self.load_map(self._map)
+        Being(self, specials[1], name='Dynofly', char=Blocks.dynofly)
 
     # -----------------------------------------------------------------------------------------------
 
@@ -1419,6 +1434,7 @@ class Being(Mixin1):
         eclipse_stone = objects.get(ID.eclipse_stone)
         red_door = objects.get(ID.red_door)
         blue_door = objects.get(ID.blue_door)
+        sever = objects.get(ID.sever)
 
         if chk_oob(r): locs.append(r)
         if chk_oob(l): locs.append(l)
@@ -1468,6 +1484,13 @@ class Being(Mixin1):
 
         elif ID.chamonix in B.get_ids(locs):
             self.talk(objects[ID.chamonix])
+
+        elif is_near('sever'):
+            self.talk(sever)
+            if self.has(ID.guitar):
+                self.talk(sever, 'Oh you do have a guitar? May I have it? I am so happy! I will open the way for you at once.')
+                self.inv[objects[ID.guitar]] = 0
+                B.remove(B[B.specials[2]])
 
         elif is_near('red_door') and has(ID.red_card):
             B.remove(red_door)
@@ -2497,6 +2520,12 @@ def main(stdscr):
     himalaya2 = Board(Loc(1, MAIN_Y+4), 'himalaya2')
     himalaya2.board_himalaya2()
 
+    bar = Board(Loc(1, MAIN_Y+5), 'night_bar')
+    bar.board_bar()
+
+    dynofly_board = Board(Loc(0, MAIN_Y+5), 'dynofly')
+    dynofly_board.board_dynofly()
+
     # for debugging
     hd=Item(None, 'H', 'hair dryer', id=ID.hair_dryer)
     pp=Item(None, 'P', 'proto pack', id=ID.proto_pack)
@@ -2520,7 +2549,9 @@ def main(stdscr):
 
          [proxima1,proxima2,    museum,   proxima4, mstone,None,None,None, None,None, None, None],
          [proxima3,None,        prox_und, proxima5, estone,None,None,None, None,None, None, None],
-         [himalaya1,himalaya2,None,None, None,None,None,None, None,None, None, None],
+
+         [himalaya1,himalaya2,  None,None, None,None,None,None, None,None, None, None],
+         [dynofly_board,  bar,       None,None, None,None,None,None, None,None, None, None],
     )
 
     stdscr.clear()
@@ -2797,10 +2828,9 @@ def editor(stdscr, _map):
         elif k == 'R':
             B.put(Blocks.rubbish, loc)
 
+        # NPCs
         elif k == 'G':
             B.put(Blocks.elephant, loc)
-        elif k == 'r':
-            B.put(Blocks.rabbit, loc)
         elif k == 'O':
             B.put(Blocks.soldier, loc)
 
@@ -2814,6 +2844,8 @@ def editor(stdscr, _map):
             brush = Blocks.rock2
         elif k == 'X':
             B.put(Blocks.shelves, loc)
+        elif k == 'C':
+            B.put(Blocks.cactus, loc)
         elif k == 'v':
             B.put(Blocks.snowflake, loc)
         elif k == 'V':
@@ -2844,6 +2876,7 @@ def editor(stdscr, _map):
                 elif cmd == 's': B.put(BL.sharp_rock, loc)
                 elif cmd == 'r': B.put(BL.rock3, loc)
                 elif cmd == 'd': B.put(BL.hexagon, loc)     # drawing
+                elif cmd == 'R': B.put(Blocks.rabbit, loc)
 
                 elif any(c.startswith(cmd) for c in cmds):
                     continue
