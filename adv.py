@@ -118,6 +118,8 @@ class Blocks:
     seal = '⏣'
     special_stone = '⏢'
     flute = 'f'
+    snowman = '☃'
+    snowflake = '❄'
 
     crates = (crate1, crate2, crate3, crate4)
 
@@ -217,6 +219,11 @@ class ID:
     marked_stone = 67
     eclipse_stone = 68
     magic_flute = 69
+    blue_door = 70
+    red_door = 71
+    clear_water_lake = 72
+    bottle_clear_water = 73
+    guitar = 74
 
     guard1 = 100
     technician1 = 101
@@ -635,6 +642,7 @@ class Board:
 
     def board_proxima1(self):
         self.colors = self.color_line(Loc(61,7), Loc(67,7), 3)
+
         containers, crates, doors, specials = self.load_map(self._map)
         Item(self, Blocks.ferry, 'Sailboat', specials[1], id=ID.sailboat)
         Being(self, specials[2], id=ID.ruffec, name='Ruffec', char=Blocks.cow)
@@ -688,6 +696,18 @@ class Board:
 
     def board_prox_und(self):
         containers, crates, doors, specials = self.load_map(self._map)
+
+    def board_himalaya1(self):
+        containers, crates, doors, specials = self.load_map(self._map)
+        d=doors[0]
+        d.id = ID.red_door; d.type=Type.door3
+
+    def board_himalaya2(self):
+        containers, crates, doors, specials = self.load_map(self._map)
+        self.colors = self.color_line(specials[1], specials[2], 5)
+        Item(self, '', '', specials[3], id=ID.clear_water_lake)
+        d=doors[0]
+        d.id = ID.blue_door; d.type=Type.door3
 
     # -----------------------------------------------------------------------------------------------
 
@@ -760,6 +780,11 @@ class Board:
 
                     elif char==Blocks.sharp_rock:
                         Item(self, Blocks.sharp_rock, 'sharp_rock', loc, type=Type.deadly)
+
+                    elif char == BL.snowman:
+                        Item(self, char, 'snowman', loc)
+                    elif char == BL.snowflake:
+                        Item(self, char, 'snowflake', loc)
 
                     elif char==Blocks.rock3:
                         Item(self, Blocks.rock3, 'rock', loc, type=Type.blocking)
@@ -1226,7 +1251,7 @@ class Being(Mixin1):
                         B.remove(x)
                     elif x.id in pick_up:
                         if x.id==ID.sendell_medallion:
-                            status('You have found Sendell Medallion')
+                            status('You have found the Sendell Medallion')
                         if x.id==ID.gawley_horn:
                             status("You have found Gawley's Horn")
                         self.inv[x] += 1
@@ -1392,6 +1417,8 @@ class Being(Mixin1):
         seal2 = objects.get(ID.seal_sendell2)
         marked_stone = objects.get(ID.marked_stone)
         eclipse_stone = objects.get(ID.eclipse_stone)
+        red_door = objects.get(ID.red_door)
+        blue_door = objects.get(ID.blue_door)
 
         if chk_oob(r): locs.append(r)
         if chk_oob(l): locs.append(l)
@@ -1441,6 +1468,11 @@ class Being(Mixin1):
 
         elif ID.chamonix in B.get_ids(locs):
             self.talk(objects[ID.chamonix])
+
+        elif is_near('red_door') and has(ID.red_card):
+            B.remove(red_door)
+        elif is_near('blue_door') and has(ID.blue_card):
+            B.remove(blue_door)
 
         elif is_near('seal_sendell2') and seal2.state==1:
             triggered_events.append((PortalEvent, dict(level_id=ID.mstone2_level, spawn_specials_ind=1)))
@@ -1567,6 +1599,7 @@ class Being(Mixin1):
             dests = [('White Leaf Desert', 'desert1'), ('Port Beluga', 'beluga')]
             if sailboat.state==1:
                 dests.append(('Proxima Island', 'proxima1'))
+                dests.append(('Himalayi Mountains', 'himalaya1'))
             dests = [(n,m) for n,m in dests if m!=B._map]
             lnames = [n for n,m in dests]
             y = self.talk(self, f'Would you like to use the sailboat for 10 kashes?', yesno=1)
@@ -1594,6 +1627,16 @@ class Being(Mixin1):
 
         elif is_near('olivet'):
             self.talk(olivet, conversations[ID.olivet2 if self.inv[book_of_bu] else ID.olivet])
+            if self.has(ID.magic_flute):
+                y = self.talk(olivet, "It's a nice flute you have there! If you don't need it anymore, would you like to trade it for my guitar?", yesno=1)
+                if y:
+                    self.inv[objects[ID.magic_flute]] = 0
+                    self.inv[Item(None, 'g', 'guitar', id=ID.guitar)] = 1
+            elif self.has(ID.guitar):
+                y = self.talk(olivet, "Would you like to return the guitar and get your flute back?", yesno=1)
+                if y:
+                    self.inv[objects[ID.magic_flute]] = 1
+                    self.inv[objects[ID.guitar]] = 0
 
         elif is_near('book_of_bu'):
             self.inv[book_of_bu] = 1
@@ -1732,7 +1775,17 @@ class Being(Mixin1):
             return getattr(ID, id) in B.get_ids(locs)
         seal2 = objects.get(ID.seal_sendell2)
 
-        if item.id == ID.gawley_horn and is_near('seal_sendell'):
+        if item.id == ID.magic_flute and is_near('clear_water_lake'):
+            status('The ice that covered the lake starts to crackle... before long, it breaks apart and you see the impossibly clean and deep waters of the Clear Water Lake! Grateful, you fill the empty bottle with clear water.')
+            for loc in B.line(B.specials[1], B.specials[2]):
+                if B[loc] == rock:
+                    B.remove(rock, loc)
+                B.put(Blocks.water, loc)
+            empty = objects[ID.empty_bottle]
+            self.inv[empty] = 0
+            self.inv[Item(None, Blocks.bottle, 'Bottle of clear water', id=ID.bottle_clear_water)] = 1
+
+        elif item.id == ID.gawley_horn and is_near('seal_sendell'):
             seal = objects[ID.seal_sendell]
             triggered_events.append(GoToElfMapEvent)
 
@@ -1798,6 +1851,7 @@ def pdb(*arg):
     import pdb; pdb.set_trace()
 
 class Event:
+    done = False
     def __init__(self, B, **kwargs):
         self.B = B
         self.player = objects[ID.player]
@@ -1970,11 +2024,15 @@ class TravelBySailboat(Event):
         self.animate(s, 'h', B=B)
         status('The sailboat took you to ' + ('the White Leaf Desert' if dest=='desert1' else 'Port Beluga'))
         if dest == 'desert1':
-            return player.move_to_board( Loc(0, 0), Loc(7, GROUND) )
+            b_loc, b = map_to_loc[dest]
+            return player.move_to_board( b_loc, Loc(7, GROUND) )
         elif dest == 'beluga':
             b = objects[ID.port_beluga_level]
             return player.move_to_board(None, b.specials[9], B=b)
         elif dest == 'proxima1':
+            b_loc, b = map_to_loc[dest]
+            return player.move_to_board(b_loc, b.specials[9])
+        elif dest == 'himalaya1':
             b_loc, b = map_to_loc[dest]
             return player.move_to_board(b_loc, b.specials[9])
 
@@ -2313,6 +2371,7 @@ def main(stdscr):
     curses.init_pair(2, curses.COLOR_YELLOW, curses.COLOR_WHITE)
     curses.init_pair(3, curses.COLOR_GREEN, curses.COLOR_WHITE)
     curses.init_pair(4, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+    curses.init_pair(5, curses.COLOR_BLUE, curses.COLOR_BLACK)
     begin_x = 0; begin_y = 0; width = 80
     win = Windows.win = newwin(HEIGHT, width, begin_y, begin_x)
     begin_x = 0; begin_y = 16; height = 6; width = 80
@@ -2432,6 +2491,12 @@ def main(stdscr):
     prox_und = Board(Loc(2, MAIN_Y+3), 'prox_und')
     prox_und.board_prox_und()
 
+    himalaya1 = Board(Loc(0, MAIN_Y+4), 'himalaya1')
+    himalaya1.board_himalaya1()
+
+    himalaya2 = Board(Loc(1, MAIN_Y+4), 'himalaya2')
+    himalaya2.board_himalaya2()
+
     # for debugging
     hd=Item(None, 'H', 'hair dryer', id=ID.hair_dryer)
     pp=Item(None, 'P', 'proto pack', id=ID.proto_pack)
@@ -2439,6 +2504,8 @@ def main(stdscr):
     player.inv[hd] = 1
     player.inv[Item(None,'g','gk',id=ID.golden_key)] = 1
     player.inv[Item(None,'h','gawley_horn',id=ID.gawley_horn)] = 1
+    player.inv[Item(None, Blocks.bottle,'empty bottle', id=ID.empty_bottle)] = 1
+    player.inv[Item(None, 'f','magic flute', id=ID.magic_flute)] = 1
     player.inv[objects[ID.book_of_bu]] = 1
     objects[ID.sailboat].state=1
 
@@ -2453,6 +2520,7 @@ def main(stdscr):
 
          [proxima1,proxima2,    museum,   proxima4, mstone,None,None,None, None,None, None, None],
          [proxima3,None,        prox_und, proxima5, estone,None,None,None, None,None, None, None],
+         [himalaya1,himalaya2,None,None, None,None,None,None, None,None, None, None],
     )
 
     stdscr.clear()
@@ -2545,7 +2613,11 @@ def main(stdscr):
         elif k == '5':
             k = win.getkey()
             k+= win.getkey()
-            status(f'printed row {k} to debug')
+            try:
+                print(B.B[int(k)])
+                status(f'printed row {k} to debug')
+            except:
+                status('try again')
         elif k == '6':
             B = player.move_to_board( Loc(1,0), Loc(35, GROUND) )
         elif k == '7':
@@ -2589,7 +2661,7 @@ def main(stdscr):
         elif k == 'i':
             txt = []
             for item, n in player.inv.items():
-                if item:
+                if item and n:
                     # txt.append(f'{item} {id(item)} {item.name} {n}')
                     txt.append(f'{item.name} {n}')
             # txt.append(f'obj bb: {id(objects[ID.book_of_bu])}')
@@ -2742,8 +2814,10 @@ def editor(stdscr, _map):
             brush = Blocks.rock2
         elif k == 'X':
             B.put(Blocks.shelves, loc)
-        elif k == 'C':
-            B.put(Blocks.cactus, loc)
+        elif k == 'v':
+            B.put(Blocks.snowflake, loc)
+        elif k == 'V':
+            B.put(Blocks.snowman, loc)
 
         elif k == 'o':
             cmds = 'gm gl gr l b ob f'.split()
