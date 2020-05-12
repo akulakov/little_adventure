@@ -127,6 +127,10 @@ class Blocks:
     snowman = '☃'
     snowflake = '❄'
     dynofly = 'D'
+    safe = '⊡'
+    saber = ')'
+    pod = '≃'
+    computer = '💻'
 
     crates = (crate1, crate2, crate3, crate4)
 
@@ -153,6 +157,8 @@ class Type:
     door3 = 14
     deadly = 15
     pressure_sensor = 16
+    computer = 17
+    pod = 18
 
 BLOCKING = [rock, Type.door1, Type.door2, Type.door3, Blocks.block1, Blocks.steps_r, Blocks.steps_l, Type.platform_top,
             Type.door_top_block, Type.blocking, Type.pressure_sensor]
@@ -232,6 +238,13 @@ class ID:
     bottle_clear_water = 73
     guitar = 74
     stone1 = 75
+    safe = 76
+    safe_key = 77
+    saber = 78
+    architect_pass = 79
+    tele_pod = 80
+    computer = 81
+    stone2 = 82
 
     guard1 = 100
     technician1 = 101
@@ -280,6 +293,10 @@ class ID:
     sever = 144
     dynofly = 145
     tartas = 146
+    candanchu = 147
+    graus = 148
+    painter = 149
+    soldier3 = 150
 
     max1 = 200
     max2 = 201
@@ -296,6 +313,7 @@ class ID:
     elf_lab_level = 305
     mstone2_level = 306
     f_island_level = 307    # fortress island
+    brundle_level = 308
 
     legend1 = 400
     fall = 401  # move that falls through to the map below
@@ -391,7 +409,13 @@ conversations = {
 
     ID.elf: ["So glad you are here! I was stuck behind the seal for no less than 4 thousand and not more than 400 million years! (I have lost count at some point).", "I'm sure you'll find this blue card useful in your travels.."],
 
-    ID.sever: ["This dance night is going nowhere..... fast! The luck has it that the accompanist stored his guitar for a year without a case, and it got so dusty that he began sneezing like a fou, and dropped the guitar. Now it has a crack in it. If you could only bring me a guitar.. I would help you find your way!"]
+    ID.sever: ["This dance night is going nowhere..... fast! The luck has it that the accompanist stored his guitar for a year without a case, and it got so dusty that he began sneezing like a fou, and dropped the guitar. Now it has a crack in it. If you could only bring me a guitar.. I would help you find your way!"],
+
+    ID.candanchu: ["I stole this key from a guard, but I don't need it anymore.."],
+
+    ID.graus: ["I'm on a special assignment from Dr. FunFrock, I need the plans for the Teleportation Center!", "Very well, you should go to the center and look around. You are trying to find that miscontent who's been going around causing a ruckus? Would you knock some sense into him if you find him? Anyway, I guess my whole weekend is ruined by all this work with the Center plans.. Here is the pass, and please bring it back when done."],
+
+    ID.painter: ["This strange sign shows up on the wall over and over again! I paint it clean and the next day.. it's there!!"],
 }
 
 def mkcell():
@@ -505,6 +529,7 @@ class Board:
         containers[2].add1(ID.key1)
         Grobo(self, specials[1], id=ID.max_, name='Max')
         RoboBunny(self, specials[2], id=ID.anthony, name='Anthony')
+        RoboBunny(self, specials[3], id=ID.graus, name='Mr. Graus')
 
     def board_6(self):
         self.labels.append((2,20, "𝒯𝓌𝒾𝓃𝓈𝑒𝓃 𝐻𝑜𝓂𝑒"))
@@ -565,6 +590,13 @@ class Board:
         specials = self.load_map(self._map)[3]
         RoboBunny(self, specials[1], id=ID.brenne, name='Brenne')
         Item(self, '', '', specials[1].mod(0,-2), id=ID.talk_to_brenne)
+        Item(self, Blocks.safe, 'Safe', specials[2], id=ID.safe)
+        d=self.doors[1]
+        d.id = ID.blue_door; d.type=Type.door3
+
+
+    def board_13(self):
+        self.load_map(self._map)
 
     def board_top1(self):
         self.labels.append((0,2, "𝒜𝓈𝓉𝓇𝑜𝓃𝑜𝓂𝑒𝓇"))
@@ -692,6 +724,15 @@ class Board:
         containers, crates, doors, specials = self.load_map(self._map)
         Being(self, specials[1], id=ID.tartas, name='Tartas', char=Blocks.rabbit)
 
+    def board_brundle(self):
+        containers, crates, doors, specials = self.load_map(self._map)
+        Soldier(self, specials[1], id=ID.soldier3)
+        RoboBunny(self, specials[2], id=ID.painter, name='Jaca')
+        Item(self, rock, '', specials[3], id=ID.stone2)
+        for n in range(4,7):
+            Item(self, Blocks.pod, 'Teleportation Pod', specials[n], type=Type.pod)
+        Item(self, Blocks.computer, 'Computer', specials[7], id=ID.computer)
+
     def board_estone(self):
         containers, crates, doors, specials = self.load_map(self._map)
         Item(self, Blocks.special_stone, 'Strange Stone', specials[1], id=ID.eclipse_stone)
@@ -724,8 +765,6 @@ class Board:
         containers, crates, doors, specials = self.load_map(self._map)
         self.colors = self.color_line(specials[1], specials[2], 5)
         Item(self, '', '', specials[3], id=ID.clear_water_lake)
-        d=doors[0]
-        d.id = ID.blue_door; d.type=Type.door3
 
     def board_bar(self):
         containers, crates, doors, specials = self.load_map(self._map)
@@ -1320,6 +1359,18 @@ class Being(Mixin1):
                     ClimbThroughGrillEvent3.new = new
                     triggered_events.append(ClimbThroughGrillEvent3)
 
+            if self.fight_stance and Type.pod in B.get_types(new):
+                p = B.get_top_obj()
+                p.state = 1
+                p.name = 'Broken teleportation pod'
+                status("You break the teleportation pod.")
+
+            if self.fight_stance and ID.computer in B.get_ids(new):
+                c = B.get_top_obj()
+                c.state = 1
+                c.name = 'Broken computer'
+                status("You break the computer.")
+
             Windows.win2.refresh()
             return True, True
         return None, None
@@ -1471,6 +1522,31 @@ class Being(Mixin1):
 
         elif ID.chamonix in B.get_ids(locs):
             self.talk(obj.chamonix)
+
+        elif is_near('painter'):
+            self.talk(obj.painter)
+
+        elif is_near('soldier3'):
+            self.talk(obj.soldier3, 'I will need some identification to let you in!')
+            if self.has(ID.architect_pass):
+                status('You show the pass to the soldier.')
+                d=self.B.doors[1]
+                self.B.remove(d)
+
+        elif is_near('candanchu'):
+            self.talk(obj.candanchu)
+            status('Candanchu gives you a fancy-looking key..')
+            self.inv[Item(None, Blocks.key, 'fancy key', id=ID.safe_key)] = 1
+
+        elif is_near('safe') and self.has(ID.safe_key):
+            status("You discover Dr.FunFrock's saber!!")
+            self.inv[Item(None, Blocks.saber, "Saber", id=ID.saber)] = 1
+            self.talk(self, 'You see a sheet of paper inside. It has a handwritten note on it: "Dear Dr. FunFrock, I have taken the teleportation plans home to work on them during the weekend. - Mr. Graus, Architect, Bug Street, Citadel Island."')
+            obj.graus.state = 1
+
+        elif is_near('graus') and obj.graus.state==1:
+            self.talk(obj.graus)
+            self.inv[Item(None, Blocks.card, "Architect's pass", id=ID.architect_pass)] = 1
 
         elif is_near('sever'):
             self.talk(obj.sever)
@@ -1786,6 +1862,9 @@ class Being(Mixin1):
                 return
         if not item: return
         locs = [self.loc]
+        if chk_oob(self.loc, x=1):
+            # need this for Brundle island only, for the sendell seal in the wall
+            locs.append(self.loc.mod_r())
         def is_near(id):
             return getattr(ID, id) in B.get_ids(locs)
         seal2 = objects.get(ID.seal_sendell2)
@@ -1799,6 +1878,9 @@ class Being(Mixin1):
                 B.put(Blocks.water, loc)
             self.inv[obj.empty_bottle] = 0
             self.inv[Item(None, Blocks.bottle, 'Bottle of clear water', id=ID.bottle_clear_water)] = 1
+
+        elif item.id == ID.gawley_horn and is_near('stone2'):
+            self.B.remove(obj.stone2)
 
         elif item.id == ID.gawley_horn and is_near('seal_sendell'):
             # seal = obj_by_attr.seal_sendell
@@ -2476,6 +2558,8 @@ def main(stdscr):
     b11.board_11()
     b12 = Board(Loc(11,MAIN_Y), 12)
     b12.board_12()
+    b13 = Board(Loc(11,MAIN_Y+1), 13)
+    b13.board_13()
 
     top1 = Board(Loc(9,MAIN_Y-1), 'top1')
     top1.board_top1()
@@ -2542,6 +2626,10 @@ def main(stdscr):
     f_island.board_f_island()   # this needs to be after `board_dynofly()`
     objects[ID.f_island_level] = f_island
 
+    brundle = Board(None, 'brundle')
+    brundle.board_brundle()   # this needs to be after `board_dynofly()`
+    objects[ID.brundle_level] = brundle
+
     # for debugging
     hd=Item(None, 'H', 'hair dryer', id=ID.hair_dryer)
     pp=Item(None, 'P', 'proto pack', id=ID.proto_pack)
@@ -2561,7 +2649,7 @@ def main(stdscr):
 
          [None,None,None,None, None,None,None,top3, top2,top1, None, None],
          [b1, b2,   b3, b4,    b5, b6,   b7, b8,    b9, b10, b11, b12],
-         [None,None,None,None, None,None,None,None, None,None, None, None],
+         [None,None,None,None, None,None,None,None, None,None, None, b13],
 
          [proxima1,proxima2,    museum,   proxima4, mstone,None,None,None, None,None, None, None],
          [proxima3,None,        prox_und, proxima5, estone,None,None,None, None,None, None, None],
