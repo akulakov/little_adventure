@@ -297,6 +297,8 @@ class ID:
     graus = 148
     painter = 149
     soldier3 = 150
+    soldier4 = 151
+    soldier5 = 152
 
     max1 = 200
     max2 = 201
@@ -312,7 +314,6 @@ class ID:
     und1_level = 304
     elf_lab_level = 305
     mstone2_level = 306
-    f_island_level = 307    # fortress island
     brundle_level = 308
 
     legend1 = 400
@@ -416,6 +417,8 @@ conversations = {
     ID.graus: ["I'm on a special assignment from Dr. FunFrock, I need the plans for the Teleportation Center!", "Very well, you should go to the center and look around. You are trying to find that miscontent who's been going around causing a ruckus? Would you knock some sense into him if you find him? Anyway, I guess my whole weekend is ruined by all this work with the Center plans.. Here is the pass, and please bring it back when done."],
 
     ID.painter: ["This strange sign shows up on the wall over and over again! I paint it clean and the next day.. it's there!!"],
+
+    ID.tartas: ["I can help but first you need to disable the teleportation pods and computers at the Teleportation Center!"],
 }
 
 def mkcell():
@@ -443,7 +446,7 @@ class Loc:
         if isinstance(l, Loc):
             return (self.x, self.y) == (l.x, l.y)
 
-    def mod(self, y, x):
+    def mod(self, y=0, x=0):
         new = copy(self)
         new.y += y
         new.x += x
@@ -724,11 +727,18 @@ class Board:
         containers, crates, doors, specials = self.load_map(self._map)
         Being(self, specials[1], id=ID.tartas, name='Tartas', char=Blocks.rabbit)
 
+    def board_f_island2(self):
+        containers, crates, doors, specials = self.load_map(self._map)
+        s = Soldier(self, specials[1], id=ID.soldier4)
+        self.guards.append(s)
+        s = Soldier(self, specials[2], id=ID.soldier5)
+        self.guards.append(s)
+
     def board_brundle(self):
         containers, crates, doors, specials = self.load_map(self._map)
         Soldier(self, specials[1], id=ID.soldier3)
         RoboBunny(self, specials[2], id=ID.painter, name='Jaca')
-        Item(self, rock, '', specials[3], id=ID.stone2)
+        Item(self, rock, '', specials[3], id=ID.stone2, type=Type.blocking)
         for n in range(4,7):
             Item(self, Blocks.pod, 'Teleportation Pod', specials[n], type=Type.pod)
         Item(self, Blocks.computer, 'Computer', specials[7], id=ID.computer)
@@ -1373,6 +1383,16 @@ class Being(Mixin1):
                     c.name = 'Broken computer'
                     status("You break the computer.")
 
+            if B._map == 'brundle':
+                # if all equipment is broken, Tartas will help Twinsen
+                x=0
+                for n in (4,5,6,7):
+                    item = B[B.specials[n]]
+                    if item.state==1 and (item.id==ID.computer or item.type==Type.pod):
+                        x+=1
+                if x==4:
+                    B.state=1
+
             Windows.win2.refresh()
             return True, True
         return None, None
@@ -1428,21 +1448,25 @@ class Being(Mixin1):
                 self.move('h')
 
     def hit(self, obj):
+        B=self.B
         if obj.health:
             obj.health -= 1
             Windows.win2.addstr(1, 0, f'{self} hits {obj} for 1pt')
             if obj.is_being and not obj.is_player:
                 obj.hostile = 1
             if obj.health <=0:
-                self.B.remove(obj)
+                B.remove(obj)
                 if random()>0.6:
-                    Item(self.B, Blocks.coin, 'one kash', obj.loc, id=ID.coin)
+                    Item(B, Blocks.coin, 'one kash', obj.loc, id=ID.coin)
                 elif random()>0.6:
-                    Item(self.B, Blocks.grn_heart, 'heart', obj.loc, id=ID.grn_heart)
+                    Item(B, Blocks.grn_heart, 'heart', obj.loc, id=ID.grn_heart)
                 for it, qty in obj.inv.items():
                     # TODO note item will not have a `loc` (ok for now)
                     it.loc = obj.loc
-                    self.B.put(it, obj.loc)
+                    B.put(it, obj.loc)
+                if B._map=='f_island2':
+                    if obj_by_attr.soldier4.dead and obj_by_attr.soldier5.dead:
+                        triggered_events.append(TartasDigsEvent)
 
     def switch_places(self):
         B = self.B
@@ -1524,6 +1548,12 @@ class Being(Mixin1):
 
         elif ID.chamonix in B.get_ids(locs):
             self.talk(obj.chamonix)
+
+        elif is_near('tartas'):
+            self.talk(obj.tartas)
+            if obj_by_attr.brundle_level.state==1:
+                self.talk(obj.tartas, "Ah, you've done that? Follow me then! You will also need to defeat the soldiers, only then I'll be able to dig the way for you...")
+                triggered_events.append(FollowTartasEvent)
 
         elif is_near('painter'):
             self.talk(obj.painter)
@@ -2063,6 +2093,19 @@ class TravelByCarEvent(Event):
             B.put(car, Loc(6,GROUND))
         return B
 
+class TartasDigsEvent(Event):
+    once=1
+    def go(self):
+        status('Tartas starts digging and with surprising speed and verve; before long you see a hole appearing in the ground!!')
+        self.B.remove(rock, obj_by_attr.tartas.loc.mod(y=1))
+
+class FollowTartasEvent(Event):
+    once=1
+    def go(self):
+        bloc, B = map_to_loc['f_island2']
+        obj_by_attr.tartas.move_to_board(bloc, B.specials[8])
+        return self.player.move_to_board(bloc, B.specials[9])
+
 class ClermontTriesWater(Event):
     once=1
     def go(self):
@@ -2148,9 +2191,9 @@ class TravelByDynofly(Event):
         status(f'Dynofly took you to {lname}')
 
         if dest == 'f_island':
-            B = obj_by_attr.f_island_level
-            obj.dynofly.move_to_board(None, B.specials[8], B=B)
-            return obj.player.move_to_board(None, B.specials[9], B=B)
+            b_loc, B = map_to_loc[dest]
+            obj.dynofly.move_to_board(b_loc, B.specials[8])
+            return obj.player.move_to_board(b_loc, B.specials[9])
         elif dest == 'brundle':
             B = obj_by_attr.brundle_level
             obj.dynofly.move_to_board(None, B.specials[8], B=B)
@@ -2420,7 +2463,7 @@ class Timer:
 
 class Player(Being):
     char = '🙍'
-    health = 50
+    health = 100
     is_player = 1
     stance = Stance.sneaky
     name = 'Player'
@@ -2630,9 +2673,11 @@ def main(stdscr):
     dynofly_board = Board(Loc(0, MAIN_Y+5), 'dynofly')
     dynofly_board.board_dynofly()
 
-    f_island = Board(None, 'f_island')
+    f_island = Board(Loc(0,MAIN_Y+6), 'f_island')
     f_island.board_f_island()   # this needs to be after `board_dynofly()`
-    objects[ID.f_island_level] = f_island
+
+    f_island2 = Board(Loc(1,MAIN_Y+6), 'f_island2')
+    f_island2.board_f_island2()
 
     brundle = Board(None, 'brundle')
     brundle.board_brundle()   # this needs to be after `board_dynofly()`
@@ -2666,6 +2711,7 @@ def main(stdscr):
 
          [himalaya1,himalaya2,  None,None, None,None,None,None, None,None, None, None],
          [dynofly_board,  bar,       None,None, None,None,None,None, None,None, None, None],
+         [f_island,  f_island2,       None,None, None,None,None,None, None,None, None, None],
     )
 
     stdscr.clear()
