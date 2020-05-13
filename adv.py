@@ -307,6 +307,9 @@ class ID:
     zoe = 153
     funfrock = 154
     funfrock2 = 155
+    fenioux2 = 156
+    olivet3 = 157
+    julien3 = 158
 
     max1 = 200
     max2 = 201
@@ -316,6 +319,8 @@ class ID:
     mstone2_exit = 205
     zoe_taken = 206
     zoe_taken2 = 207
+    safe_note = 208
+    lake_ice_breaking = 209
 
     sea_level1 = 300
     landscape_level1 = 301
@@ -402,6 +407,8 @@ conversations = {
 
     ID.olivet2: ['I now see that you are the chosen one. You can keep the Book of Bu. It will let you decipher runes and speak to the animals.', 'I do not know how you can defeat Dr. FunFrock, but I know that you must. I wish I could help you.', 'Something tells me your parents must have left a clue or a direction at your home to help you along. Perhaps it is a good time to return home.'],
 
+    ID.olivet3: "It's a nice flute you have there! If you don't need it anymore, would you like to trade it for my guitar?",
+
     ID.runes: ['This room contains information and weapons that will help against the future Tyrant. Unfortunately, the ship carrying the golden key was waylaid by the notorious and unreasonably violent pirate DeForge. It may now be with his treasure, wherever it is to be found. If you wish to defeat the Tyrant, finding treasure of DeForge might be a nice idea!'],
 
     ID.aubigny: ['Can you tell me anything about the notorious pirate DeForge?', 'I have had an old book by him for many years! Just as your luck would have it, this morning a customer came in and bought it. He works at the library, I believe..'],
@@ -425,6 +432,8 @@ conversations = {
 
     ID.fenioux: ["Wait, how did you get in here? Who are you??", "I'm the heir, just like in the Prophecy... You know, the Legend! It's true!", "I'm happy for you, Twinsen! My brother is being held in Dr. FunFrock's headquarters, but his window is facing outside. If you can talk to him and find out how he's doing, I will give you the red card as a small token of gratitude."],
 
+    ID.fenioux2: ['I spoke to your brother.. he told me to mention the word "Amos" to you..', 'Very well, here is the red card..'],
+
     ID.alarm_tech: ['I am almost done setting up the alarm system for the museum! Whenever it is activated, the Marine Museum would be evacuated and the doors are locked. But that is not all! There will be pressure sensitive tiles before the most valuable exhibits, anyone who steps on one of them, will summon plenty of GroboClones who will make quick handywork of the intruder,  he-he, heh heh, HA!'],
 
     ID.elf: ["So glad you are here! I was stuck behind the seal for no less than 4 thousand and not more than 400 million years! (I have lost count at some point).", "I'm sure you'll find this blue card useful in your travels.."],
@@ -446,6 +455,12 @@ conversations = {
     ID.zoe_taken: ["Suddenly you see your wife, Zoe, emerge from your home, accompanied by two GroboClones."],
 
     ID.zoe_taken2: ["You try to follow them but a third GroboClone jumps as if from under ground, whacks you with a baton right over your head, and that's the last thing you remember."],
+
+    ID.julien3: 'You may be able to find out more on Principal Island. I wanted to use this ferry ticket myself but I can guess I can sell it to you for some 10 kashes and buy some candy..',
+
+    ID.safe_note: 'You see a sheet of paper inside. It has a handwritten note on it: "Dear Dr. FunFrock, I have taken the teleportation plans home to work on them during the weekend. - Mr. Graus, Architect, Bug Street, Citadel Island."',
+
+    ID.lake_ice_breaking: 'The ice that covered the lake starts to crackle... before long, it breaks apart and you see the impossibly clean and deep waters of the Clear Water Lake! Grateful, you fill the empty bottle with clear water.',
 }
 
 def mkcell():
@@ -1139,12 +1154,13 @@ class Item(BeingItemMixin):
     def __hash__(self):
         return self.id
 
-    def move(self, dir):
+    def move(self, dir, n=1):
         m = dict(h=(0,-1), l=(0,1), j=(1,0), k=(-1,0))[dir]
-        new = self.loc.mod(*m)
-        self.B.remove(self)
-        self.loc = new
-        self.B.put(self)
+        for _ in range(n):
+            new = self.loc.mod(*m)
+            self.B.remove(self)
+            self.loc = new
+            self.B.put(self)
 
 class TriggerEventLocation(Item):
     """Location that triggers an event."""
@@ -1555,9 +1571,48 @@ class Being(BeingItemMixin):
             lo.put(loc)
             status(f'{self} moved past {lo.name}')
 
+    def loot(self, B, cont):
+        if cont.id==ID.treasure_chest and B.state==0:
+            status('You do not dare open the treasure chest with so many museum guards around')
+            return
+        items = {k:v for k,v in cont.inv.items() if v}
+        lst = []
+        for x in items:
+            if x.id==ID.golden_key:
+                status('You have found the Golden Key that the runes at cave under your home spoke of!')
+            if x.id==ID.coin:
+                self.kashes+=1
+            else:
+                self.inv[x] += cont.inv[x]
+            cont.inv[x] = 0
+            lst.append(str(x))
+        status('You found {}'.format(', '.join(lst)))
+        if not items:
+            status(f'{cont.name} is empty')
+
+    def talk_to_baldino(self):
+        obj = obj_by_attr
+        if obj.baldino.state==0:
+            self.talk(obj.baldino)
+            obj.salesman.state=1
+            obj.baldino.state = 1
+
+        elif obj.baldino.state==1 and self.has(ID.hair_dryer):
+            self.talk(obj.baldino, ID.baldino2)
+            obj.baldino.state = 2
+
+        elif obj.baldino.state==2:
+            y = self.talk(obj.baldino, ID.baldino3, yesno=1)
+            if y:
+                self.remove1(ID.hair_dryer)
+                self.kashes+=10
+                obj.baldino.state = 3
+                pp = Item(None, Blocks.proto_pack, 'Proto-pack', id=ID.proto_pack)
+                self.inv[pp] = 1
+
     def action(self):
         B=self.B
-        c = last( [x for x in B.get_all(self.loc) if x.type==Type.container] )
+        cont = last( [x for x in B.get_all(self.loc) if x.type==Type.container] )
         objs = B.get_all_obj(self.loc)
 
         r,l = self.loc.mod_r(), self.loc.mod_l()
@@ -1573,25 +1628,8 @@ class Being(BeingItemMixin):
         def is_near(id):
             return getattr(ID, id) in B.get_ids(locs)
 
-        if c:
-            if c.id==ID.treasure_chest and B.state==0:
-                status('You do not dare open the treasure chest with so many museum guards around')
-                return
-            items = {k:v for k,v in c.inv.items() if v}
-            lst = []
-            for x in items:
-                if x.id==ID.golden_key:
-                    status('You have found the Golden Key that the runes at cave under your home spoke of!')
-                if x.id==ID.coin:
-                    self.kashes+=1
-                else:
-                    self.inv[x] += c.inv[x]
-                c.inv[x] = 0
-                lst.append(str(x))
-            status('You found {}'.format(', '.join(lst)))
-            if not items:
-                status(f'{c.name} is empty')
-
+        if cont:
+            self.loot(B, cont)
         elif len(objs)>1 and objs[-2].id == ID.crate1:
             objs[-2].move('l')
             Item(B, Blocks.grill, 'grill', self.loc, id=ID.grill3)
@@ -1638,7 +1676,7 @@ class Being(BeingItemMixin):
         elif is_near('safe') and self.has(ID.safe_key):
             status("You discover Dr.FunFrock's saber!!")
             self.inv[Item(None, Blocks.saber, "Saber", id=ID.saber)] = 1
-            self.talk(self, 'You see a sheet of paper inside. It has a handwritten note on it: "Dear Dr. FunFrock, I have taken the teleportation plans home to work on them during the weekend. - Mr. Graus, Architect, Bug Street, Citadel Island."')
+            self.talk(self,ID.safe_note)
             obj.graus.state = 1
 
         elif is_near('graus') and obj.graus.state==1:
@@ -1654,6 +1692,7 @@ class Being(BeingItemMixin):
 
         elif is_near('red_door') and self.has(ID.red_card):
             B.remove(obj.red_door)
+
         elif is_near('blue_door') and self.has(ID.blue_card):
             B.remove(obj.blue_door)
 
@@ -1729,23 +1768,7 @@ class Being(BeingItemMixin):
             self.talk(self, ID.legend1)
 
         elif is_near('baldino'):
-            if obj.baldino.state==0:
-                self.talk(obj.baldino)
-                obj.salesman.state=1
-                obj.baldino.state = 1
-
-            elif obj.baldino.state==1 and self.has(ID.hair_dryer):
-                self.talk(obj.baldino, ID.baldino2)
-                obj.baldino.state = 2
-
-            elif obj.baldino.state==2:
-                y = self.talk(obj.baldino, ID.baldino3, yesno=1)
-                if y:
-                    self.remove1(ID.hair_dryer)
-                    self.kashes+=10
-                    obj.baldino.state=3
-                    pp = Item(None, Blocks.proto_pack, 'Proto-pack', id=ID.proto_pack)
-                    self.inv[pp] = 1
+            self.talk_to_baldino()
 
         # Unused?
         elif is_near('buzancais') and obj.sailboat.state==1:
@@ -1768,7 +1791,7 @@ class Being(BeingItemMixin):
         elif is_near('fenioux'):
             self.talk(obj.fenioux)
             if obj.fenioux.state==1:
-                self.talk(obj.fenioux, ['I spoke to your brother.. he told me to mention the word "Amos" to you..', 'Very well, here is the red card..'])
+                self.talk(obj.fenioux, ID.fenioux2)
                 rc = Item(None, 'R', 'red magnetic card', id=ID.red_card)
                 self.inv[rc] = 1
 
@@ -1792,22 +1815,7 @@ class Being(BeingItemMixin):
                 triggered_events.append((TravelByDynofly, dict(dest=dest[1], dests=dests)))
 
         elif is_near('sailboat'):
-            dests = [('White Leaf Desert', 'desert1'), ('Port Beluga', 'beluga')]
-            if obj.sailboat.state==1:
-                dests.append(('Proxima Island', 'proxima1'))
-                dests.append(('Himalayi Mountains', 'himalaya1'))
-            dests = [(n,m) for n,m in dests if m!=B._map]
-            lnames = [n for n,m in dests]
-            y = self.talk(self, f'Would you like to use the sailboat for 10 kashes?', yesno=1)
-            if y:
-                if self.kashes>=10:
-                    self.kashes-=10
-                    ch = self.talk(self, [f'Where would you like to go?', lnames])
-                    if ch:
-                        dest = dests[ch-1]
-                        triggered_events.append((TravelBySailboat, dict(dest=dest[1], dests=dests)))
-                else:
-                    status("Looks like you don't have enough kashes!")
+            self.use_sailboat()
 
         elif is_near('aubigny'):
             if obj.aubigny.state==1:
@@ -1822,17 +1830,7 @@ class Being(BeingItemMixin):
                     status("Looks like you don't have enough kashes!")
 
         elif is_near('olivet'):
-            self.talk(obj.olivet, conversations[ID.olivet2 if self.inv[obj.book_of_bu] else ID.olivet])
-            if self.has(ID.magic_flute):
-                y = self.talk(obj.olivet, "It's a nice flute you have there! If you don't need it anymore, would you like to trade it for my guitar?", yesno=1)
-                if y:
-                    self.inv[obj.magic_flute] = 0
-                    self.inv[Item(None, 'g', 'guitar', id=ID.guitar)] = 1
-            elif self.has(ID.guitar):
-                y = self.talk(obj.olivet, "Would you like to return the guitar and get your flute back?", yesno=1)
-                if y:
-                    self.inv[obj.magic_flute] = 1
-                    self.inv[obj.guitar] = 0
+            self.talk_to_olivet()
 
         elif is_near('book_of_bu'):
             self.inv[obj.book_of_bu] = 1
@@ -1849,21 +1847,17 @@ class Being(BeingItemMixin):
             if obj.lever3.state==0 and obj.lever5.state==0 and obj.lever4.state==1:
                 dir = 'k' if obj.platform6.loc.y>5 else 'j'
                 obj.platform4.move(dir)
-                obj.platform6.move(dir)
-                obj.platform6.move(dir)
-                obj.platform6.move(dir)
+                obj.platform6.move(dir, 3)
 
         elif is_near('lever4'):
             if obj.lever3.state==0 and obj.lever5.state==0 and obj.lever4.state==0:
                 obj.lever4.state = 1
                 dir = 'k' if obj.platform5.loc.y>5 else 'j'
-                obj.platform5.move(dir)
-                obj.platform5.move(dir)
+                obj.platform5.move(dir, 2)
 
         elif is_near('lever5'):
             dir = 'k' if obj.platform4.loc.y>5 else 'j'
-            obj.platform4.move(dir)
-            obj.platform4.move(dir)
+            obj.platform4.move(dir, 2)
             obj.lever4.state=1
 
         elif is_near('statue'):
@@ -1888,27 +1882,7 @@ class Being(BeingItemMixin):
                 obj.sailboat.state = 1
 
         elif is_near('car'):
-            # if maurice and maurice.state == 1:
-            if 1:     # TODO use the commented line above
-                if B._map == 'top3':
-                    choices = ['Water Tower', 'Port Beluga']
-                elif B._map == 'wtower':
-                    choices = ['Old town', 'Port Beluga']
-                elif B._map == 'beluga':
-                    choices = ['Old town', 'Water Tower']
-            else:
-                if B._map == 'top3': choices = ['Water Tower']
-                elif B._map == 'wtower': choices = ['Old town']
-            ch = self.talk(ID.car, ['Where would you like to go?', choices])
-            if ch:
-                ch = choices[ch-1]
-                desc_to_map = {'Water Tower': 'wtower', 'Port Beluga': 'beluga', 'Old town': 'top3'}
-                ch = desc_to_map[ch]
-                if self.has(ID.fuel):
-                    triggered_events.append((TravelByCarEvent, dict(dest=ch)))
-                    self.remove1(ID.fuel)
-                else:
-                    status("It looks like you don't have any petrol!")
+            self.use_car()
 
         elif is_near('agen'):
             if obj.agen.state == 0:
@@ -1927,16 +1901,7 @@ class Being(BeingItemMixin):
                 B.guards.append(c)
 
         elif is_near('julien'):
-            have_bb = self.has('book_of_bu')
-            c = ID.julien if not have_bb else ID.julien2
-            self.talk(obj.julien, conversations[c])
-            if have_bb:
-                obj.aubigny.state = 1
-            y = self.talk(obj.julien, 'You may be able to find out more on Principal Island. I wanted to use this ferry ticket myself but I can guess I can sell it to you for some 10 kashes and buy some candy..', yesno=1)
-            if y:
-                if self.kashes>=10:
-                    self.add1(ID.ferry_ticket)
-                    self.kashes -= 10
+            self.talk_to_julien()
 
         elif is_near('ferry') and self.has(ID.ferry_ticket):
             dest = 8 if B._map==7 else 7
@@ -1947,6 +1912,75 @@ class Being(BeingItemMixin):
             x = B[loc] # TODO won't work if something is in the platform tile
             if x and getattr(x,'id',None)==ID.platform_top1:
                 PlatformEvent2(B).go()
+
+    def talk_to_julien(self):
+        obj = obj_by_attr
+        have_bb = self.has('book_of_bu')
+        self.talk(obj.julien, (ID.julien if not have_bb else ID.julien2))
+        if have_bb:
+            obj.aubigny.state = 1
+        y = self.talk(obj.julien, ID.julien3, yesno=1)
+        if y:
+            if self.kashes>=10:
+                self.add1(ID.ferry_ticket)
+                self.kashes -= 10
+
+    def use_car(self):
+        # if 1:     # for testing
+        obj = obj_by_attr
+        B=self.B
+        if obj.maurice and obj.maurice.state == 1:
+            if B._map == 'top3':
+                choices = ['Water Tower', 'Port Beluga']
+            elif B._map == 'wtower':
+                choices = ['Old town', 'Port Beluga']
+            elif B._map == 'beluga':
+                choices = ['Old town', 'Water Tower']
+        else:
+            if B._map == 'top3': choices = ['Water Tower']
+            elif B._map == 'wtower': choices = ['Old town']
+        ch = self.talk(ID.car, ['Where would you like to go?', choices])
+        if ch:
+            ch = choices[ch-1]
+            desc_to_map = {'Water Tower': 'wtower', 'Port Beluga': 'beluga', 'Old town': 'top3'}
+            ch = desc_to_map[ch]
+            if self.has(ID.fuel):
+                triggered_events.append((TravelByCarEvent, dict(dest=ch)))
+                self.remove1(ID.fuel)
+            else:
+                status("It looks like you don't have any petrol!")
+
+    def talk_to_olivet(self):
+        obj = obj_by_attr
+        self.talk(obj.olivet, ID.olivet2 if self.has(ID.book_of_bu) else ID.olivet)
+        if self.has(ID.magic_flute):
+            y = self.talk(obj.olivet, ID.olivet3, yesno=1)
+            if y:
+                self.inv[obj.magic_flute] = 0
+                self.inv[Item(None, 'g', 'guitar', id=ID.guitar)] = 1
+        elif self.has(ID.guitar):
+            y = self.talk(obj.olivet, "Would you like to return the guitar and get your flute back?", yesno=1)
+            if y:
+                self.inv[obj.magic_flute] = 1
+                self.inv[obj.guitar] = 0
+
+    def use_sailboat(self):
+        dests = [('White Leaf Desert', 'desert1'), ('Port Beluga', 'beluga')]
+        if obj_by_attr.sailboat.state==1:
+            dests.append(('Proxima Island', 'proxima1'))
+            dests.append(('Himalayi Mountains', 'himalaya1'))
+        dests = [(n,m) for n,m in dests if m!=self.B._map]
+        lnames = [n for n,m in dests]
+        y = self.talk(self, f'Would you like to use the sailboat for 10 kashes?', yesno=1)
+        if y:
+            if self.kashes>=10:
+                self.kashes-=10
+                ch = self.talk(self, [f'Where would you like to go?', lnames])
+                if ch:
+                    dest = dests[ch-1]
+                    triggered_events.append((TravelBySailboat, dict(dest=dest[1], dests=dests)))
+            else:
+                status("Looks like you don't have enough kashes!")
 
     def use(self):
         B=self.B
@@ -1968,11 +2002,11 @@ class Being(BeingItemMixin):
             locs.append(self.loc.mod_r())
         def is_near(id):
             return getattr(ID, id) in B.get_ids(locs)
-        seal2 = objects.get(ID.seal_sendell2)
         obj = obj_by_attr
+        seal2 = obj.seal_sendell2
 
         if item.id == ID.magic_flute and is_near('clear_water_lake'):
-            status('The ice that covered the lake starts to crackle... before long, it breaks apart and you see the impossibly clean and deep waters of the Clear Water Lake! Grateful, you fill the empty bottle with clear water.')
+            self.talk(self, ID.lake_ice_breaking)
             for loc in B.line(B.specials[1], B.specials[2]):
                 if B[loc] == rock:
                     B.remove(rock, loc)
@@ -1984,7 +2018,6 @@ class Being(BeingItemMixin):
             self.B.remove(obj.stone2)
 
         elif item.id == ID.gawley_horn and is_near('seal_sendell'):
-            # seal = obj_by_attr.seal_sendell
             triggered_events.append(GoToElfMapEvent)
 
         elif item.id == ID.gawley_horn and is_near('seal_sendell2') and seal2.state==0:
@@ -1995,6 +2028,7 @@ class Being(BeingItemMixin):
             pp = obj.proto_pack
             pp.state = not pp.state
             status('Proto-pack is ' + ('on' if pp.state else 'off'))
+
         elif is_near('water_supply') and item.id == ID.jar_syrup:
             status('You add raspberry syrup to the water supply')
             self.inv[item] -=1
@@ -2022,9 +2056,9 @@ class Quest:
 
 class MaxQuest(Quest):
     def go(self, player):
-        max_ = objects[ID.max_]
+        max_ = obj_by_attr.max_
         if max_.state==1:
-            player.talk(max_, conversations[ID.max1])
+            player.talk(max_, ID.max1)
             max_.state=2
         elif max_.state==2 and player.has(ID.wine):
             y = player.talk(max_, 'Give wine to Max?', yesno=1)
@@ -2032,7 +2066,7 @@ class MaxQuest(Quest):
                 player.remove1(ID.wine)
                 max_.state = 3
         elif max_.state==3:
-            player.talk(max_, conversations[ID.max2])
+            player.talk(max_, ID.max2)
             max_.state=4
 
 def first(x):
@@ -2083,11 +2117,10 @@ class Event:
 class JailEvent(Event):
     once = False
     def go(self):
-        player = objects[ID.player]
-        if player.state==1:
+        if self.player.state==1:
             B=self.B
-            player.tele(B.spawn_locations[8])
-            c=Clone(B, B.spawn_locations[4])
+            self.player.tele(B.spawn_locations[8])
+            c = Clone(B, B.spawn_locations[4])
             B.soldiers.append(c)
             Guard(B, B.spawn_locations[6], id=ID.guard2)
             status('Suddenly a Groboclone appears and leads you away...')
@@ -2136,35 +2169,6 @@ class GoToElfMapEvent(Event):
         b = objects[ID.elf_lab_level]
         return self.player.move_to_board(None, b.specials[1], B=b)
 
-class TravelByCarEvent(Event):
-    once = False
-    def go(self):
-        dest = self.kwargs.get('dest')
-        B = self.B
-        car = objects[ID.car]
-        B.remove(self.player)
-        self.animate(car, 'h')
-
-        # switch to landscape map
-        B = objects[ID.landscape_level1]
-        self.B = B
-        B.put(car, Loc(77,GROUND))
-        self.animate(car, 'h')
-
-        if dest == 'wtower':
-            status('You have driven the car to the Water tower')
-            B = self.player.move_to_board(None, Loc(7, GROUND), B=objects[ID.water_tower_level])
-            B.put(car, Loc(6,GROUND))
-        elif dest == 'top3':
-            status('You have driven the car to Old Town')
-            B = self.player.move_to_board(map_to_loc['top3'][0], Loc(7, GROUND))
-            B.put(car, Loc(6,GROUND))
-        elif dest == 'beluga':
-            status('You have driven the car to Port Beluga')
-            B = self.player.move_to_board(None, Loc(7, GROUND), B=objects[ID.port_beluga_level])
-            B.put(car, Loc(6,GROUND))
-        return B
-
 class DrFunfrockTrapEvent(Event):
     once=1
     def go(self):
@@ -2202,11 +2206,10 @@ class FollowTartasEvent(Event):
 class ClermontTriesWater(Event):
     once=1
     def go(self):
-        clermont = objects[ID.clermont_ferrand]
+        clermont = obj_by_attr.clermont_ferrand
         clermont.move('h')
-        status('Clermont tries a bit of water from the from the fountain')
-        status('Clermont tries a bit more of the water')
-        self.player.talk(clermont, conversations[ID.clermont_ferrand3])
+        self.player.talk(self.player, ['Clermont tries a bit of water from the from the fountain', 'Clermont tries a bit more of the water'])
+        self.player.talk(clermont, ID.clermont_ferrand3)
         clermont.tele(Loc(61,4))
         self.player.tele(Loc(59,5))
         self.B.remove(self.B.doors[0])
@@ -2216,7 +2219,7 @@ class MovePlatform3Event(Event):
     once=False
     def go(self):
         B = self.B
-        p = objects[ID.platform3]
+        p = obj_by_attr.platform3
         a,b = B.specials[4], B.specials[5]
         i = B[p.loc.mod_u()]
         if i==p or i is blank: i=None
@@ -2246,6 +2249,35 @@ class TravelByFerry(Event):
             return player.move_to_board( map_to_loc['8'][0], Loc(7, GROUND) )
         elif dest == 7:
             return player.move_to_board( map_to_loc['7'][0], Loc(7, GROUND) )
+
+class TravelByCarEvent(Event):
+    once = False
+    def go(self):
+        dest = self.kwargs.get('dest')
+        B = self.B
+        car = objects[ID.car]
+        B.remove(self.player)
+        self.animate(car, 'h')
+
+        # switch to landscape map
+        B = objects[ID.landscape_level1]
+        self.B = B
+        B.put(car, Loc(77,GROUND))
+        self.animate(car, 'h')
+
+        if dest == 'wtower':
+            status('You have driven the car to the Water tower')
+            B = self.player.move_to_board(None, Loc(7, GROUND), B=objects[ID.water_tower_level])
+            B.put(car, Loc(6,GROUND))
+        elif dest == 'top3':
+            status('You have driven the car to Old Town')
+            B = self.player.move_to_board(map_to_loc['top3'][0], Loc(7, GROUND))
+            B.put(car, Loc(6,GROUND))
+        elif dest == 'beluga':
+            status('You have driven the car to Port Beluga')
+            B = self.player.move_to_board(None, Loc(7, GROUND), B=objects[ID.port_beluga_level])
+            B.put(car, Loc(6,GROUND))
+        return B
 
 class TravelBySailboat(Event):
     once = False
@@ -2333,6 +2365,21 @@ class PlatformEvent1(Event):
         B = self.B
         self.animate_arc(obj_by_attr.platform1, B.specials[1], carry_item=self.player, height=3)
 
+class PlatformEvent2(Event):
+    once=True
+    def go(self):
+        B = self.B
+        p = objects[ID.platform_top1]
+        pl = objects[ID.player]
+        dir = 'j' if pl.loc.y == GROUND-4 else 'k'
+        for _ in range(45):
+            p.move(dir)
+            pl.move(dir, fly=1)
+            if pl.loc.y in (GROUND, GROUND-4):
+                break
+            B.draw(Windows.win)
+            sleep(0.2)
+
 class ClimbThroughGrillEvent1(Event):
     once = False
     def go(self):
@@ -2406,21 +2453,6 @@ class GarbageTruckEvent(Event):
             B.draw(Windows.win)
             sleep(SLP)
         return pl.move_to_board(Loc(3, B.loc.y), Loc(0,GROUND))
-
-class PlatformEvent2(Event):
-    once=True
-    def go(self):
-        B = self.B
-        p = objects[ID.platform_top1]
-        pl = objects[ID.player]
-        dir = 'j' if pl.loc.y == GROUND-4 else 'k'
-        for _ in range(45):
-            p.move(dir)
-            pl.move(dir, fly=1)
-            if pl.loc.y in (GROUND, GROUND-4):
-                break
-            B.draw(Windows.win)
-            sleep(0.2)
 
 class ShopKeeperEvent1(Event):
     once=True
