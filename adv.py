@@ -1084,7 +1084,7 @@ class Mixin1:
             triggered_events.append(PlatformEvent1)
 
     def has(self, id):
-        return self.inv[objects.get(id)]
+        return self.inv.get(objects.get(id))
 
     def remove1(self, id):
         self.inv[objects[id]] -= 1
@@ -2010,7 +2010,7 @@ class Event:
         for _ in range(n):
             item.move(dir)
             if carry_item:
-                carry_item.move(dir)
+                carry_item.move(dir, fly=1)
             B.draw(Windows.win)
             sleep(SLP*4)
             if item.loc.x in (0, 78):
@@ -2235,85 +2235,18 @@ class TravelByDynofly(Event):
 
 
 class GuardAttackEvent1(Event):
-    once=True
+    once=False
     def go(self):
-        guard = objects[ID.guard1]
-        if self.done: return
+        guard = obj_by_attr.guard1
         guard.hostile = 1
         B = self.B
-        mode = 1
-        x, y = guard.loc
-        platform = objects[ID.platform1]
-
-        for _ in range(55):
-            if mode==1:
-                if y>=HEIGHT-10:
-                    platform.move('k')
-                    guard.move('k', fly=1)
-                    y = guard.loc.y
-                else:
-                    mode = 2
-            elif mode==2:
-                if x>=3:
-                    platform.move('h')
-                    guard.move('h', fly=1)
-                    x = guard.loc.x
-                else:
-                    mode = 3
-            elif mode==3:
-                if y<GROUND:
-                    platform.move('j')
-                    guard.move('j', fly=1)
-                    y = guard.loc.y
-                else:
-                    mode = 4
-            elif mode==4:
-                break
-            B.draw(Windows.win)
-            sleep(SLP)
-        self.done = True
+        self.animate_arc(obj_by_attr.platform1, B.specials[3].mod_r(), carry_item=guard, height=3)
 
 class PlatformEvent1(Event):
-    once=True
+    once=False
     def go(self):
-        debug('PlatformEvent1 start')
-        if self.done: return
-        player = objects[ID.player]
         B = self.B
-        mode = 1
-        x, y = player.loc
-        platform = objects[ID.platform1]
-
-        debug('y', y)
-        for _ in range(35):
-            debug('y', y, 'mode', mode, 'height-10', HEIGHT-10)
-            if mode==1:
-                if y>=(HEIGHT-10):
-                    platform.move('k')
-                    player.move('k', fly=1)
-                    y = player.loc.y
-                else:
-                    mode = 2
-
-            elif mode==2:
-                if x<15:
-                    platform.move('l')
-                    player.move('l', fly=1)
-                    x = player.loc.x
-                else:
-                    mode = 3
-            elif mode==3:
-                if y<GROUND:
-                    platform.move('j')
-                    player.move('j', fly=1)
-                    y = player.loc.y
-                else:
-                    mode = 4
-
-            elif mode==4:
-                break
-            B.draw(Windows.win)
-            sleep(SLP)
+        self.animate_arc(obj_by_attr.platform1, B.specials[3].mod_r(), carry_item=B.guards[0])
         self.done = True
 
 class ClimbThroughGrillEvent1(Event):
