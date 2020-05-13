@@ -14,6 +14,7 @@ races: Spheros, Rabbibunnies, Quetches, Grobos
 """
 from curses import wrapper, newwin
 import curses
+import os
 import sys
 from copy import copy, deepcopy
 from time import sleep
@@ -131,6 +132,8 @@ class Blocks:
     saber = ')'
     pod = '≃'
     computer = '💻'
+    zoe = '👩'
+    funfrock = 'F'
 
     crates = (crate1, crate2, crate3, crate4)
 
@@ -245,6 +248,7 @@ class ID:
     tele_pod = 80
     computer = 81
     stone2 = 82
+    stone3 = 83
 
     guard1 = 100
     technician1 = 101
@@ -299,6 +303,9 @@ class ID:
     soldier3 = 150
     soldier4 = 151
     soldier5 = 152
+    zoe = 153
+    funfrock = 154
+    funfrock2 = 155
 
     max1 = 200
     max2 = 201
@@ -342,7 +349,7 @@ conversations = {
                   ["I'm Twinsen, I'm escaping!", "Fixing the antenna.", "Santa Claus."]],
     ID.guard2: ['Hey! I think the stone is loose in my cell! I might escape..', "Hmm, that's odd, I remember checking the camera earlier.. I guess there's no harm in checking again!"],
     ID.chamonix: ['Have you seen a young girl being led by two Groboclones?', "I haven't seen them.. ", "Here's something strange: I found a page torn out of a book which said, 'pull the middle lever once first then pull the right lever once.' Must be some kind of puzzle.", "I'm really enjoying a book about all kinds of wonders, one of them being a Clear Water Lake in the Himalayi mountains!"],
-    ID.agen: ["Did you know Dr. Funfrock installed his busts to protect and defend us? The ones that don't have pedestals are covering ancient undestructible seals that could put the entire system of governance in danger!"],
+    ID.agen: ["Did you know Dr. FunFrock installed his busts to protect and defend us? The ones that don't have pedestals are covering ancient undestructible seals that could put the entire system of governance in danger!"],
     ID.brenne: ["I've heard you fought some soldiers and clones, I guess I can trust you.. You should see my brother on the Proxima Island, I know that he made a fake red card. Just tell him the word 'Amos'. He lives in a red house, it's hard to miss."],
 
     ID.trier: ["Hi, are you the Brenne's brother?", "Yes", "I have a message for you, it's 'AMOS'.", "You don't have to shout, but that sounds right.", "Is there anything you would like from me?", "Yes, Brenne mentioned the Red Card.", "Ah, so you are curious about all the secret places and nice things hidden therein? Well some things may be not so nice, but I'm sure you'll take it in stride, and get out getting out's what's doc ordered! Here I am, blabbering like an old senile NPC while I'm sure you have quests to finish, to prove your mettle. Here you have it, the red card, good as new! Except it shouldn't look new, that would be suspicious, so I've aged it a bit."],
@@ -374,7 +381,7 @@ conversations = {
                    'Very well, I will open the door for you.'],
 
     ID.astronomer: ['Have you..', "I know that you are looking for your friend, but I haven't seen her. It's very odd that she was taken from Citadel island",
-                    'I feel that Dr. Funfrock is afraid of something related to the Legend. If you find out what it is, you may be able to help your friend.', 'Go to port Beluga, and talk to my dear friend Maurice, he will help you get off the island.'
+                    'I feel that Dr. FunFrock is afraid of something related to the Legend. If you find out what it is, you may be able to help your friend.', 'Go to port Beluga, and talk to my dear friend Maurice, he will help you get off the island.'
                    ],
 
     ID.legend1: ['The secret of the Prophecy, which is now often called simply The Legend, can be found somewhere in the White Leaf Desert.'],
@@ -419,6 +426,10 @@ conversations = {
     ID.painter: ["This strange sign shows up on the wall over and over again! I paint it clean and the next day.. it's there!!"],
 
     ID.tartas: ["I can help but first you need to disable the teleportation pods and computers at the Teleportation Center!"],
+
+    ID.funfrock: ["You see Dr. FunFrock appear.", "He looks at you menacingly", "All of the nonsense with breaking of seals and attacking my soldiers and the prophecy is now over! Jailbirds belong in jail, and you are going back home!!!"],
+
+    ID.funfrock2: ["You see Dr. FunFrock dying, surprised that he lost so utterly.", "He looks at you menacingly one last time.", "You return home with your wife Zoe.", "Without commanding influence of Dr. FunFrock, the clones put up little to no resistence.", "You feel that Sendell is content, and all of the citizens of Twinsun are happy!!"],
 }
 
 def mkcell():
@@ -501,7 +512,13 @@ class Board:
         self.guards = [g]
         Item(self, Blocks.grill, 'grill', specials[2], id=ID.grill1)
         p = Player(self, specials[3], id=ID.player)
+        Item(self, rock, '', specials[4], id=ID.stone3, type=Type.blocking)
         return p
+
+    def board_und2(self):
+        specials = self.load_map(self._map)[3]
+        Being(self, specials[1], name='Dr. FunFrock', char=Blocks.funfrock, id=ID.funfrock, health=25)
+        Being(self, specials[2], id=ID.zoe, name='Zoe', char=Blocks.zoe)
 
     def board_2(self):
         """Technician, alarm."""
@@ -730,9 +747,10 @@ class Board:
     def board_f_island2(self):
         containers, crates, doors, specials = self.load_map(self._map)
         s = Soldier(self, specials[1], id=ID.soldier4)
-        self.guards.append(s)
-        s = Soldier(self, specials[2], id=ID.soldier5)
-        self.guards.append(s)
+        s2 = Soldier(self, specials[2], id=ID.soldier5)
+        self.guards.extend((s,s2))
+        TriggerEventLocation(self, specials[3], evt=DrFunfrockTrapEvent)
+        Being(self, specials[5], id=ID.zoe, name='Zoe', char=Blocks.zoe)
 
     def board_brundle(self):
         containers, crates, doors, specials = self.load_map(self._map)
@@ -813,7 +831,7 @@ class Board:
     def load_map(self, map_num, for_editor=0):
         _map = open(f'maps/{map_num}.map').readlines()
         crates = []
-        containers = []
+        self.containers = containers = []
         self.doors = doors = []
         self.specials = specials = defaultdict(list)
         BL=Blocks
@@ -1098,11 +1116,6 @@ class Item(Mixin1):
         self.loc = new
         self.B.put(self)
 
-# class UnlocatedItem(Item):
-#     """Item that is never placed on the ground, so doesn't require board/loc args."""
-#     def __init__(self, *args, **kwargs):
-#         super().__init__(None, *args, loc=None)
-
 class TriggerEventLocation(Item):
     """Location that triggers an event."""
     def __init__(self, B, loc, evt, id=None):
@@ -1152,10 +1165,6 @@ class Being(Mixin1):
             self.add1(ID.key1, n=2)
             self.inv[objects[ID.fuel]] = 10
             self.inv[objects[ID.ferry_ticket]] = 10
-        # j=Item(None, Blocks.bottle, 'jar of syrup', id=ID.jar_syrup)
-        # self.inv[j] = 1
-        # hd=Item(None, 'H', 'hair dryer', id=ID.hair_dryer)
-        # self.inv[hd] = 1
         self.kashes = 54
         if id:
             objects[id] = self
@@ -1467,6 +1476,8 @@ class Being(Mixin1):
                 if B._map=='f_island2':
                     if obj_by_attr.soldier4.dead and obj_by_attr.soldier5.dead:
                         triggered_events.append(TartasDigsEvent)
+                if obj.id==ID.funfrock:
+                    self.talk(self, conversations[ID.funfrock2])
 
     def switch_places(self):
         B = self.B
@@ -2093,6 +2104,25 @@ class TravelByCarEvent(Event):
             B.put(car, Loc(6,GROUND))
         return B
 
+class DrFunfrockTrapEvent(Event):
+    once=1
+    def go(self):
+        B=self.B
+        pl = self.player
+        pl.talk(pl, "As you are about to reach the iron bars and set Zoe free, a cage drops around you. ")
+        Item(B, Blocks.bars, 'bars', pl.loc.mod_l())
+        Item(B, Blocks.bars, 'bars', pl.loc.mod_r())
+        Windows.win.refresh()
+        pl.talk(pl, conversations[ID.funfrock])
+        bloc,B = map_to_loc['1']
+        B.containers[0].inv = pl.inv
+        pl.inv = {}
+        B.state = 1
+        B.remove(B[B.specials[4]])
+        B.guards[0].tele(B.specials[1])     # guard back to starting position
+        return pl.move_to_board(bloc, B.specials[3])
+
+
 class TartasDigsEvent(Event):
     once=1
     def go(self):
@@ -2562,6 +2592,9 @@ def main(stdscr):
 
     MAIN_Y = 3
     B = b1 = Board(Loc(0,MAIN_Y), 1)
+    und2 = Board(Loc(0,MAIN_Y+1), 'und2')
+    und2.board_und2()
+
     b2 = Board(Loc(1,MAIN_Y), 2)
     b3 = Board(Loc(2,MAIN_Y), 3)
     b4 = Board(Loc(3,MAIN_Y), 4)
@@ -2814,7 +2847,7 @@ def main(stdscr):
             except:
                 status('try again')
         elif k == '6':
-            B = player.move_to_board( map_to_loc['dynofly'][0], Loc(25, 5) )
+            B = player.move_to_board( map_to_loc['f_island2'][0], Loc(25, 12) )
         elif k == '7':
             B = player.move_to_board( Loc(6,MAIN_Y), Loc(72, GROUND) )
         elif k == '8':
@@ -2923,7 +2956,6 @@ def editor(stdscr, _map):
     brush = None
     written = 0
     B = Board(Loc(0,0), _map)
-    import os
     fname = f'maps/{_map}.map'
     if not os.path.exists(fname):
         with open(fname, 'w') as fp:
