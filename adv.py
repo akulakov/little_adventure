@@ -517,7 +517,8 @@ class Board:
 
     def board_und2(self):
         specials = self.load_map(self._map)[3]
-        Being(self, specials[1], name='Dr. FunFrock', char=Blocks.funfrock, id=ID.funfrock, health=25)
+        ff = Being(self, specials[1], name='Dr. FunFrock', char=Blocks.funfrock, id=ID.funfrock, health=25, hostile=1)
+        self.guards.append(ff)
         Being(self, specials[2], id=ID.zoe, name='Zoe', char=Blocks.zoe)
 
     def board_2(self):
@@ -1080,7 +1081,7 @@ class Mixin1:
     def put(self, loc):
         self.loc = loc
         self.B.put(self)
-        if self.is_player and ID.platform1 in self.B.get_ids(loc):
+        if self.is_player and ID.platform1 in self.B.get_ids(loc) and loc==self.B.specials[3].mod_r():
             triggered_events.append(PlatformEvent1)
 
     def has(self, id):
@@ -1302,7 +1303,8 @@ class Being(Mixin1):
                 new = None
                 if self.fight_stance:
                     Windows.win2.addstr(1, 0, 'BANG')
-                    triggered_events.append(GuardAttackEvent1)
+                    if GuardAttackEvent1 not in triggered_events:
+                        triggered_events.append(GuardAttackEvent1)
 
         if new:
             statue = objects.get(ID.statue)
@@ -1316,7 +1318,8 @@ class Being(Mixin1):
             if B.loc and B.loc.x==3 and new==Loc(23,8):   # TODO use trigger event location
                 triggered_events.append(ShopKeeperEvent1)
 
-            new = self.fall(new)
+            if not fly:
+                new = self.fall(new)
             if new[0] == LOAD_BOARD or new[0] is None:
                 return new
             pick_up = [ID.key1, ID.key2, ID.key3, ID.magic_ball, ID.pirate_flag, ID.gawley_horn, ID.sendell_medallion]
@@ -1478,6 +1481,7 @@ class Being(Mixin1):
                         triggered_events.append(TartasDigsEvent)
                 if obj.id==ID.funfrock:
                     self.talk(self, conversations[ID.funfrock2])
+                    triggered_events.append(EndGameEvent)
 
     def switch_places(self):
         B = self.B
@@ -1997,6 +2001,7 @@ class Event:
         self.kwargs = kwargs
 
     def animate_arc(self, item, to_loc, height=1, carry_item=None):
+        print ("in def animate_arc()")
         for _ in range(height):
             self.animate(item, 'k', n=height, carry_item=carry_item)
         a,b = item.loc, to_loc
@@ -2116,10 +2121,12 @@ class DrFunfrockTrapEvent(Event):
         pl.talk(pl, conversations[ID.funfrock])
         bloc,B = map_to_loc['1']
         B.containers[0].inv = pl.inv
-        pl.inv = {}
+        pl.inv = defaultdict(int)
         B.state = 1
         B.remove(B[B.specials[4]])
-        B.guards[0].tele(B.specials[1])     # guard back to starting position
+        guard = B.guards[0]
+        guard.hostile = 0
+        guard.tele(B.specials[1])     # guard back to starting position
         return pl.move_to_board(bloc, B.specials[3])
 
 
@@ -2234,20 +2241,25 @@ class TravelByDynofly(Event):
             return obj.player.move_to_board(b_loc, b.specials[9])
 
 
+class EndGameEvent(Event):
+    pass
+
 class GuardAttackEvent1(Event):
     once=False
     def go(self):
-        guard = obj_by_attr.guard1
-        guard.hostile = 1
         B = self.B
+        guard = obj_by_attr.guard1
+        if guard.loc != B.specials[1]:
+            return
+        guard.hostile = 1
         self.animate_arc(obj_by_attr.platform1, B.specials[3].mod_r(), carry_item=guard, height=3)
 
 class PlatformEvent1(Event):
     once=False
     def go(self):
+        print ("in PlatformEvent1 def go()")
         B = self.B
-        self.animate_arc(obj_by_attr.platform1, B.specials[3].mod_r(), carry_item=B.guards[0])
-        self.done = True
+        self.animate_arc(obj_by_attr.platform1, B.specials[1], carry_item=self.player, height=3)
 
 class ClimbThroughGrillEvent1(Event):
     once = False
@@ -2670,7 +2682,7 @@ def main(stdscr):
 
          [None,None,None,None, None,None,None,top3, top2,top1, None, None],
          [b1, b2,   b3, b4,    b5, b6,   b7, b8,    b9, b10, b11, b12],
-         [None,None,None,None, None,None,None,None, None,None, None, b13],
+         [und2,None,None,None, None,None,None,None, None,None, None, b13],
 
          [proxima1,proxima2,    museum,   proxima4, mstone,None,None,None, None,None, None, None],
          [proxima3,None,        prox_und, proxima5, estone,None,None,None, None,None, None, None],
@@ -2847,6 +2859,8 @@ def main(stdscr):
             player, B = Saves().load('start')
 
         for evt in triggered_events:
+            if evt==EndGameEvent:
+                return
             kwargs = {}
             if isinstance(evt, SEQ_TYPES):
                 evt, kwargs = evt
