@@ -132,7 +132,8 @@ class Blocks:
     saber = ')'
     pod = '≃'
     computer = '💻'
-    zoe = '👩'
+    # zoe = '👩'
+    zoe = 'Z'
     funfrock = 'F'
 
     crates = (crate1, crate2, crate3, crate4)
@@ -313,6 +314,8 @@ class ID:
     talk_to_brenne = 203
     water_supply = 204
     mstone2_exit = 205
+    zoe_taken = 206
+    zoe_taken2 = 207
 
     sea_level1 = 300
     landscape_level1 = 301
@@ -334,22 +337,31 @@ descr_by_id.update(
      14: 'a jar of syrup',
      10: 'a green heart',
      11: 'a simple key',
-     9 : 'kashes',
     }
 )
 
 conversations = {
     ID.robobunny1: ['I like to rummage through the rubbish pile.. this area is not closely watched! I hide in the garbage truck and come here when I can. You just have to be very DISCREET!'],
+
     ID.shopkeeper1: ['Twinsen!? I thought you were arrested?', 'They let me out early for good behaviour!', 'But.. nobody gets out of Citadel alive! I.. I.. have to call the guards.'],
+
     ID.max1: ['Have you seen a young girl being led by two clones?', 'I think I have seen her and I will tell you more if you buy me a drink.'],
+
     ID.max2: ["I've seen them near the port, it looked like they were getting away from the island, which is strange, because usually prisoners stay in the citadel", 'Thank you!'],
+
     ID.julien: ['Have you seen a young girl being led by two Groboclones?', 'Yes, they were here earlier today, they got on a speedboat and were off. Destination unknown.'],
+
     ID.julien2: ['Do you know anything about the notorious pirate DeForge?', 'I know he had a log where he wrote down every minutae of every day. Wish I had it, it would be sure to be a fascinating read! But it is lost to time. However, the shopkeeper on Principal island might know how to track it down.'],
+
     ID.soldier2: ['Wait! How did you get here, and who are you?',
                   ["I'm Twinsen, I'm escaping!", "Fixing the antenna.", "Santa Claus."]],
+
     ID.guard2: ['Hey! I think the stone is loose in my cell! I might escape..', "Hmm, that's odd, I remember checking the camera earlier.. I guess there's no harm in checking again!"],
+
     ID.chamonix: ['Have you seen a young girl being led by two Groboclones?', "I haven't seen them.. ", "Here's something strange: I found a page torn out of a book which said, 'pull the middle lever once first then pull the right lever once.' Must be some kind of puzzle.", "I'm really enjoying a book about all kinds of wonders, one of them being a Clear Water Lake in the Himalayi mountains!"],
+
     ID.agen: ["Did you know Dr. FunFrock installed his busts to protect and defend us? The ones that don't have pedestals are covering ancient undestructible seals that could put the entire system of governance in danger!"],
+
     ID.brenne: ["I've heard you fought some soldiers and clones, I guess I can trust you.. You should see my brother on the Proxima Island, I know that he made a fake red card. Just tell him the word 'Amos'. He lives in a red house, it's hard to miss."],
 
     ID.trier: ["Hi, are you the Brenne's brother?", "Yes", "I have a message for you, it's 'AMOS'.", "You don't have to shout, but that sounds right.", "Is there anything you would like from me?", "Yes, Brenne mentioned the Red Card.", "Ah, so you are curious about all the secret places and nice things hidden therein? Well some things may be not so nice, but I'm sure you'll take it in stride, and get out getting out's what's doc ordered! Here I am, blabbering like an old senile NPC while I'm sure you have quests to finish, to prove your mettle. Here you have it, the red card, good as new! Except it shouldn't look new, that would be suspicious, so I've aged it a bit."],
@@ -430,6 +442,10 @@ conversations = {
     ID.funfrock: ["You see Dr. FunFrock appear.", "He looks at you menacingly", "All of the nonsense with breaking of seals and attacking my soldiers and the prophecy is now over! Jailbirds belong in jail, and you are going back home!!!"],
 
     ID.funfrock2: ["You see Dr. FunFrock dying, surprised that he lost so utterly.", "He looks at you menacingly one last time.", "You return home with your wife Zoe.", "Without commanding influence of Dr. FunFrock, the clones put up little to no resistence.", "You feel that Sendell is content, and all of the citizens of Twinsun are happy!!"],
+
+    ID.zoe_taken: ["Suddenly you see your wife, Zoe, emerge from your home, accompanied by two GroboClones."],
+
+    ID.zoe_taken2: ["You try to follow them but a third GroboClone jumps as if from under ground, whacks you with a baton right over your head, and that's the last thing you remember."],
 }
 
 def mkcell():
@@ -561,6 +577,8 @@ class Board:
         crates[5].id = ID.crate1
         TriggerEventLocation(self, specials[1], evt=MaxState1)
         Item(self, Blocks.grill, 'grill', specials[2], id=ID.grill4)
+
+        TriggerEventLocation(self, specials[3], evt=GroboClonesTakingZoeEvent)
 
     def board_7(self):
         self.labels.append((10,5, "𝒯𝒽𝑒 𝐹𝑒𝓇𝓇𝓎"))
@@ -1002,6 +1020,9 @@ class Board:
     def get_types(self, loc):
         return types(self.get_all(loc))
 
+    def found_type_at(self, type, loc):
+        return any(x.type==type for x in self.get_all_obj(loc))
+
     def draw(self, win):
         for y, row in enumerate(self.B):
             for x, cell in enumerate(row):
@@ -1019,16 +1040,24 @@ class Board:
             Windows.win2.addstr(0,74, str(self._map))
 
     def put(self, obj, loc=None):
+        """
+        If loc is not given, try to use obj's own location attr.
+        If loc IS given, update obj's own location attr if possible.
+        """
         loc = loc or obj.loc
         if not isinstance(obj,str):
             obj.B = self
             obj.loc = loc
-        try: self.B[loc.y][loc.x].append(obj)
+        try:
+            self.B[loc.y][loc.x].append(obj)
         except Exception as e:
             sys.stdout.write(str(loc))
             raise
 
     def remove(self, obj, loc=None):
+        """
+        If loc is not given, use obj's own location attr.
+        """
         loc = loc or obj.loc
         self.B[loc.y][loc.x].remove(obj)
 
@@ -1071,8 +1100,9 @@ def types(lst):
     return [x.type for x in lst if not isinstance(x, str)]
 
 
-class Mixin1:
+class BeingItemMixin:
     is_player = 0
+    state = 0
 
     def tele(self, loc):
         self.B.remove(self)
@@ -1094,8 +1124,7 @@ class Mixin1:
         self.inv[objects[id]] += n
 
 
-class Item(Mixin1):
-    state = 0
+class Item(BeingItemMixin):
     def __init__(self, B, char, name, loc=None, put=True, id=None, type=None):
         self.B, self.char, self.name, self.loc, self.id, self.type = B, char, name, loc, id, type
         self.inv = defaultdict(int)
@@ -1146,7 +1175,8 @@ class MagicBall(Item):
     def __init__(self, B, loc):
         super().__init__(B, Blocks.magic_ball, 'magic_ball', loc, id=ID.magic_ball)
 
-class Being(Mixin1):
+
+class Being(BeingItemMixin):
     stance = Stance.normal
     health = None
     is_being = 1
@@ -1199,6 +1229,8 @@ class Being(Mixin1):
         return self.stance==Stance.sneaky
 
     def talk(self, being, dialog=None, yesno=False, resp=False):
+        if isinstance(dialog, int):
+            dialog = conversations.get(dialog)
         being = objects.get(being) or being
         loc = being.loc
         if isinstance(dialog, str):
@@ -1206,6 +1238,7 @@ class Being(Mixin1):
         dialog = dialog or conversations[being.id]
         x = min(loc.x, 60)
         multichoice = 0
+
         for m, txt in enumerate(dialog):
             lst = []
             if isinstance(txt, (list,tuple)):
@@ -1223,11 +1256,13 @@ class Being(Mixin1):
             y = max(0, loc.y+offset_y)
             win = newwin(lines+2, w+2, y, x)
             win.addstr(1,1, txt + (' [Y/N]' if yesno else ''))
+
             if yesno:
                 # TODO in some one-time dialogs, may need to detect 'no' explicitly
                 k = win.getkey()
                 del win
                 return k in 'Yy'
+
             elif multichoice:
                 for _ in range(2):
                     k = win.getkey()
@@ -1282,19 +1317,19 @@ class Being(Mixin1):
             return True, True
 
         # TODO This is a little messy, doors are by type and keys are by ID
-        if new and Type.door1 in B.get_types(new) and self.has(ID.key1):
+        if new and B.found_type_at(Type.door1, new) and self.has(ID.key1):
             d = B[new]
             if d.id == ID.door1:
                 triggered_events.append(AlarmEvent1)
             B.remove(B[new])    # TODO will not work if something is on top of door
             self.remove1(ID.key1)
-            Windows.win2.addstr(2,0, 'You open the door with your key')
+            status('You open the door with your key')
             return None, None
 
-        if new and Type.door3 in B.get_types(new) and self.has(ID.key3):
+        if new and B.found_type_at(Type.door3, new) and self.has(ID.key3):
             B.remove(B[new])    # TODO will not work if something is on top of door
             self.remove1(ID.key3)
-            Windows.win2.addstr(2,0, 'You open the door with your key')
+            status('You open the door with your key')
             return None, None
 
         if new and B.is_blocked(new):
@@ -1302,7 +1337,7 @@ class Being(Mixin1):
             if B.is_blocked(new):
                 new = None
                 if self.fight_stance:
-                    Windows.win2.addstr(1, 0, 'BANG')
+                    status('BANG')
                     if GuardAttackEvent1 not in triggered_events:
                         triggered_events.append(GuardAttackEvent1)
 
@@ -1310,7 +1345,7 @@ class Being(Mixin1):
             statue = objects.get(ID.statue)
             if ID.grill5 in B.get_ids(new):
                 new = new.mod(0,-3)
-                Windows.win2.addstr(1, 0, 'You climb through the window covered by a grill and escape to a small nook under the stairs')
+                status('You climb through the window covered by a grill and escape to a small nook under the stairs')
             if ID.grill6 in B.get_ids(new):
                 SoldierEvent2(B).go()
                 return None, None
@@ -1322,40 +1357,17 @@ class Being(Mixin1):
                 new = self.fall(new)
             if new[0] == LOAD_BOARD or new[0] is None:
                 return new
-            pick_up = [ID.key1, ID.key2, ID.key3, ID.magic_ball, ID.pirate_flag, ID.gawley_horn, ID.sendell_medallion]
             B.remove(self)
             self.loc = new
 
             if self.is_player:
-                top_obj = B.get_top_obj(new)
-                items = B.get_all_obj(new)
-                if top_obj and top_obj.type == Type.event_trigger:
-                    triggered_events.append(top_obj.evt)
-                for x in reversed(items):
-                    if x.id == ID.coin:
-                        self.kashes += 1
-                    elif x.id == ID.grn_heart:
-                        self.health = min(15, self.health+1)
-                        B.remove(x)
-                    elif x.id in pick_up:
-                        if x.id==ID.sendell_medallion:
-                            status('You have found the Sendell Medallion')
-                        if x.id==ID.gawley_horn:
-                            status("You have found Gawley's Horn")
-                        self.inv[x] += 1
-                        B.remove(x)
-                names = [i.name for i in B.get_all_obj(new) if i.name]
-                plural = len(names)>1
-                names = ', '.join(names)
-                if names:
-                    a = ':' if plural else ' a'
-                    Windows.win2.addstr(2,0, f'You see{a} {names}')
+                self.handle_player_move(new)
 
             # this needs to be after previous block because the block looks at `top_obj` which would always be the being
             # instead of an event trigger item
             self.put(new)
 
-            if chk_oob(new.mod_d()) and Type.pressure_sensor in B.get_types(new.mod_d()):
+            if chk_oob(new.mod_d()) and B.found_type_at(Type.pressure_sensor, new.mod_d()):
                 if B.state==1:
                     if self.has(ID.proto_pack) and objects[ID.proto_pack].state:
                         status('You float above a panel that looks slightly different and emits a low humming noise.')
@@ -1370,30 +1382,7 @@ class Being(Mixin1):
                 if statue.loc == B.specials[6]:
                     triggered_events.append(StatueInPlace)
 
-            grills = set((ID.grill1, ID.grill2))
-            if self.sneaky_stance:
-                if (grills & set(B.get_ids(self.loc))):
-                    triggered_events.append(ClimbThroughGrillEvent1)
-                if ID.grill3 in B.get_ids(self.loc):
-                    ClimbThroughGrillEvent2.new = new
-                    triggered_events.append(ClimbThroughGrillEvent2)
-                if ID.grill4 in B.get_ids(self.loc):
-                    ClimbThroughGrillEvent3.new = new
-                    triggered_events.append(ClimbThroughGrillEvent3)
-
-            if self.fight_stance and Type.pod in B.get_types(new):
-                p = B.get_top_obj(new)
-                if p.state==0:
-                    p.state = 1
-                    p.name = 'Broken teleportation pod'
-                    status("You break the teleportation pod.")
-
-            if self.fight_stance and ID.computer in B.get_ids(new):
-                c = B.get_top_obj(new)
-                if c.state==0:
-                    c.state = 1
-                    c.name = 'Broken computer'
-                    status("You break the computer.")
+            self.handle_special_stance_move(new)
 
             if B._map == 'brundle':
                 # if all equipment is broken, Tartas will help Twinsen
@@ -1409,11 +1398,66 @@ class Being(Mixin1):
             return True, True
         return None, None
 
-    def fall(self, new):
-        fly=False
+    def handle_special_stance_move(self, new):
         B=self.B
-        objs = [o.type for o in B.get_all_obj(new)]
-        if not fly and not Type.ladder in objs:
+        grills = set((ID.grill1, ID.grill2))
+        if self.sneaky_stance:
+            if (grills & set(B.get_ids(self.loc))):
+                triggered_events.append(ClimbThroughGrillEvent1)
+            if ID.grill3 in B.get_ids(self.loc):
+                ClimbThroughGrillEvent2.new = new
+                triggered_events.append(ClimbThroughGrillEvent2)
+            if ID.grill4 in B.get_ids(self.loc):
+                ClimbThroughGrillEvent3.new = new
+                triggered_events.append(ClimbThroughGrillEvent3)
+
+        if self.fight_stance and B.found_type_at(Type.pod, new):
+            p = B.get_top_obj(new)
+            if p.state==0:
+                p.state = 1
+                p.name = 'Broken teleportation pod'
+                status("You break the teleportation pod.")
+
+        if self.fight_stance and ID.computer in B.get_ids(new):
+            c = B.get_top_obj(new)
+            if c.state==0:
+                c.state = 1
+                c.name = 'Broken computer'
+                status("You break the computer.")
+
+    def handle_player_move(self, new):
+        B=self.B
+        pick_up = [ID.key1, ID.key2, ID.key3, ID.magic_ball, ID.pirate_flag, ID.gawley_horn, ID.sendell_medallion]
+        top_obj = B.get_top_obj(new)
+        items = B.get_all_obj(new)
+        if top_obj and top_obj.type == Type.event_trigger:
+            triggered_events.append(top_obj.evt)
+
+        for x in reversed(items):
+            if x.id == ID.coin:
+                self.kashes += 1
+            elif x.id == ID.grn_heart:
+                self.health = min(15, self.health+1)
+                B.remove(x)
+            elif x.id in pick_up:
+                if x.id==ID.sendell_medallion:
+                    status('You have found the Sendell Medallion')
+                if x.id==ID.gawley_horn:
+                    status("You have found Gawley's Horn")
+                self.inv[x] += 1
+                B.remove(x)
+
+        names = [i.name for i in B.get_all_obj(new) if i.name]
+        plural = len(names)>1
+        names = ', '.join(names)
+        if names:
+            a = ':' if plural else ' a'
+            status(f'You see{a} {names}')
+
+    def fall(self, new):
+        fly = False
+        B=self.B
+        if not fly and not B.found_type_at(Type.ladder, new):
             new2 = new
             while 1:
                 # TODO: these may overdraw non-blocking items; it's an ugly hack but creates a nice fall animation
@@ -1434,12 +1478,12 @@ class Being(Mixin1):
                     status('You fall into the water and drown...')
                     return None, None
 
-                if getattr(B[new2], 'type', None) == Type.deadly:
+                if B.found_type_at(Type.deadly, new2):
                     triggered_events.append(DieEvent)
                     status('You fall down onto sharp rocks and die of sustained wounds...')
                     return None, None
 
-                if chk_oob(new2) and B.avail(new2) and not Type.ladder in B.get_types(new2):
+                if chk_oob(new2) and B.avail(new2) and not B.found_type_at(Type.ladder, new2):
                     # ugly hack for the fall animation
                     Windows.win.addstr(new2.y, new2.x, str(self))
                     sleep(0.05)
@@ -1454,6 +1498,7 @@ class Being(Mixin1):
            abs(self.loc.y - obj.loc.y) <= 1:
                 self.hit(obj)
         else:
+            # TODO handle vertical, ladders etc; real pathfinding
             if self.loc.x < obj.loc.x:
                 self.move('l')
             else:
@@ -1463,19 +1508,24 @@ class Being(Mixin1):
         B=self.B
         if obj.health:
             obj.health -= 1
-            Windows.win2.addstr(1, 0, f'{self} hits {obj} for 1pt')
+            status(f'{self} hits {obj} for 1pt')
             if obj.is_being and not obj.is_player:
                 obj.hostile = 1
+
+            # KILL
             if obj.health <=0:
                 B.remove(obj)
                 if random()>0.6:
                     Item(B, Blocks.coin, 'one kash', obj.loc, id=ID.coin)
                 elif random()>0.6:
                     Item(B, Blocks.grn_heart, 'heart', obj.loc, id=ID.grn_heart)
+
                 for it, qty in obj.inv.items():
                     # TODO note item will not have a `loc` (ok for now)
                     it.loc = obj.loc
                     B.put(it, obj.loc)
+
+                # Special kills
                 if B._map=='f_island2':
                     if obj_by_attr.soldier4.dead and obj_by_attr.soldier5.dead:
                         triggered_events.append(TartasDigsEvent)
@@ -1496,14 +1546,14 @@ class Being(Mixin1):
             loc = self.loc
             self.put(r)
             ro.put(loc)
-            Windows.win2.addstr(1, 0, f'{self} moved past {ro.name}')
+            status(f'{self} moved past {ro.name}')
         elif isinstance(lo, Being):
             B.remove(lo)
             B.remove(self)
             loc = self.loc
             self.put(l)
             lo.put(loc)
-            Windows.win2.addstr(1, 0, f'{self} moved past {lo}')
+            status(f'{self} moved past {lo.name}')
 
     def action(self):
         B=self.B
@@ -1538,30 +1588,30 @@ class Being(Mixin1):
                     self.inv[x] += c.inv[x]
                 c.inv[x] = 0
                 lst.append(str(x))
-            Windows.win2.addstr(2,0, 'You found {}'.format(', '.join(lst)))
+            status('You found {}'.format(', '.join(lst)))
             if not items:
-                Windows.win2.addstr(2,0, f'{c.name} is empty')
+                status(f'{c.name} is empty')
 
         elif len(objs)>1 and objs[-2].id == ID.crate1:
             objs[-2].move('l')
             Item(B, Blocks.grill, 'grill', self.loc, id=ID.grill3)
 
-        elif ID.anthony in B.get_ids(locs):
+        elif is_near('anthony'):
             BuyADrinkAnthony(B).go()
 
-        elif ID.trick_guard in B.get_ids(locs):
+        elif is_near('trick_guard'):
             self.talk(objects[ID.guard2])
             B.remove(objects[ID.bars1])
             objects[ID.guard2].move('l')
 
-        elif ID.talk_to_brenne in B.get_ids(locs):
+        elif is_near('talk_to_brenne'):
             self.talk(obj.brenne)
             obj.fenioux.state = 1
 
-        elif ID.max_ in B.get_ids(locs):
+        elif is_near('max_'):
             MaxQuest().go(self)
 
-        elif ID.chamonix in B.get_ids(locs):
+        elif is_near('chamonix'):
             self.talk(obj.chamonix)
 
         elif is_near('tartas'):
@@ -1640,32 +1690,33 @@ class Being(Mixin1):
             triggered_events.append(ClermontTriesWater)
             obj.clermont_ferrand.state = 3
 
-        elif ID.morvan in B.get_ids(locs) and obj.morvan.state==0:
+        elif is_near('morvan') and obj.morvan.state==0:
             self.talk(obj.morvan)
             obj.morvan.state = 1
-        elif ID.morvan in B.get_ids(locs) and obj.morvan.state==1:
+
+        elif is_near('morvan') and obj.morvan.state==1:
             self.talk(obj.morvan, conversations[ID.morvan2])
 
-        elif ID.montbard in B.get_ids(locs) and obj.groboclone1.dead:
+        elif is_near('montbard') and obj.groboclone1.dead:
             self.talk(obj.montbard)
             obj.montbard.state = 1  # allow sink to be used
 
-        elif ID.locksmith in B.get_ids(locs) and obj.locksmith.state==1:
+        elif is_near('locksmith') and obj.locksmith.state==1:
             self.talk(obj.locksmith)
             B.remove(B.doors[1])
 
-        elif ID.grill8 in B.get_ids(locs):
+        elif is_near('grill8'):
             self.tele(obj.grill7.loc)
-            Windows.win2.addstr(2,0, "You use the secret passage and find yourself in the locksmith's house")
+            status("You use the secret passage and find yourself in the locksmith's house")
             obj.locksmith.state = 1
 
-        elif ID.sink in B.get_ids(locs) and obj.montbard.state==1:
+        elif is_near('sink') and obj.montbard.state==1:
             dr = obj.drawing
             loc = dr.loc
             dr.move('h')
             Item(B, Blocks.grill, 'grill', loc, id=ID.grill8)
 
-        elif ID.astronomer in B.get_ids(locs):
+        elif is_near('astronomer'):
             self.talk(ID.astronomer)
             obj.maurice.state = 1
 
@@ -1675,18 +1726,20 @@ class Being(Mixin1):
             status('The elf gives you the blue magnetic card!')
 
         elif is_near('legend1'):
-            self.talk(self, conversations[ID.legend1])
+            self.talk(self, ID.legend1)
 
         elif is_near('baldino'):
             if obj.baldino.state==0:
                 self.talk(obj.baldino)
                 obj.salesman.state=1
                 obj.baldino.state = 1
+
             elif obj.baldino.state==1 and self.has(ID.hair_dryer):
-                self.talk(obj.baldino, conversations[ID.baldino2])
+                self.talk(obj.baldino, ID.baldino2)
                 obj.baldino.state = 2
+
             elif obj.baldino.state==2:
-                y = self.talk(obj.baldino, conversations[ID.baldino3], yesno=1)
+                y = self.talk(obj.baldino, ID.baldino3, yesno=1)
                 if y:
                     self.remove1(ID.hair_dryer)
                     self.kashes+=10
@@ -1857,7 +1910,7 @@ class Being(Mixin1):
                 else:
                     status("It looks like you don't have any petrol!")
 
-        elif ID.agen in B.get_ids(locs):
+        elif is_near('agen'):
             if obj.agen.state == 0:
                 self.talk(obj.agen)
                 obj.agen.state = 1
@@ -1865,13 +1918,14 @@ class Being(Mixin1):
                 self.talk(obj.agen, conversations[ID.agen2])
                 obj.clermont_ferrand.state = 1
 
-        elif ID.ticket_seller1 in B.get_ids(locs):
+        elif is_near('ticket_seller1'):
             seller = obj.ticket_seller1
             y = self.talk(seller, 'Would you like to buy a ferry ticket?', yesno=1)
             if y:
                 self.talk(seller, 'Here is your ticket... Wait a second... Alarm! The prisoner escaped!!')
                 c = Clone(B, self.loc.mod(0,1), hostile=1, health=20)
                 B.guards.append(c)
+
         elif is_near('julien'):
             have_bb = self.has('book_of_bu')
             c = ID.julien if not have_bb else ID.julien2
@@ -1884,7 +1938,7 @@ class Being(Mixin1):
                     self.add1(ID.ferry_ticket)
                     self.kashes -= 10
 
-        elif ID.ferry in B.get_ids(locs) and self.has(ID.ferry_ticket):
+        elif is_near('ferry') and self.has(ID.ferry_ticket):
             dest = 8 if B._map==7 else 7
             triggered_events.append((TravelByFerry, dict(dest=dest)))
 
@@ -2001,7 +2055,6 @@ class Event:
         self.kwargs = kwargs
 
     def animate_arc(self, item, to_loc, height=1, carry_item=None):
-        print ("in def animate_arc()")
         for _ in range(height):
             self.animate(item, 'k', n=height, carry_item=carry_item)
         a,b = item.loc, to_loc
@@ -2010,19 +2063,22 @@ class Event:
         for _ in range(height):
             self.animate(item, 'j', n=height, carry_item=carry_item)
 
-    def animate(self, item, dir, B=None, n=999, carry_item=None):
+    def animate(self, items, dir, B=None, n=999, carry_item=None, sleep_time=SLP*4):
+        if not isinstance(items, SEQ_TYPES):
+            items = [items]
         B = B or self.B
         for _ in range(n):
-            item.move(dir)
-            if carry_item:
-                carry_item.move(dir, fly=1)
-            B.draw(Windows.win)
-            sleep(SLP*4)
-            if item.loc.x in (0, 78):
-                B.remove(item)
+            for item in items:
+                item.move(dir)
                 if carry_item:
-                    B.remove(carry_item)
-                return
+                    carry_item.move(dir, fly=1)
+                B.draw(Windows.win)
+                sleep(sleep_time)
+                if item.loc.x in (0, 78):
+                    B.remove(item)
+                    if carry_item:
+                        B.remove(carry_item)
+                    return
 
 class JailEvent(Event):
     once = False
@@ -2034,7 +2090,7 @@ class JailEvent(Event):
             c=Clone(B, B.spawn_locations[4])
             B.soldiers.append(c)
             Guard(B, B.spawn_locations[6], id=ID.guard2)
-            Windows.win2.addstr(2,0, 'Suddenly a Groboclone appears and leads you away...')
+            status('Suddenly a Groboclone appears and leads you away...')
             # TODO: this is an ugly hack, instead an event should only be triggered when player is in state=1, and make
             # this a once=True event
             JailEvent.once = True
@@ -2244,6 +2300,22 @@ class TravelByDynofly(Event):
 class EndGameEvent(Event):
     pass
 
+class GroboClonesTakingZoeEvent(Event):
+    once=True
+    def go(self):
+        B=self.B
+        specials=B.specials
+        pl = self.player
+        a=Being(B, specials[4], name='GroboClone', char=Blocks.elephant)
+        b=Being(B, specials[5], name='Zoe', char=Blocks.zoe)
+        c=Being(B, specials[6], name='GroboClone', char=Blocks.elephant)
+        pl.talk(pl, ID.zoe_taken)
+        self.animate((a,b,c), 'h', sleep_time=0.8)
+        B.remove(b)
+        B.remove(c)
+        pl.talk(pl, ID.zoe_taken2)
+
+
 class GuardAttackEvent1(Event):
     once=False
     def go(self):
@@ -2268,7 +2340,7 @@ class ClimbThroughGrillEvent1(Event):
         bi = self.B.loc.x
         loc = Loc(25 if bi==0 else 36, GROUND)
         b_loc = Loc(2 if bi==0 else 0, self.B.loc.y)
-        Windows.win2.addstr(2,0, 'You climb through the grill into a space that opens into an open area outside the building')
+        status('You climb through the grill into a space that opens into an open area outside the building')
         return player.move_to_board(b_loc, loc)
 
 class ClimbThroughGrillEvent2(Event):
@@ -2291,8 +2363,7 @@ class ClimbThroughGrillEvent3(Event):
         bi = self.B.loc.x
         x = 6 if bi==5 else 5
         b_loc = Loc(x, self.B.loc.y)
-        Windows.win2.addstr(2,0, 'You climb through the grill into ' +
-                            ('the port area' if bi==5 else 'back to the shore near your home'))
+        status('You climb through the grill into ' + ('the port area' if bi==5 else 'back to the shore near your home'))
         if player.state == 0:
             player.state = 1
         elif player.state == 1:
@@ -2309,7 +2380,7 @@ class AlarmEvent1(Event):
         for _ in range(35):
             tech.move('l')
             if ID.alarm1 in self.B.get_ids(tech.loc):
-                Windows.win2.addstr(2,0, '!ALARM!')
+                status('!ALARM!')
                 return Saves().load('start')
             self.B.draw(Windows.win)
             sleep(0.1)
@@ -2327,7 +2398,7 @@ class GarbageTruckEvent(Event):
             if t.loc == pl.loc:
                 dir = 'l'
                 B.remove(pl)
-                Windows.win2.addstr(2,0, 'The truck suddenly picks you up along with the rubbish!')
+                status('The truck suddenly picks you up along with the rubbish!')
             if t.loc.x==78:
                 B.remove(t)
                 B.draw(Windows.win)
@@ -2403,9 +2474,9 @@ class BuyADrinkAnthony(Event):
             if pl.kashes>=2:
                 pl.kashes -= 2
                 pl.add1(ID.wine)
-                Windows.win2.addstr(2,0, 'You bought a glass of wine.')
+                status('You bought a glass of wine.')
             else:
-                Windows.win2.addstr(2,0, "OH NO! You don't have enough kashes.. ..")
+                status("OH NO! You don't have enough kashes.. ..")
 
 class MaxState1(Event):
     once=True
@@ -2420,7 +2491,7 @@ class SoldierEvent2(Event):
         pl = objects[ID.player]
         pl.tele(pl.loc.mod(0,-3))
         self.B.draw(Windows.win)
-        Windows.win2.addstr(1, 0, 'You climb through the window covered by a grill and escape to the open area')
+        status('You climb through the window covered by a grill and escape to the open area')
         pl.state = 1
         if s.state == 0:
             ch = pl.talk(s)
