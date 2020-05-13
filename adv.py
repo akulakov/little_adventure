@@ -957,7 +957,7 @@ class Board:
         return [n for n in self.B[loc.y][loc.x] if n!=blank]
 
     def get_all_obj(self, loc):
-        return [n for n in self.B[loc.y][loc.x] if not isinstance(n, str)]
+        return [n for n in self.B[loc.y][loc.x] if not isinstance(n, (str, Player))]
 
     def get_top_obj(self, loc):
         return last(self.get_all_obj(loc))
@@ -1360,16 +1360,18 @@ class Being(Mixin1):
                     triggered_events.append(ClimbThroughGrillEvent3)
 
             if self.fight_stance and Type.pod in B.get_types(new):
-                p = B.get_top_obj()
-                p.state = 1
-                p.name = 'Broken teleportation pod'
-                status("You break the teleportation pod.")
+                p = B.get_top_obj(new)
+                if p.state==0:
+                    p.state = 1
+                    p.name = 'Broken teleportation pod'
+                    status("You break the teleportation pod.")
 
             if self.fight_stance and ID.computer in B.get_ids(new):
-                c = B.get_top_obj()
-                c.state = 1
-                c.name = 'Broken computer'
-                status("You break the computer.")
+                c = B.get_top_obj(new)
+                if c.state==0:
+                    c.state = 1
+                    c.name = 'Broken computer'
+                    status("You break the computer.")
 
             Windows.win2.refresh()
             return True, True
@@ -1683,7 +1685,7 @@ class Being(Mixin1):
                     status('You do not have enough kashes!')
 
         elif is_near('dynofly'):
-            dests = [('Fortress Island', 'f_island'), ('Himalayi mountains', 'dynofly')]
+            dests = [('Fortress Island', 'f_island'), ('Himalayi mountains', 'dynofly'), ('Brundle Island', 'brundle')]
             dests = [(n,m) for n,m in dests if m!=B._map]
             lnames = [n for n,m in dests]
             ch = self.talk(self, [f'Where would you like to fly?', lnames])
@@ -2135,6 +2137,7 @@ class TravelBySailboat(Event):
             b_loc, b = map_to_loc[dest]
             return player.move_to_board(b_loc, b.specials[9])
 
+
 class TravelByDynofly(Event):
     once = False
     def go(self):
@@ -2148,10 +2151,15 @@ class TravelByDynofly(Event):
             B = obj_by_attr.f_island_level
             obj.dynofly.move_to_board(None, B.specials[8], B=B)
             return obj.player.move_to_board(None, B.specials[9], B=B)
+        elif dest == 'brundle':
+            B = obj_by_attr.brundle_level
+            obj.dynofly.move_to_board(None, B.specials[8], B=B)
+            return obj.player.move_to_board(None, B.specials[9], B=B)
         elif dest == 'dynofly':
             b_loc, b = map_to_loc[dest]
             obj.dynofly.move_to_board(b_loc, b.specials[1])
             return obj.player.move_to_board(b_loc, b.specials[9])
+
 
 class GuardAttackEvent1(Event):
     once=True
@@ -2639,6 +2647,8 @@ def main(stdscr):
     player.inv[Item(None,'h','gawley_horn',id=ID.gawley_horn)] = 1
     player.inv[Item(None, Blocks.bottle,'empty bottle', id=ID.empty_bottle)] = 1
     player.inv[Item(None, 'f','magic flute', id=ID.magic_flute)] = 1
+    player.inv[Item(None, 'c','blue card', id=ID.blue_card)] = 1
+    player.inv[Item(None, 'p','architect_pass', id=ID.architect_pass)] = 1
     player.inv[objects[ID.book_of_bu]] = 1
     objects[ID.sailboat].state=1
 
