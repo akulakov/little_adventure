@@ -1125,9 +1125,10 @@ class BeingItemMixin:
 
     def put(self, loc):
         self.loc = loc
-        self.B.put(self)
-        if self.is_player and ID.platform1 in self.B.get_ids(loc) and loc==self.B.specials[3].mod_r():
-            triggered_events.append(PlatformEvent1)
+        B=self.B
+        B.put(self)
+        if self.is_player and ID.platform1 in B.get_ids(loc) and loc==B.specials[3].mod_r():
+            Event(B).animate_arc(obj_by_attr.platform1, B.specials[1], carry_item=self, height=3)
 
     def has(self, id):
         return self.inv.get(objects.get(id))
@@ -1396,7 +1397,7 @@ class Being(BeingItemMixin):
                 if statue.state:
                     statue.move(dir)
                 if statue.loc == B.specials[6]:
-                    triggered_events.append(StatueInPlace)
+                    B.remove(B.doors[0])
 
             self.handle_special_stance_move(new)
 
@@ -1910,7 +1911,7 @@ class Being(BeingItemMixin):
         else:
             loc = self.loc.mod(1,0)
             x = B[loc] # TODO won't work if something is in the platform tile
-            if x and getattr(x,'id',None)==ID.platform_top1:
+            if x and getattr(x, 'id', None)==ID.platform_top1:
                 PlatformEvent2(B).go()
 
     def talk_to_julien(self):
@@ -2225,10 +2226,9 @@ class MovePlatform3Event(Event):
         if i==p or i is blank: i=None
         self.animate_arc(p, to_loc=(a if p.loc==b else b), carry_item=i)
 
-class StatueInPlace(Event):
-    once=True
-    def go(self):
-        self.B.remove(self.B.doors[0])
+# class StatueInPlace(Event):
+#     once=True
+#     def go(self):
 
 class LeaveBuEvent(Event):
     once=False
@@ -2358,59 +2358,52 @@ class GuardAttackEvent1(Event):
         guard.hostile = 1
         self.animate_arc(obj_by_attr.platform1, B.specials[3].mod_r(), carry_item=guard, height=3)
 
-class PlatformEvent1(Event):
-    once=False
-    def go(self):
-        print ("in PlatformEvent1 def go()")
-        B = self.B
-        self.animate_arc(obj_by_attr.platform1, B.specials[1], carry_item=self.player, height=3)
+# class PlatformEvent1(Event):
+#     once=False
+#     def go(self):
+#         B = self.B
 
 class PlatformEvent2(Event):
     once=True
     def go(self):
-        B = self.B
-        p = objects[ID.platform_top1]
-        pl = objects[ID.player]
-        dir = 'j' if pl.loc.y == GROUND-4 else 'k'
-        for _ in range(45):
-            p.move(dir)
-            pl.move(dir, fly=1)
-            if pl.loc.y in (GROUND, GROUND-4):
-                break
-            B.draw(Windows.win)
-            sleep(0.2)
+        pl = self.player
+        dir = 'k' if pl.loc.y==GROUND else 'j'
+        self.animate(obj_by_attr.platform_top1, dir, carry_item=pl, n=4)
 
 class ClimbThroughGrillEvent1(Event):
+    """Related to Jail event."""
     once = False
     def go(self):
-        player = objects[ID.player]
-        bi = self.B.loc.x
-        loc = Loc(25 if bi==0 else 36, GROUND)
-        b_loc = Loc(2 if bi==0 else 0, self.B.loc.y)
+        bx = self.B.loc.x
+        loc = Loc(25 if bx==0 else 36, GROUND)
+        b_loc = Loc(2 if bx==0 else 0, self.B.loc.y)
         status('You climb through the grill into a space that opens into an open area outside the building')
-        return player.move_to_board(b_loc, loc)
+        return self.player.move_to_board(b_loc, loc)
 
 class ClimbThroughGrillEvent2(Event):
+    """Twinsen Home / Cave."""
     once = False
     def go(self):
-        player = objects[ID.player]
         B=self.B
         dest = 'und1' if B._map==6 else 6
         status('You climb through the grill ' +
                             ('into a strange underground area' if dest=='und1' else 'back into your home'))
         if dest=='und1':
-            return player.move_to_board(None, Loc(62,10), B=objects[ID.und1_level])
+            return self.player.move_to_board(None, Loc(62,10), B=obj_by_attr.und1_level)
         elif dest==6:
-            return player.move_to_board(map_to_loc['6'][0], Loc(62,10))
+            return self.player.move_to_board(map_to_loc['6'][0], Loc(62,10))
 
 class ClimbThroughGrillEvent3(Event):
+    """Home / Ferry map."""
     once = False
     def go(self):
-        player = objects[ID.player]
-        bi = self.B.loc.x
-        x = 6 if bi==5 else 5
+        player = self.player
+        bx = self.B.loc.x
+        x = 6 if bx==5 else 5
         b_loc = Loc(x, self.B.loc.y)
-        status('You climb through the grill into ' + ('the port area' if bi==5 else 'back to the shore near your home'))
+        status('You climb through the grill into ' + ('the port area' if bx==5 else 'back to the shore near your home'))
+
+        # ????
         if player.state == 0:
             player.state = 1
         elif player.state == 1:
@@ -2420,46 +2413,27 @@ class ClimbThroughGrillEvent3(Event):
 class AlarmEvent1(Event):
     once=True
     def go(self):
-        if self.done: return
-        tech = objects[ID.technician1]
-        x, y = tech.loc
-
-        for _ in range(35):
-            tech.move('l')
-            if ID.alarm1 in self.B.get_ids(tech.loc):
-                status('!ALARM!')
-                return Saves().load('start')
-            self.B.draw(Windows.win)
-            sleep(0.1)
+        self.animate(obj_by_attr.technician1, 'l', n=4)
+        self.player.talk(self.player, '!ALARM!')
+        return Saves().load('start')
 
 class GarbageTruckEvent(Event):
     once=True
     def go(self):
-        B=self.B
-        if self.done: return
-        t = Item(B, Blocks.truck, 'Garbage truck', Loc(78, GROUND))
-        dir = 'h'
-        pl = objects[ID.player]
-        for _ in range(75):
-            t.move(dir)
-            if t.loc == pl.loc:
-                dir = 'l'
-                B.remove(pl)
-                status('The truck suddenly picks you up along with the rubbish!')
-            if t.loc.x==78:
-                B.remove(t)
-                B.draw(Windows.win)
-                break
-            B.draw(Windows.win)
-            sleep(SLP)
-        return pl.move_to_board(Loc(3, B.loc.y), Loc(0,GROUND))
+        t = Item(self.B, Blocks.truck, 'Garbage truck', Loc(78, GROUND))
+        player = self.player
+        self.animate(t, 'h', n=26)
+        self.B.remove(player)
+        player.talk(player, 'The truck suddenly picks you up along with the rubbish!')
+        self.animate(t, 'l', n=26)
+        bloc,B = map_to_loc['4']
+        return player.move_to_board(bloc, Loc(0,GROUND))
 
 class ShopKeeperEvent1(Event):
+    """Related to ShopKeeperAlarmEvent."""
     once=True
     def go(self):
-        pl = objects[ID.player]
-        shk = objects[ID.shopkeeper1]
-        pl.talk(shk)
+        self.player.talk(ID.shopkeeper1)
         timers.append(Timer(10, ShopKeeperAlarmEvent))
 
 class ShopKeeperAlarmEvent(Event):
@@ -2500,9 +2474,9 @@ class MagicBallEvent(Event):
 class BuyADrinkAnthony(Event):
     once=True
     def go(self):
-        pl = objects[ID.player]
-        yes = pl.talk(objects[ID.anthony], 'Would you like to buy a drink for two kashes?', yesno=1)
-        if yes:
+        pl = self.player
+        y = pl.talk(ID.anthony, 'Would you like to buy a drink for two kashes?', yesno=1)
+        if y:
             if pl.kashes>=2:
                 pl.kashes -= 2
                 pl.add1(ID.wine)
@@ -2517,20 +2491,21 @@ class MaxState1(Event):
 
 
 class SoldierEvent2(Event):
+    """Suspiciuos soldier asking who you are, once."""
     once=False
     def go(self):
-        s = objects[ID.soldier2]
-        pl = objects[ID.player]
+        soldier = obj_by_attr.soldier2
+        pl = self.player
         pl.tele(pl.loc.mod(0,-3))
         self.B.draw(Windows.win)
-        status('You climb through the window covered by a grill and escape to the open area')
+        pl.talk(pl, 'You climb through the window covered by a grill and escape to the open area')
         pl.state = 1
-        if s.state == 0:
-            ch = pl.talk(s)
+        if soldier.state == 0:
+            ch = pl.talk(soldier)
             if ch==1:
-                s.hostile = 1
+                soldier.hostile = 1
             else:
-                s.state = 1
+                soldier.state = 1
 
 def rev_dir(dir):
     return dict(h='l',l='h',j='k',k='j')[dir]
@@ -2610,14 +2585,22 @@ def dist(a,b):
     return max(abs(a.loc.x - b.loc.x),
                abs(a.loc.y - b.loc.y))
 
+class Colors:
+    blue_on_white = 1
+    yellow_on_white = 2
+    green_on_white = 3
+    yellow_on_black = 4
+    blue_on_black = 5
+
 def main(stdscr):
     # Misc.is_game = 1
     Misc.is_game = 1
-    curses.init_pair(1, curses.COLOR_BLUE, curses.COLOR_WHITE)
-    curses.init_pair(2, curses.COLOR_YELLOW, curses.COLOR_WHITE)
-    curses.init_pair(3, curses.COLOR_GREEN, curses.COLOR_WHITE)
-    curses.init_pair(4, curses.COLOR_YELLOW, curses.COLOR_BLACK)
-    curses.init_pair(5, curses.COLOR_BLUE, curses.COLOR_BLACK)
+    curses.init_pair(Colors.blue_on_white, curses.COLOR_BLUE, curses.COLOR_WHITE)
+    curses.init_pair(Colors.yellow_on_white, curses.COLOR_YELLOW, curses.COLOR_WHITE)
+    curses.init_pair(Colors.green_on_white, curses.COLOR_GREEN, curses.COLOR_WHITE)
+    curses.init_pair(Colors.yellow_on_black, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+    curses.init_pair(Colors.blue_on_black, curses.COLOR_BLUE, curses.COLOR_BLACK)
+
     begin_x = 0; begin_y = 0; width = 80
     win = Windows.win = newwin(HEIGHT, width, begin_y, begin_x)
     begin_x = 0; begin_y = 16; height = 6; width = 80
