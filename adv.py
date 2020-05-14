@@ -22,6 +22,7 @@ from random import random, choice
 from collections import defaultdict
 from textwrap import wrap
 import string
+import shelve
 
 rock = '█'
 blank = ' '
@@ -1129,7 +1130,10 @@ class BeingItemMixin:
         self.inv[objects[id]] -= 1
 
     def add1(self, id, n=1):
-        self.inv[objects[id]] += n
+        if isinstance(id, int):
+            self.inv[objects[id]] += n
+        else:
+            self.inv[id] += n
 
 
 class Item(BeingItemMixin):
@@ -1201,11 +1205,13 @@ class Being(BeingItemMixin):
         self.health = self.health or health or 5
         self.char = self.char or char
         self.inv = defaultdict(int)
-        if Misc.is_game: # not editor
-            self.add1(ID.key1, n=2)
-            self.inv[objects[ID.fuel]] = 10
-            self.inv[objects[ID.ferry_ticket]] = 10
-        self.kashes = 54
+        self.kashes = 0
+        if DBG:
+            if Misc.is_game: # not editor
+                self.add1(ID.key1, n=2)
+                self.inv[objects[ID.fuel]] = 10
+                self.inv[objects[ID.ferry_ticket]] = 10
+            self.kashes = 54
         if id:
             objects[id] = self
         if put:
@@ -1321,8 +1327,6 @@ class Being(BeingItemMixin):
             being = B[new]
             if self.fight_stance or self.hostile:
                 self.attack(being)
-            elif being.id == ID.robobunny1:
-                self.talk(being)
             else:
                 self.switch_places()    # TODO support direction
             return True, True
@@ -1438,7 +1442,7 @@ class Being(BeingItemMixin):
 
     def handle_player_move(self, new):
         B=self.B
-        pick_up = [ID.key1, ID.key2, ID.key3, ID.magic_ball, ID.pirate_flag, ID.gawley_horn, ID.sendell_medallion]
+        pick_up = [ID.key1, ID.key2, ID.key3, ID.magic_ball, ID.pirate_flag, ID.gawley_horn, ID.sendell_medallion, ID.coin]
         top_obj = B.get_top_obj(new)
         items = B.get_all_obj(new)
         if top_obj and top_obj.type == Type.event_trigger:
@@ -1527,7 +1531,7 @@ class Being(BeingItemMixin):
             if obj.health <=0:
                 B.remove(obj)
                 if random()>0.6:
-                    Item(B, Blocks.coin, 'one kash', obj.loc, id=ID.coin)
+                    Item(B, Blocks.coin, 'coin', obj.loc, id=ID.coin)
                 elif random()>0.6:
                     Item(B, Blocks.grn_heart, 'heart', obj.loc, id=ID.grn_heart)
 
@@ -1668,6 +1672,9 @@ class Being(BeingItemMixin):
             self.talk(obj.candanchu)
             status('Candanchu gives you a fancy-looking key..')
             self.inv[Item(None, Blocks.key, 'fancy key', id=ID.safe_key)] = 1
+
+        elif is_near('robobunny1'):
+            self.talk(obj.robobunny1)
 
         elif is_near('safe') and self.has(ID.safe_key):
             status("You discover Dr.FunFrock's saber!!")
@@ -2452,6 +2459,7 @@ class BuyADrinkAnthony(Event):
         if y:
             if pl.kashes>=2:
                 pl.kashes -= 2
+                Item(None, Blocks.wine, 'glass of wine', id=ID.wine)
                 pl.add1(ID.wine)
                 status('You bought a glass of wine.')
             else:
@@ -2489,7 +2497,7 @@ class Timer:
 
 class Player(Being):
     char = '🙍'
-    health = 100
+    health = 10
     is_player = 1
     stance = Stance.sneaky
     name = 'Player'
@@ -2527,6 +2535,8 @@ class Saves:
     loaded = 0
 
     def save(self, name, cur_brd):
+        sh = shelve.open('data')
+        self.saves = sh['saves']
         s = {}
         s['boards'] = deepcopy(boards)
         s['cur_brd'] = cur_brd
@@ -2538,8 +2548,13 @@ class Saves:
         print("B.get_all(player.loc)", B.get_all(player.loc))
         print("in save s['player'].loc", s['player'].loc)
         self.saves[name] = s
+        sh['saves'] = self.saves
+        sh.close()
 
     def load(self, name):
+        sh = shelve.open('data')
+        self.saves = sh['saves']
+        print("self.saves", self.saves)
         s = self.saves[name]
         boards[:] = s['boards']
         global objects
@@ -2565,7 +2580,7 @@ class Colors:
     yellow_on_black = 4
     blue_on_black = 5
 
-def main(stdscr):
+def main(stdscr, load_game):
     # Misc.is_game = 1
     Misc.is_game = 1
     curses.init_pair(Colors.blue_on_white, curses.COLOR_BLUE, curses.COLOR_WHITE)
@@ -2608,6 +2623,8 @@ def main(stdscr):
     b9 = Board(Loc(8,MAIN_Y), 9)
 
     player = b1.board_1()
+    if DBG:
+        player.health = 100
 
     b2.board_2()
     b3.board_3()
@@ -2616,7 +2633,6 @@ def main(stdscr):
     b6.board_6()
     b7.board_7()
     b8.board_8()
-
 
     b9 = Board(Loc(8,MAIN_Y), 9)
     b9.board_9()
@@ -2757,6 +2773,9 @@ def main(stdscr):
     Misc.wait_count = 0
     Misc.last_dir = 'l'
 
+    if load_game:
+        player, B = Saves().load(load_game)
+        B.draw(Windows.win)
     while 1:
         rv = handle_ui(B, player)
         if not rv: return
@@ -2818,7 +2837,8 @@ def handle_ui(B, player):
             triggered_events.append(GarbageTruckEvent)
         debug(str(triggered_events))
     elif k == 's':
-        player.switch_places()
+        Saves().save('last', B.loc)
+        status('Saved game as "last"')
     elif k == 'S':
         player.stance = Stance.sneaky
         win2.addstr(1, 0, 'stance: sneaky')
@@ -3122,7 +3142,8 @@ def editor(stdscr, _map):
 if __name__ == "__main__":
     argv = sys.argv[1:]
     DBG = first(argv) == '-d'
+    load_game = 'last' if first(argv)=='-l' else None
     if first(argv) == 'ed':
         wrapper(editor, argv[1])
     else:
-        wrapper(main)
+        wrapper(main, load_game)
