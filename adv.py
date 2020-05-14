@@ -28,6 +28,7 @@ blank = ' '
 HEIGHT = 16
 GROUND = HEIGHT-2   # ground level
 LOAD_BOARD = 999
+MAIN_Y = 3          # starting row of game boards
 SLP = 0.01
 SEQ_TYPES = (list, tuple)
 debug_log = open('debug', 'w')
@@ -2621,7 +2622,6 @@ def main(stdscr):
     objects[ID.key1] = key1
     objects[ID.key2] = key2
 
-    MAIN_Y = 3
     B = b1 = Board(Loc(0,MAIN_Y), 1)
     und2 = Board(Loc(0,MAIN_Y+1), 'und2')
     und2.board_und2()
@@ -2747,19 +2747,19 @@ def main(stdscr):
     brundle.board_brundle()   # this needs to be after `board_dynofly()`
     objects[ID.brundle_level] = brundle
 
-    # for debugging
-    hd=Item(None, 'H', 'hair dryer', id=ID.hair_dryer)
-    pp=Item(None, 'P', 'proto pack', id=ID.proto_pack)
-    player.inv[pp] = 1
-    player.inv[hd] = 1
-    player.inv[Item(None,'g','gk',id=ID.golden_key)] = 1
-    player.inv[Item(None,'h','gawley_horn',id=ID.gawley_horn)] = 1
-    player.inv[Item(None, Blocks.bottle,'empty bottle', id=ID.empty_bottle)] = 1
-    player.inv[Item(None, 'f','magic flute', id=ID.magic_flute)] = 1
-    player.inv[Item(None, 'c','blue card', id=ID.blue_card)] = 1
-    player.inv[Item(None, 'p','architect_pass', id=ID.architect_pass)] = 1
-    player.inv[objects[ID.book_of_bu]] = 1
-    objects[ID.sailboat].state=1
+    if DBG:
+        hd=Item(None, 'H', 'hair dryer', id=ID.hair_dryer)
+        pp=Item(None, 'P', 'proto pack', id=ID.proto_pack)
+        player.inv[pp] = 1
+        player.inv[hd] = 1
+        player.inv[Item(None,'g','gk',id=ID.golden_key)] = 1
+        player.inv[Item(None,'h','gawley_horn',id=ID.gawley_horn)] = 1
+        player.inv[Item(None, Blocks.bottle,'empty bottle', id=ID.empty_bottle)] = 1
+        player.inv[Item(None, 'f','magic flute', id=ID.magic_flute)] = 1
+        player.inv[Item(None, 'c','blue card', id=ID.blue_card)] = 1
+        player.inv[Item(None, 'p','architect_pass', id=ID.architect_pass)] = 1
+        player.inv[objects[ID.book_of_bu]] = 1
+        objects[ID.sailboat].state=1
 
     boards[:] = (
          [desert1,desert2,None,None, None,None,None,None, None,None, None, None],
@@ -2790,188 +2790,196 @@ def main(stdscr):
     last_dir = 'l'
 
     while 1:
-        k = win.getkey()
-        win2.clear()
-        win2.addstr(1,0, ' '*78)
-        win2.addstr(2,0,k)
-        if k=='q':
-            return
-        elif k=='f':
-            player.stance = Stance.fight
-            win2.addstr(1, 0, 'stance: fight')
-        elif k=='n':
-            player.stance = Stance.normal
-            win2.addstr(1, 0, 'stance: normal')
+        rv = handle_ui(B, player)
+        if not rv: return
+        B, player = rv
 
-        elif k in 'hjklHL':
-            last_dir = k
-            if k in 'HL':
-                k = k.lower()
-                for _ in range(5):
-                    rv = player.move(k)
-                    if rv[0] == LOAD_BOARD:
-                        break
-            else:
+
+def handle_ui(B, player):
+    win, win2 = Windows.win, Windows.win2
+    k = win.getkey()
+    win2.clear()
+    win2.addstr(1,0, ' '*78)
+    win2.addstr(2,0,k)
+    if k=='q':
+        return
+    elif k=='f':
+        player.stance = Stance.fight
+        win2.addstr(1, 0, 'stance: fight')
+    elif k=='n':
+        player.stance = Stance.normal
+        win2.addstr(1, 0, 'stance: normal')
+
+    elif k in 'hjklHL':
+        last_dir = k
+        if k in 'HL':
+            k = k.lower()
+            for _ in range(5):
                 rv = player.move(k)
-            if rv[0] == LOAD_BOARD:
-                loc = rv[1]
-                if loc==ID.fall:
-                    # a bit ugly, handle fall as explicit 'move' down
-                    k = 'j'
-                    loc = B.loc.mod(1,0)
-                    if not chk_b_oob(loc):
-                        status('You fall down and die.....')
-                        triggered_events.append(DieEvent)
-                x, y = player.loc
-                if k=='l': x = 0
-                if k=='h': x = 78
-                if k=='k': y = 15
-                if k=='j': y = 0
-
-                # ugly but....
-                p_loc = Loc(x, y)
-                if chk_b_oob(loc):
-                    B = player.move_to_board(loc, p_loc)
-                    B.remove(player)
-                    player.loc = player.fall(player.loc)
-                    B.put(player)
-
-        elif k == '.':
-            if last_cmd=='.':
-                wait_count += 1
-            if wait_count >= 5 and ID.rubbish1 in B.get_ids(player.loc):
-                triggered_events.append(GarbageTruckEvent)
-            debug(str(triggered_events))
-        elif k == 's':
-            player.switch_places()
-        elif k == 'S':
-            player.stance = Stance.sneaky
-            win2.addstr(1, 0, 'stance: sneaky')
-        elif k == 'v':
-            status(str(player.loc))
-            # player, B = Saves().load('start')
-            # objects[ID.player] = player
-        elif k == ' ':
-            player.action()
-        elif k == '4':
-            mp = ''
-            status('> ')
-            Windows.win2.refresh()
-            while 1:
-                mp += win.getkey()
-                status('> '+mp)
-                Windows.win2.refresh()
-                if mp in map_to_loc:
-                    loc,b = map_to_loc[mp]
-                    B = player.move_to_board(loc, Loc(8, GROUND), B=b)
-                    if B._map=='des_und': player.tele(Loc(7,7))
-                    if B._map=='und1': player.tele(Loc(65,7))
-                    if B._map=='des_und2': player.tele(Loc(70,7))
-                if not any(m.startswith(mp) for m in map_to_loc):
+                if rv[0] == LOAD_BOARD:
                     break
-        elif k == '5':
-            k = win.getkey()
-            k+= win.getkey()
-            try:
-                print(B.B[int(k)])
-                status(f'printed row {k} to debug')
-            except:
-                status('try again')
-        elif k == '6':
-            B = player.move_to_board( map_to_loc['f_island2'][0], Loc(25, 12) )
-        elif k == '7':
-            B = player.move_to_board( Loc(6,MAIN_Y), Loc(72, GROUND) )
-        elif k == '8':
-            B = player.move_to_board( Loc(7,MAIN_Y), Loc(7, GROUND) )
-        elif k == '9':
-            B = player.move_to_board( Loc(9,MAIN_Y), Loc(59, 5) )
+        else:
+            rv = player.move(k)
+        if rv[0] == LOAD_BOARD:
+            loc = rv[1]
+            if loc==ID.fall:
+                # a bit ugly, handle fall as explicit 'move' down
+                k = 'j'
+                loc = B.loc.mod(1,0)
+                if not chk_b_oob(loc):
+                    status('You fall down and die.....')
+                    triggered_events.append(DieEvent)
+            x, y = player.loc
+            if k=='l': x = 0
+            if k=='h': x = 78
+            if k=='k': y = 15
+            if k=='j': y = 0
 
-        elif k == 't':
-            # debug teleport
-            k = ''
-            while 1:
-                k+=win.getkey()
-                status(k)
-                win2.refresh()
-                if k.endswith(' '):
-                    try:
-                        x,y=k[:-1].split(',')
-                        player.tele(Loc(int(x), int(y)))
-                    except Exception as e:
-                        print(e)
-                    break
+            # ugly but....
+            p_loc = Loc(x, y)
+            if chk_b_oob(loc):
+                B = player.move_to_board(loc, p_loc)
+                B.remove(player)
+                player.loc = player.fall(player.loc)
+                B.put(player)
 
-        elif k == '0':
-            B = player.move_to_board( Loc(0,0), Loc(7, GROUND) )
-        # -----------------------------------------------------------------------------------------------
-
-        elif k == 'u':
-            player.use()
-
-        elif k == 'U':
-            B = player.move_to_board( None, Loc(35, 10) , B=und1)
-        elif k == 'E':
-            B.display(str(B.get_all(player.loc)))
-        elif k == 'b':
-            status('has bu? ' + str(player.has(ID.book_of_bu)))
-        elif k == 'm':
-            if player.has(ID.magic_ball):
-                MagicBallEvent(B).go(player, last_dir)
-        elif k == 'i':
-            txt = []
-            for item, n in player.inv.items():
-                if item and n:
-                    # txt.append(f'{item} {id(item)} {item.name} {n}')
-                    txt.append(f'{item.name} {n}')
-            # txt.append(f'obj bb: {id(objects[ID.book_of_bu])}')
-            B.display(txt)
-
-        if k != '.':
-            wait_count = 0
-        last_cmd = k
-
-        B.guards = [g for g in B.guards if g.health>0]
-        B.soldiers = [g for g in B.soldiers if g.health>0]
-        for g in B.guards:
-            if g.hostile:
-                g.attack(player)
-        for s in B.soldiers:
-            if s.hostile or dist(s, player) <= (1 if player.sneaky_stance else 5):
-                s.hostile = 1
-                s.attack(player)
-
-        if player.health <= 0:
-            win2.addstr(1, 0, f'Hmm.. it looks like you lost the game!')
-            player, B = Saves().load('start')
-
-        for evt in triggered_events:
-            if evt==EndGameEvent:
-                return
-            kwargs = {}
-            if isinstance(evt, SEQ_TYPES):
-                evt, kwargs = evt
-            if evt in done_events and evt.once:
-                continue
-            rv = evt(B, **kwargs).go()
-            if isinstance(rv, Board):
-                B = rv
-            try:
-                player, B = rv
-            except Exception as e:
-                print("e", e)
-                pass
-            done_events.add(evt)
-
-        triggered_events.clear()
-        for t in timers:
-            t.turns -= 1
-            if not t.turns:
-                triggered_events.append(t.evt)
-        timers[:] = [t for t in timers if t.turns>0]
-        B.draw(win)
-        key = '[key]' if player.has(ID.key1) else ''
-        win2.addstr(0,0, f'[{STANCES[player.stance]}] [H{player.health}] [{player.kashes} Kashes] {key}')
+    elif k == '.':
+        if last_cmd=='.':
+            wait_count += 1
+        if wait_count >= 5 and ID.rubbish1 in B.get_ids(player.loc):
+            triggered_events.append(GarbageTruckEvent)
+        debug(str(triggered_events))
+    elif k == 's':
+        player.switch_places()
+    elif k == 'S':
+        player.stance = Stance.sneaky
+        win2.addstr(1, 0, 'stance: sneaky')
+    elif k == 'v':
+        status(str(player.loc))
+        # player, B = Saves().load('start')
+        # objects[ID.player] = player
+    elif k == ' ':
+        player.action()
+    elif k == '4':
+        mp = ''
+        status('> ')
         win2.refresh()
+        while 1:
+            mp += win.getkey()
+            status('> '+mp)
+            win2.refresh()
+            if mp in map_to_loc:
+                loc,b = map_to_loc[mp]
+                B = player.move_to_board(loc, Loc(8, GROUND), B=b)
+                if B._map=='des_und': player.tele(Loc(7,7))
+                if B._map=='und1': player.tele(Loc(65,7))
+                if B._map=='des_und2': player.tele(Loc(70,7))
+            if not any(m.startswith(mp) for m in map_to_loc):
+                break
+    elif k == '5':
+        k = win.getkey()
+        k+= win.getkey()
+        try:
+            print(B.B[int(k)])
+            status(f'printed row {k} to debug')
+        except:
+            status('try again')
+    elif k == '6':
+        B = player.move_to_board( map_to_loc['f_island2'][0], Loc(25, 12) )
+    elif k == '7':
+        B = player.move_to_board( Loc(6,MAIN_Y), Loc(72, GROUND) )
+    elif k == '8':
+        B = player.move_to_board( Loc(7,MAIN_Y), Loc(7, GROUND) )
+    elif k == '9':
+        B = player.move_to_board( Loc(9,MAIN_Y), Loc(59, 5) )
+
+    elif k == 't':
+        # debug teleport
+        k = ''
+        while 1:
+            k+=win.getkey()
+            status(k)
+            win2.refresh()
+            if k.endswith(' '):
+                try:
+                    x,y=k[:-1].split(',')
+                    player.tele(Loc(int(x), int(y)))
+                except Exception as e:
+                    print(e)
+                break
+
+    elif k == '0':
+        B = player.move_to_board( Loc(0,0), Loc(7, GROUND) )
+    # -----------------------------------------------------------------------------------------------
+
+    elif k == 'u':
+        player.use()
+
+    elif k == 'U':
+        B = player.move_to_board( None, Loc(35, 10) , B=und1)
+    elif k == 'E':
+        B.display(str(B.get_all(player.loc)))
+    elif k == 'b':
+        status('has bu? ' + str(player.has(ID.book_of_bu)))
+    elif k == 'm':
+        if player.has(ID.magic_ball):
+            MagicBallEvent(B).go(player, last_dir)
+    elif k == 'i':
+        txt = []
+        for item, n in player.inv.items():
+            if item and n:
+                # txt.append(f'{item} {id(item)} {item.name} {n}')
+                txt.append(f'{item.name} {n}')
+        # txt.append(f'obj bb: {id(objects[ID.book_of_bu])}')
+        B.display(txt)
+
+    if k != '.':
+        wait_count = 0
+    last_cmd = k
+
+    B.guards = [g for g in B.guards if g.health>0]
+    B.soldiers = [g for g in B.soldiers if g.health>0]
+    for g in B.guards:
+        if g.hostile:
+            g.attack(player)
+    for s in B.soldiers:
+        if s.hostile or dist(s, player) <= (1 if player.sneaky_stance else 5):
+            s.hostile = 1
+            s.attack(player)
+
+    if player.health <= 0:
+        win2.addstr(1, 0, f'Hmm.. it looks like you lost the game!')
+        player, B = Saves().load('start')
+
+    for evt in triggered_events:
+        if evt==EndGameEvent:
+            return
+        kwargs = {}
+        if isinstance(evt, SEQ_TYPES):
+            evt, kwargs = evt
+        if evt in done_events and evt.once:
+            continue
+        rv = evt(B, **kwargs).go()
+        if isinstance(rv, Board):
+            B = rv
+        try:
+            player, B = rv
+        except Exception as e:
+            print("e", e)
+            pass
+        done_events.add(evt)
+
+    triggered_events.clear()
+    for t in timers:
+        t.turns -= 1
+        if not t.turns:
+            triggered_events.append(t.evt)
+    timers[:] = [t for t in timers if t.turns>0]
+    B.draw(win)
+    key = '[key]' if player.has(ID.key1) else ''
+    win2.addstr(0,0, f'[{STANCES[player.stance]}] [H{player.health}] [{player.kashes} Kashes] {key}')
+    win2.refresh()
+    return B, player
 
 
 def debug(*args):
@@ -3148,6 +3156,7 @@ def editor(stdscr, _map):
 
 if __name__ == "__main__":
     argv = sys.argv[1:]
+    DBG = first(argv) == '-d'
     if first(argv) == 'ed':
         wrapper(editor, argv[1])
     else:
