@@ -323,15 +323,6 @@ class ID:
     safe_note = 208
     lake_ice_breaking = 209
 
-    sea_level1 = 300
-    landscape_level1 = 301
-    water_tower_level = 302
-    port_beluga_level = 303
-    und1_level = 304
-    elf_lab_level = 305
-    mstone2_level = 306
-    brundle_level = 308
-
     legend1 = 400
     fall = 401  # move that falls through to the map below
 
@@ -521,7 +512,7 @@ class Board:
         self.labels = []
         self.misc = []
         self.loc = loc
-        self._map = _map
+        self._map = str(_map)
         self.state = 0
         map_to_loc[str(_map)] = loc, self
 
@@ -1223,10 +1214,12 @@ class Being(BeingItemMixin):
     def __str__(self):
         return self.char
 
-    def move_to_board(self, b_loc, loc, B=None):
+    def move_to_board(self, _map, specials_ind=None, loc=None):
+        B = map_to_loc[_map][1]
+        if specials_ind is not None:
+            loc = B.specials[specials_ind]
         if self in self.B.get_all(self.loc):
             self.B.remove(self)
-        B = B or boards[b_loc.y][b_loc.x]
         self.loc = loc
         B.put(self)
         self.B = B
@@ -1656,7 +1649,8 @@ class Being(BeingItemMixin):
 
         elif is_near('tartas'):
             self.talk(obj.tartas)
-            if obj_by_attr.brundle_level.state==1:
+            brundle = map_to_loc['brundle'][1]
+            if brundle.state==1:
                 self.talk(obj.tartas, "Ah, you've done that? Follow me then! You will also need to defeat the soldiers, only then I'll be able to dig the way for you...")
                 triggered_events.append(FollowTartasEvent)
 
@@ -1699,7 +1693,7 @@ class Being(BeingItemMixin):
             B.remove(obj.blue_door)
 
         elif is_near('seal_sendell2') and obj.seal2.state==1:
-            triggered_events.append((PortalEvent, dict(level_id=ID.mstone2_level, spawn_specials_ind=1)))
+            triggered_events.append((PortalEvent, dict(map='mstone2', spawn_specials_ind=1)))
 
         elif is_near('mstone2_exit'):
             triggered_events.append((PortalEvent, dict(map='marked_stone', spawn_specials_ind=1)))
@@ -2143,16 +2137,9 @@ class RoboCloneAppearEvent(Event):
 class PortalEvent(Event):
     once = False
     def go(self):
-        bloc = None
-        board = None
         _map = self.kwargs.get('map')
-        level_id = self.kwargs.get('level_id')
         spawn_specials_ind = self.kwargs.get('spawn_specials_ind')
-        if _map:
-            bloc, board = map_to_loc[_map]
-        elif level_id:
-            board = objects[level_id]
-        return self.player.move_to_board(bloc, board.specials[spawn_specials_ind], B=board)
+        return self.player.move_to_board(_map, spawn_specials_ind)
 
 class OneTimePortalEvent(PortalEvent):
     once = True
@@ -2161,15 +2148,13 @@ class ExitElfMapEvent(Event):
     # TODO: conver to PortalEvent
     once = True
     def go(self):
-        bloc, b = map_to_loc['desert2']
-        return self.player.move_to_board(bloc, b.specials[2])
+        return self.player.move_to_board('desert2', 2)
 
 class GoToElfMapEvent(Event):
     # TODO: conver to PortalEvent
     once = True
     def go(self):
-        b = objects[ID.elf_lab_level]
-        return self.player.move_to_board(None, b.specials[1], B=b)
+        return self.player.move_to_board('elf_lab', 1)
 
 class DrFunfrockTrapEvent(Event):
     once=1
@@ -2189,7 +2174,7 @@ class DrFunfrockTrapEvent(Event):
         guard = B.guards[0]
         guard.hostile = 0
         guard.tele(B.specials[1])     # guard back to starting position
-        return pl.move_to_board(bloc, B.specials[3])
+        return pl.move_to_board('1', 3)
 
 
 class TartasDigsEvent(Event):
@@ -2202,8 +2187,8 @@ class FollowTartasEvent(Event):
     once=1
     def go(self):
         bloc, B = map_to_loc['f_island2']
-        obj_by_attr.tartas.move_to_board(bloc, B.specials[8])
-        return self.player.move_to_board(bloc, B.specials[9])
+        obj_by_attr.tartas.move_to_board('f_island2', 8)
+        return self.player.move_to_board('f_island2', 9)
 
 class ClermontTriesWater(Event):
     once=1
@@ -2234,22 +2219,22 @@ class MovePlatform3Event(Event):
 class LeaveBuEvent(Event):
     once=False
     def go(self):
-        return self.player.move_to_board( Loc(1, self.B.loc.y-1), Loc(7, GROUND) )
+        return self.player.move_to_board('desert2', loc=Loc(7, GROUND))
 
 class TravelByFerry(Event):
     once=False
     def go(self):
         dest = self.kwargs.get('dest')
         player = objects[ID.player]
-        B = objects[ID.sea_level1]
-        f = objects[ID.ferry]
+        B = map_to_loc['sea1'][1]
+        f = obj_by_attr.ferry
         B.put(f, Loc(78,GROUND))
         self.animate(f, 'h', B=B)
         status('The ferry took you to ' + ('Principal Island' if dest=='8' else 'Citadel Island'))
         if dest == 8:
-            return player.move_to_board( map_to_loc['8'][0], Loc(7, GROUND) )
+            return player.move_to_board('8', loc=Loc(7, GROUND))
         elif dest == 7:
-            return player.move_to_board( map_to_loc['7'][0], Loc(7, GROUND) )
+            return player.move_to_board('7', loc=Loc(7, GROUND))
 
 class TravelByCarEvent(Event):
     once = False
@@ -2261,22 +2246,22 @@ class TravelByCarEvent(Event):
         self.animate(car, 'h')
 
         # switch to landscape map
-        B = objects[ID.landscape_level1]
+        B = map_to_loc['landscape1'][1]
         self.B = B
         B.put(car, Loc(77,GROUND))
         self.animate(car, 'h')
 
         if dest == 'wtower':
             status('You have driven the car to the Water tower')
-            B = self.player.move_to_board(None, Loc(7, GROUND), B=objects[ID.water_tower_level])
+            B = self.player.move_to_board(dest, loc=Loc(7, GROUND))
             B.put(car, Loc(6,GROUND))
         elif dest == 'top3':
             status('You have driven the car to Old Town')
-            B = self.player.move_to_board(map_to_loc['top3'][0], Loc(7, GROUND))
+            B = self.player.move_to_board(dest, loc=Loc(7, GROUND))
             B.put(car, Loc(6,GROUND))
         elif dest == 'beluga':
             status('You have driven the car to Port Beluga')
-            B = self.player.move_to_board(None, Loc(7, GROUND), B=objects[ID.port_beluga_level])
+            B = self.player.move_to_board(dest, loc=Loc(7, GROUND))
             B.put(car, Loc(6,GROUND))
         return B
 
@@ -2287,24 +2272,20 @@ class TravelBySailboat(Event):
         dests = self.kwargs.get('dests')
         lname = first([ln for ln,m in dests if m==dest])
         player = objects[ID.player]
-        B = objects[ID.sea_level1]
+        B = map_to_loc['sea1'][1]
         s = objects[ID.sailboat]
         B.put(s, Loc(78,GROUND))
         self.animate(s, 'h', B=B)
         status(f'The sailboat took you to {lname}')
 
         if dest == 'desert1':
-            b_loc, b = map_to_loc[dest]
-            return player.move_to_board( b_loc, Loc(7, GROUND) )
+            return player.move_to_board(dest, loc=Loc(7, GROUND))
         elif dest == 'beluga':
-            b = objects[ID.port_beluga_level]
-            return player.move_to_board(None, b.specials[9], B=b)
+            return player.move_to_board(dest, 9)
         elif dest == 'proxima1':
-            b_loc, b = map_to_loc[dest]
-            return player.move_to_board(b_loc, b.specials[9])
+            return player.move_to_board(dest, 9)
         elif dest == 'himalaya1':
-            b_loc, b = map_to_loc[dest]
-            return player.move_to_board(b_loc, b.specials[9])
+            return player.move_to_board(dest, 9)
 
 
 class TravelByDynofly(Event):
@@ -2317,17 +2298,14 @@ class TravelByDynofly(Event):
         status(f'Dynofly took you to {lname}')
 
         if dest == 'f_island':
-            b_loc, B = map_to_loc[dest]
-            obj.dynofly.move_to_board(b_loc, B.specials[8])
-            return obj.player.move_to_board(b_loc, B.specials[9])
+            obj.dynofly.move_to_board(dest, 8)
+            return obj.player.move_to_board(dest, 9)
         elif dest == 'brundle':
-            B = obj_by_attr.brundle_level
-            obj.dynofly.move_to_board(None, B.specials[8], B=B)
-            return obj.player.move_to_board(None, B.specials[9], B=B)
+            obj.dynofly.move_to_board(dest, 8)
+            return obj.player.move_to_board(dest, 9)
         elif dest == 'dynofly':
-            b_loc, b = map_to_loc[dest]
-            obj.dynofly.move_to_board(b_loc, b.specials[1])
-            return obj.player.move_to_board(b_loc, b.specials[9])
+            obj.dynofly.move_to_board(dest, 1)
+            return obj.player.move_to_board(dest, 9)
 
 
 class EndGameEvent(Event):
@@ -2372,44 +2350,39 @@ class PlatformEvent2(Event):
         self.animate(obj_by_attr.platform_top1, dir, carry_item=pl, n=4)
 
 class ClimbThroughGrillEvent1(Event):
-    """Related to Jail event."""
     once = False
     def go(self):
-        bx = self.B.loc.x
-        loc = Loc(25 if bx==0 else 36, GROUND)
-        b_loc = Loc(2 if bx==0 else 0, self.B.loc.y)
+        B=self.B
+        loc = Loc(25 if B._map=='1' else 36,
+                  GROUND)
+        _map = '1' if B._map=='3' else '3'
         status('You climb through the grill into a space that opens into an open area outside the building')
-        return self.player.move_to_board(b_loc, loc)
+        return self.player.move_to_board(_map, loc=loc)
 
 class ClimbThroughGrillEvent2(Event):
     """Twinsen Home / Cave."""
     once = False
     def go(self):
         B=self.B
-        dest = 'und1' if B._map==6 else 6
+        dest = 'und1' if B._map==6 else '6'
         status('You climb through the grill ' +
                             ('into a strange underground area' if dest=='und1' else 'back into your home'))
-        if dest=='und1':
-            return self.player.move_to_board(None, Loc(62,10), B=obj_by_attr.und1_level)
-        elif dest==6:
-            return self.player.move_to_board(map_to_loc['6'][0], Loc(62,10))
+        return self.player.move_to_board(dest, loc=Loc(62,10))
 
 class ClimbThroughGrillEvent3(Event):
     """Home / Ferry map."""
     once = False
     def go(self):
+        B=self.B
         player = self.player
-        bx = self.B.loc.x
-        x = 6 if bx==5 else 5
-        b_loc = Loc(x, self.B.loc.y)
-        status('You climb through the grill into ' + ('the port area' if bx==5 else 'back to the shore near your home'))
+        status('You climb through the grill into ' + ('the port area' if B._map=='6' else 'back to the shore near your home'))
 
         # ????
         if player.state == 0:
             player.state = 1
         elif player.state == 1:
             player.state = 2
-        return player.move_to_board(b_loc, Loc(72, GROUND))
+        return player.move_to_board('6' if B._map=='7' else '7', Loc(72, GROUND))
 
 class AlarmEvent1(Event):
     once=True
@@ -2427,8 +2400,7 @@ class GarbageTruckEvent(Event):
         self.B.remove(player)
         player.talk(player, 'The truck suddenly picks you up along with the rubbish!')
         self.animate(t, 'l', n=26)
-        bloc,B = map_to_loc['4']
-        return player.move_to_board(bloc, Loc(0,GROUND))
+        return player.move_to_board('4', loc=Loc(0,GROUND))
 
 class ShopKeeperEvent1(Event):
     """Related to ShopKeeperAlarmEvent."""
@@ -2635,22 +2607,6 @@ def main(stdscr):
     b8 = Board(Loc(7,MAIN_Y), 8)
     b9 = Board(Loc(8,MAIN_Y), 9)
 
-    und1 = Board(None, 'und1')
-    objects[ID.und1_level] = und1
-    sea1 = Board(None, 'sea1')
-    objects[ID.sea_level1] = sea1
-    landscape1 = Board(None, 'landscape1')
-    landscape1.board_landscape1()
-    wtower = Board(None, 'wtower')
-    objects[ID.landscape_level1] = landscape1
-    objects[ID.water_tower_level] = wtower
-    beluga = Board(None, 'beluga')
-    beluga.board_beluga()
-    objects[ID.port_beluga_level] = beluga
-    elf_lab = Board(None, 'elf_lab')
-    elf_lab.board_elf_lab()
-    objects[ID.elf_lab_level] = elf_lab
-
     player = b1.board_1()
 
     b2.board_2()
@@ -2661,9 +2617,6 @@ def main(stdscr):
     b7.board_7()
     b8.board_8()
 
-    und1.board_und1()
-    sea1.board_sea1()
-    wtower.board_wtower()
 
     b9 = Board(Loc(8,MAIN_Y), 9)
     b9.board_9()
@@ -2712,10 +2665,6 @@ def main(stdscr):
     mstone = Board(Loc(4, MAIN_Y+2), 'marked_stone')
     mstone.board_mstone()
 
-    mstone2 = Board(None, 'marked_stone2')
-    mstone2.board_mstone2()
-    objects[ID.mstone2_level] = mstone2
-
     proxima5 = Board(Loc(3, MAIN_Y+3), 'proxima5')
     proxima5.board_proxima5()
 
@@ -2743,10 +2692,6 @@ def main(stdscr):
     f_island2 = Board(Loc(1,MAIN_Y+6), 'f_island2')
     f_island2.board_f_island2()
 
-    brundle = Board(None, 'brundle')
-    brundle.board_brundle()   # this needs to be after `board_dynofly()`
-    objects[ID.brundle_level] = brundle
-
     if DBG:
         hd=Item(None, 'H', 'hair dryer', id=ID.hair_dryer)
         pp=Item(None, 'P', 'proto pack', id=ID.proto_pack)
@@ -2760,6 +2705,25 @@ def main(stdscr):
         player.inv[Item(None, 'p','architect_pass', id=ID.architect_pass)] = 1
         player.inv[objects[ID.book_of_bu]] = 1
         objects[ID.sailboat].state=1
+
+    last_row = MAIN_Y+8
+    und1 = Board(Loc(0, last_row), 'und1')
+    sea1 = Board(Loc(1,last_row), 'sea1')
+    landscape1 = Board(Loc(2,last_row), 'landscape1')
+    landscape1.board_landscape1()
+    wtower = Board(Loc(3,last_row), 'wtower')
+    beluga = Board(Loc(4,last_row), 'beluga')
+    beluga.board_beluga()
+    elf_lab = Board(Loc(5,last_row), 'elf_lab')
+    elf_lab.board_elf_lab()
+    mstone2 = Board(Loc(6,last_row), 'marked_stone2')
+    mstone2.board_mstone2()
+    brundle = Board(Loc(7,last_row), 'brundle')
+    brundle.board_brundle()   # this needs to be after `board_dynofly()`
+
+    und1.board_und1()
+    sea1.board_sea1()
+    wtower.board_wtower()
 
     boards[:] = (
          [desert1,desert2,None,None, None,None,None,None, None,None, None, None],
@@ -2776,6 +2740,10 @@ def main(stdscr):
          [himalaya1,himalaya2,  None,None, None,None,None,None, None,None, None, None],
          [dynofly_board,  bar,       None,None, None,None,None,None, None,None, None, None],
          [f_island,  f_island2,       None,None, None,None,None,None, None,None, None, None],
+         [None,  None,       None,None, None,None,None,None, None,None, None, None],
+
+         # Unconnected maps
+         [und1,  sea1,       landscape1, wtower, beluga, elf_lab, mstone2, brundle, None,None, None, None],
     )
 
     stdscr.clear()
@@ -2785,9 +2753,9 @@ def main(stdscr):
     win2.refresh()
 
     Saves().save('start', B.loc)
-    last_cmd = None
-    wait_count = 0
-    last_dir = 'l'
+    Misc.last_cmd = None
+    Misc.wait_count = 0
+    Misc.last_dir = 'l'
 
     while 1:
         rv = handle_ui(B, player)
@@ -2811,7 +2779,7 @@ def handle_ui(B, player):
         win2.addstr(1, 0, 'stance: normal')
 
     elif k in 'hjklHL':
-        last_dir = k
+        Misc.last_dir = k
         if k in 'HL':
             k = k.lower()
             for _ in range(5):
@@ -2838,15 +2806,15 @@ def handle_ui(B, player):
             # ugly but....
             p_loc = Loc(x, y)
             if chk_b_oob(loc):
-                B = player.move_to_board(loc, p_loc)
+                B = player.move_to_board(boards[loc.y][loc.x]._map, loc=p_loc)
                 B.remove(player)
                 player.loc = player.fall(player.loc)
                 B.put(player)
 
     elif k == '.':
-        if last_cmd=='.':
-            wait_count += 1
-        if wait_count >= 5 and ID.rubbish1 in B.get_ids(player.loc):
+        if Misc.last_cmd=='.':
+            Misc.wait_count += 1
+        if Misc.wait_count >= 5 and ID.rubbish1 in B.get_ids(player.loc):
             triggered_events.append(GarbageTruckEvent)
         debug(str(triggered_events))
     elif k == 's':
@@ -2869,8 +2837,7 @@ def handle_ui(B, player):
             status('> '+mp)
             win2.refresh()
             if mp in map_to_loc:
-                loc,b = map_to_loc[mp]
-                B = player.move_to_board(loc, Loc(8, GROUND), B=b)
+                B = player.move_to_board(mp, loc=Loc(40, 5))
                 if B._map=='des_und': player.tele(Loc(7,7))
                 if B._map=='und1': player.tele(Loc(65,7))
                 if B._map=='des_und2': player.tele(Loc(70,7))
@@ -2885,13 +2852,13 @@ def handle_ui(B, player):
         except:
             status('try again')
     elif k == '6':
-        B = player.move_to_board( map_to_loc['f_island2'][0], Loc(25, 12) )
+        B = player.move_to_board('f_island2', loc=Loc(25, 12))
     elif k == '7':
-        B = player.move_to_board( Loc(6,MAIN_Y), Loc(72, GROUND) )
+        B = player.move_to_board('7', loc=Loc(72, GROUND))
     elif k == '8':
-        B = player.move_to_board( Loc(7,MAIN_Y), Loc(7, GROUND) )
+        B = player.move_to_board('8', loc=Loc(7, GROUND))
     elif k == '9':
-        B = player.move_to_board( Loc(9,MAIN_Y), Loc(59, 5) )
+        B = player.move_to_board('9', loc=Loc(59, 5))
 
     elif k == 't':
         # debug teleport
@@ -2909,21 +2876,19 @@ def handle_ui(B, player):
                 break
 
     elif k == '0':
-        B = player.move_to_board( Loc(0,0), Loc(7, GROUND) )
+        B = player.move_to_board( 'desert1', loc=Loc(7, GROUND) )
     # -----------------------------------------------------------------------------------------------
 
     elif k == 'u':
         player.use()
 
-    elif k == 'U':
-        B = player.move_to_board( None, Loc(35, 10) , B=und1)
     elif k == 'E':
         B.display(str(B.get_all(player.loc)))
     elif k == 'b':
         status('has bu? ' + str(player.has(ID.book_of_bu)))
     elif k == 'm':
         if player.has(ID.magic_ball):
-            MagicBallEvent(B).go(player, last_dir)
+            MagicBallEvent(B).go(player, Misc.last_dir)
     elif k == 'i':
         txt = []
         for item, n in player.inv.items():
@@ -2934,8 +2899,8 @@ def handle_ui(B, player):
         B.display(txt)
 
     if k != '.':
-        wait_count = 0
-    last_cmd = k
+        Misc.wait_count = 0
+    Misc.last_cmd = k
 
     B.guards = [g for g in B.guards if g.health>0]
     B.soldiers = [g for g in B.soldiers if g.health>0]
