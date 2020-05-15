@@ -335,6 +335,7 @@ descr_by_id.update(
      14: 'a jar of syrup',
      10: 'a green heart',
      11: 'a simple key',
+     ID.jar_syrup: 'a jar of raspberry syrup',
     }
 )
 
@@ -518,7 +519,7 @@ class Board:
         map_to_loc[str(_map)] = loc, self
 
     def __repr__(self):
-        return f'<B: {self._map}'
+        return f'<B: {self._map}>'
 
     def __getitem__(self, loc):
         return self.B[loc.y][loc.x][-1]
@@ -1011,6 +1012,9 @@ class Board:
     def get_all(self, loc):
         return [n for n in self.B[loc.y][loc.x] if n!=blank]
 
+    def get_all_obj_and_player(self, loc):
+        return [n for n in self.B[loc.y][loc.x] if not isinstance(n, str)]
+
     def get_all_obj(self, loc):
         return [n for n in self.B[loc.y][loc.x] if not isinstance(n, (str, Player))]
 
@@ -1121,7 +1125,7 @@ class BeingItemMixin:
         B=self.B
         B.put(self)
         if self.is_player and ID.platform1 in B.get_ids(loc) and loc==B.specials[3].mod_r():
-            Event(B).animate_arc(obj_by_attr.platform1, B.specials[1], carry_item=self, height=3)
+            Event(B).animate_arc(obj_by_attr.platform1, B.specials[1], carry_item=self, height=3, sleep_time=0.01)
 
     def has(self, id):
         return self.inv.get(objects.get(id))
@@ -1229,13 +1233,19 @@ class Being(BeingItemMixin):
         self.loc = loc
         B.put(self)
         self.B = B
+        self.update_refs()
+        return B
 
-        # update references in `objects` in case there was a game load from a save
-        for loc, cell in B:
-            for obj in B.get_all_obj(loc):
+    def update_refs(self):
+        """Update references in `objects` in case there was a game load from a save"""
+        for loc, cell in self.B:
+            for obj in self.B.get_all_obj_and_player(loc):
                 if obj.id in objects:
                     objects[obj.id] = obj
-        return B
+
+                for obj in obj.inv:
+                    if obj.id in objects:
+                        objects[obj.id] = obj
 
     @property
     def fight_stance(self):
@@ -2091,14 +2101,14 @@ class Event:
         self.player = objects[ID.player]
         self.kwargs = kwargs
 
-    def animate_arc(self, item, to_loc, height=1, carry_item=None):
+    def animate_arc(self, item, to_loc, height=1, carry_item=None, sleep_time=SLP*4):
         for _ in range(height):
-            self.animate(item, 'k', n=height, carry_item=carry_item)
+            self.animate(item, 'k', n=height, carry_item=carry_item, sleep_time=sleep_time)
         a,b = item.loc, to_loc
         dir = 'h' if a.x>b.x else 'l'
-        self.animate(item, dir, n=abs(a.x-b.x), carry_item=carry_item)
+        self.animate(item, dir, n=abs(a.x-b.x), carry_item=carry_item, sleep_time=sleep_time)
         for _ in range(height):
-            self.animate(item, 'j', n=height, carry_item=carry_item)
+            self.animate(item, 'j', n=height, carry_item=carry_item, sleep_time=sleep_time)
 
     def animate(self, items, dir, B=None, n=999, carry_item=None, sleep_time=SLP*4):
         if not isinstance(items, SEQ_TYPES):
@@ -2328,7 +2338,7 @@ class GroboClonesTakingZoeEvent(Event):
         b=Being(B, specials[5], name='Zoe', char=Blocks.zoe)
         c=Being(B, specials[6], name='GroboClone', char=Blocks.elephant)
         pl.talk(pl, ID.zoe_taken)
-        self.animate((a,b,c), 'h', sleep_time=0.8)
+        self.animate((a,b,c), 'h', sleep_time=0.3)
         B.remove(b)
         B.remove(c)
         pl.talk(pl, ID.zoe_taken2)
@@ -2342,7 +2352,7 @@ class GuardAttackEvent1(Event):
         if guard.loc != B.specials[1]:
             return
         guard.hostile = 1
-        self.animate_arc(obj_by_attr.platform1, B.specials[3].mod_r(), carry_item=guard, height=3)
+        self.animate_arc(obj_by_attr.platform1, B.specials[3].mod_r(), carry_item=guard, height=3, sleep_time=0.01)
 
 # class PlatformEvent1(Event):
 #     once=False
@@ -2360,10 +2370,10 @@ class ClimbThroughGrillEvent1(Event):
     once = False
     def go(self):
         B=self.B
-        loc = Loc(25 if B._map=='1' else 36,
-                  GROUND)
+        x = 25 if B._map=='1' else 36
+        loc = Loc(x, GROUND)
         _map = '1' if B._map=='3' else '3'
-        status('You climb through the grill into a space that opens into an open area outside the building')
+        status('You climb through the grill into an open area outside the building')
         return self.player.move_to_board(_map, loc=loc)
 
 class ClimbThroughGrillEvent2(Event):
@@ -2459,8 +2469,7 @@ class BuyADrinkAnthony(Event):
         if y:
             if pl.kashes>=2:
                 pl.kashes -= 2
-                Item(None, Blocks.wine, 'glass of wine', id=ID.wine)
-                pl.add1(ID.wine)
+                pl.add1(Item(None, Blocks.wine, 'glass of wine', id=ID.wine))
                 status('You bought a glass of wine.')
             else:
                 status("OH NO! You don't have enough kashes.. ..")
@@ -2534,12 +2543,18 @@ class Saves:
     saves = {}
     loaded = 0
 
-    def save(self, name, cur_brd):
-        sh = shelve.open('data')
-        self.saves = sh['saves']
+    def UNUSEDsave(self, name, cur_brd):
+        for n in range(1,999):
+            fn = f'saves/{n}.data'
+            if not os.path.exists(fn):
+                break
+        sh = shelve.open(fn, protocol=1)
+        if 'saves' in sh:
+            self.saves = sh['saves']
         s = {}
         s['boards'] = deepcopy(boards)
         s['cur_brd'] = cur_brd
+        print("save: cur_brd", cur_brd)
         player = objects[ID.player]
         s['player'] = deepcopy(objects[ID.player])
         s['objects'] = deepcopy(objects)
@@ -2547,27 +2562,71 @@ class Saves:
         B = boards[bl.y][bl.x]
         print("B.get_all(player.loc)", B.get_all(player.loc))
         print("in save s['player'].loc", s['player'].loc)
-        self.saves[name] = s
         sh['saves'] = self.saves
         sh.close()
+        return B.get_all(player.loc), n
 
-    def load(self, name):
-        sh = shelve.open('data')
+    # def save(self, name, cur_brd):
+    #     import pickle
+    #     with open('data', 'w') as fp:
+
+    def load(self, name=None):
+        for n in range(1,999):
+            fn = f'saves/{n}.data'
+            if not os.path.exists(fn + '.db'):
+                n-=1
+                fn = f'saves/{n}.data'
+                break
+
+        if name:
+            fn = f'saves/{name}.data'
+
+        sh = shelve.open(fn, protocol=1)
         self.saves = sh['saves']
         print("self.saves", self.saves)
-        s = self.saves[name]
+        s = self.saves[name or n]
         boards[:] = s['boards']
+        for row in boards:
+            for b in row:
+                if b:
+                    map_to_loc[b._map] = b.loc, b
         global objects
         objects = s['objects']
-        loc = s['player'].loc
+        player = objects[ID.player]
+        loc = player.loc
         print("load, player loc", loc)
         bl = s['cur_brd']
+        print("load: cur_brd", bl)
         B = boards[bl.y][bl.x]
         print("B.get_all(loc)", B.get_all(loc))
-        player = B[loc]
+        # pdb(B, loc)
+        player = first([x for x in B.get_all(loc) if isinstance(x,Player)])
+        if not isinstance(player, Player):
+            print("loc", loc)
+            print("list(B)", list(B))
+            print("B._map", B._map)
+            print("B.loc", B.loc)
+            # player = B[Loc(2,14)]
         player.B = B
         objects[ID.player] = player
         return player, B
+
+    def save(self, cur_brd):
+        for n in range(1,999):
+            fn = f'saves/{n}.data'
+            if not os.path.exists(fn+'.db'):
+                break
+        sh = shelve.open(fn, protocol=1)
+        s = {}
+        s['boards'] = boards
+        s['cur_brd'] = cur_brd
+        s['objects'] = objects
+        player = obj_by_attr.player
+        bl = cur_brd
+        B = boards[bl.y][bl.x]
+        sh['saves'] = {str(n): s}
+        sh.close()
+        return B.get_all(player.loc), n
 
 def dist(a,b):
     return max(abs(a.loc.x - b.loc.x),
@@ -2768,13 +2827,14 @@ def main(stdscr, load_game):
     win2.addstr(0, 0, '-'*80)
     win2.refresh()
 
-    Saves().save('start', B.loc)
+    # Saves().save('start', B.loc)
     Misc.last_cmd = None
     Misc.wait_count = 0
     Misc.last_dir = 'l'
 
     if load_game:
         player, B = Saves().load(load_game)
+        player.update_refs()
         B.draw(Windows.win)
     while 1:
         rv = handle_ui(B, player)
@@ -2836,9 +2896,16 @@ def handle_ui(B, player):
         if Misc.wait_count >= 5 and ID.rubbish1 in B.get_ids(player.loc):
             triggered_events.append(GarbageTruckEvent)
         debug(str(triggered_events))
+
     elif k == 's':
-        Saves().save('last', B.loc)
-        status('Saved game as "last"')
+        x,n = Saves().save(B.loc)
+        if any(isinstance(a,Player) for a in x):
+            status(f'Saved game as "{n}"')
+            Windows.win2.refresh()
+            # sleep(1)
+        else:
+            status(f'Error saving game: {x}, {n}')
+
     elif k == 'S':
         player.stance = Stance.sneaky
         win2.addstr(1, 0, 'stance: sneaky')
@@ -3142,7 +3209,10 @@ def editor(stdscr, _map):
 if __name__ == "__main__":
     argv = sys.argv[1:]
     DBG = first(argv) == '-d'
-    load_game = 'last' if first(argv)=='-l' else None
+    load_game = None
+    a = first(argv)
+    if a and a.startswith('-l'):
+        load_game = a[2:]
     if first(argv) == 'ed':
         wrapper(editor, argv[1])
     else:
