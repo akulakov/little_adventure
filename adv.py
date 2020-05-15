@@ -312,6 +312,7 @@ class ID:
     fenioux2 = 156
     olivet3 = 157
     julien3 = 158
+    clone1 = 159
 
     max1 = 200
     max2 = 201
@@ -500,6 +501,9 @@ class Loc:
     def mod_u(self):
         return self.mod(-1, 0)
 
+def map_to_board(_map):
+    l = map_to_loc[_map]
+    return boards[l.y][l.x]
 
 class Board:
     def __init__(self, loc, _map):
@@ -516,13 +520,15 @@ class Board:
         self.loc = loc
         self._map = str(_map)
         self.state = 0
-        map_to_loc[str(_map)] = loc, self
+        map_to_loc[str(_map)] = loc
 
     def __repr__(self):
         return f'<B: {self._map}>'
 
     def __getitem__(self, loc):
-        return self.B[loc.y][loc.x][-1]
+        o = self.B[loc.y][loc.x][-1]
+        if isinstance(o,int): o = objects[o]
+        return o
 
     def __iter__(self):
         for y, row in enumerate(self.B):
@@ -566,8 +572,7 @@ class Board:
         containers, crates, doors, specials = self.load_map(self._map)
         Item(self, Blocks.platform_top, 'platform', specials[Blocks.platform_top], id=ID.platform_top1, type=Type.platform_top)
         ShopKeeper(self, specials[1], name='Abe', id=ID.shopkeeper1)
-        jar = Item(None, Blocks.bottle, 'bottle of raspberry syrup', None, id=ID.jar_syrup)
-        containers[3].inv[jar] = 1
+        containers[3].inv[ID.jar_syrup] = 1
 
     def board_5(self):
         self.labels.append((2,20, "𝓐𝓷𝓽𝓱𝓸𝓷𝔂 𝓫𝓪𝓻"))
@@ -580,10 +585,11 @@ class Board:
     def board_6(self):
         self.labels.append((2,20, "𝒯𝓌𝒾𝓃𝓈𝑒𝓃 𝐻𝑜𝓂𝑒"))
         containers, crates, doors, specials = self.load_map(self._map)
-        mball = Item(None, Blocks.magic_ball, 'magic ball', None, id=ID.magic_ball)
-        containers[0].inv[mball] = 1
+        containers[0].inv[ID.magic_ball] = 1
         containers[0].add1(ID.key1)
-        crates[5].id = ID.crate1
+        self.remove(crates[5])
+        self.put(ID.crate1, crates[5].loc)
+
         TriggerEventLocation(self, specials[1], evt=MaxState1)
         Item(self, Blocks.grill, 'grill', specials[2], id=ID.grill4)
 
@@ -593,15 +599,15 @@ class Board:
         self.labels.append((10,5, "𝒯𝒽𝑒 𝐹𝑒𝓇𝓇𝓎"))
         containers, crates, doors, specials = self.load_map(self._map)
         julien, clone1 = specials[Blocks.elephant]
-        key3 = Item(self, Blocks.key, 'key', id=ID.key3, put=0)
-        clone1.inv[key3] = 1
+        # key3 = Item(self, Blocks.key, 'key', id=ID.key3, put=0)
+        clone1.inv[ID.key3] = 1
         julien.id = ID.julien
         objects[julien.id] = julien
         doors[0].type = Type.door3
         Item(self, Blocks.grill, 'grill', specials[1], id=ID.grill4)
         Item(self, Blocks.ticket_seller, 'Ticket seller booth', specials[2], id=ID.ticket_seller1)
         # invisible, with ferry id to be able to take the ferry near this tile
-        Item(self, '', '', specials[3], id=ID.ferry)
+        # Item(self, '', '', specials[3], id=ID.ferry)
 
     def board_8(self):
         containers, crates, doors, specials = self.load_map(self._map)
@@ -807,7 +813,8 @@ class Board:
         Being(self, specials[7], name='Museum patron', char=Blocks.rabbit)
         Being(self, specials[8], name='Museum patron', char=Blocks.monkey)
         containers[0].id = ID.treasure_chest
-        containers[0].inv[Item(None, Blocks.key, 'Golden Key', id=ID.golden_key)] = 1
+        # containers[0].inv[Item(None, Blocks.key, 'Golden Key', id=ID.golden_key)] = 1
+        containers[0].inv[ID.golden_key] = 1
 
     def board_prox_und(self):
         containers, crates, doors, specials = self.load_map(self._map)
@@ -858,7 +865,7 @@ class Board:
 
     def load_map(self, map_num, for_editor=0):
         _map = open(f'maps/{map_num}.map').readlines()
-        crates = []
+        self.crates = crates = []
         self.containers = containers = []
         self.doors = doors = []
         self.specials = specials = defaultdict(list)
@@ -1013,10 +1020,10 @@ class Board:
         return [n for n in self.B[loc.y][loc.x] if n!=blank]
 
     def get_all_obj_and_player(self, loc):
-        return [n for n in self.B[loc.y][loc.x] if not isinstance(n, str)]
+        return [objects.get(n) or n for n in self.B[loc.y][loc.x] if not isinstance(n, str)]
 
     def get_all_obj(self, loc):
-        return [n for n in self.B[loc.y][loc.x] if not isinstance(n, (str, Player))]
+        return [objects.get(n) or n for n in self.B[loc.y][loc.x] if not isinstance(n, str) and n!=ID.player]
 
     def get_top_obj(self, loc):
         return last(self.get_all_obj(loc))
@@ -1026,14 +1033,17 @@ class Board:
             loc = [loc]
         lst = []
         for l in loc:
-            lst.extend(ids(self.get_all(l)))
+            lst.extend(self.get_all(l))
+        lst = [getattr(x, 'id', None) or x for x in lst]
         return lst
 
     def get_types(self, loc):
         return types(self.get_all(loc))
 
     def found_type_at(self, type, loc):
-        return any(x.type==type for x in self.get_all_obj(loc))
+        def get_obj(x):
+            return objects.get(x) or x
+        return any(get_obj(x).type==type for x in self.get_all_obj(loc))
 
     def draw(self, win):
         for y, row in enumerate(self.B):
@@ -1042,7 +1052,10 @@ class Board:
                 # when it's moved out, the invisible item is drawn, but being an empty string, it doesn't draw over the
                 # being's char, so the 'image' of the being remains there, even after being moved away.
                 cell = [c for c in cell if str(c)]
-                win.addstr(y,x, str(last(cell)))
+                a = last(cell)
+                if isinstance(a, int):
+                    a = objects[a]
+                win.addstr(y,x, str(a))
         for y,x,txt in self.labels:
             win.addstr(y,x,txt)
         for loc, col in self.colors:
@@ -1057,11 +1070,11 @@ class Board:
         If loc IS given, update obj's own location attr if possible.
         """
         loc = loc or obj.loc
-        if not isinstance(obj,str):
-            obj.B = self
+        if not isinstance(obj, (int, str)):
+            obj.board_map = self._map
             obj.loc = loc
         try:
-            self.B[loc.y][loc.x].append(obj)
+            self.B[loc.y][loc.x].append(getattr(obj, 'id', None) or obj)
         except Exception as e:
             sys.stdout.write(str(loc))
             raise
@@ -1071,10 +1084,13 @@ class Board:
         If loc is not given, use obj's own location attr.
         """
         loc = loc or obj.loc
-        self.B[loc.y][loc.x].remove(obj)
+        cell = self.B[loc.y][loc.x]
+        cell.remove(obj if obj in cell else obj.id)
 
     def is_blocked(self, loc):
         for x in self.get_all(loc):
+            if isinstance(x, int):
+                x = objects[x]
             if x in BLOCKING or getattr(x, 'type', None) in BLOCKING:
                 return True
         return False
@@ -1128,32 +1144,43 @@ class BeingItemMixin:
             Event(B).animate_arc(obj_by_attr.platform1, B.specials[1], carry_item=self, height=3, sleep_time=0.01)
 
     def has(self, id):
-        return self.inv.get(objects.get(id))
+        # return self.inv.get(objects.get(id))
+        return self.inv.get(id)
 
     def remove1(self, id):
-        self.inv[objects[id]] -= 1
+        # self.inv[objects[id]] -= 1
+        self.inv[id] -= 1
 
     def add1(self, id, n=1):
-        if isinstance(id, int):
-            self.inv[objects[id]] += n
-        else:
-            self.inv[id] += n
+        # if isinstance(id, int):
+        #     self.inv[objects[id]] += n
+        # else:
+        self.inv[id] += n
+
+    @property
+    def B(self):
+        return map_to_board(self.board_map)
 
 
 class Item(BeingItemMixin):
+    board_map = None
+
     def __init__(self, B, char, name, loc=None, put=True, id=None, type=None):
-        self.B, self.char, self.name, self.loc, self.id, self.type = B, char, name, loc, id, type
+        self.char, self.name, self.loc, self.id, self.type = char, name, loc, id, type
+        if B:
+            self.board_map = B._map
+
         self.inv = defaultdict(int)
         if id:
             objects[id] = self
         if B and put:
             B.put(self)
 
-    def __repr__(self):
+    def __str__(self):
         return self.char
 
-    def __hash__(self):
-        return self.id
+    def __repr__(self):
+        return f'<I: {self.char}>'
 
     def move(self, dir, n=1):
         m = dict(h=(0,-1), l=(0,1), j=(1,0), k=(-1,0))[dir]
@@ -1203,8 +1230,9 @@ class Being(BeingItemMixin):
     char = None
 
     def __init__(self, B, loc=None, put=True, id=None, name=None, state=0, hostile=False, health=None, char='?'):
-        self.B, self.id, self.loc, self.name, self.state, self.hostile  = \
-                B, id, loc, name, state, hostile
+        self.id, self.loc, self.name, self.state, self.hostile  = id, loc, name, state, hostile
+        if B:
+            self.board_map = B._map
 
         self.health = self.health or health or 5
         self.char = self.char or char
@@ -1213,8 +1241,10 @@ class Being(BeingItemMixin):
         if DBG:
             if Misc.is_game: # not editor
                 self.add1(ID.key1, n=2)
-                self.inv[objects[ID.fuel]] = 10
-                self.inv[objects[ID.ferry_ticket]] = 10
+                # self.inv[objects[ID.fuel]] = 10
+                # self.inv[objects[ID.ferry_ticket]] = 10
+                self.inv[ID.fuel] = 10
+                self.inv[ID.ferry_ticket] = 10
             self.kashes = 54
         if id:
             objects[id] = self
@@ -1224,28 +1254,8 @@ class Being(BeingItemMixin):
     def __str__(self):
         return self.char
 
-    def move_to_board(self, _map, specials_ind=None, loc=None):
-        B = map_to_loc[_map][1]
-        if specials_ind is not None:
-            loc = B.specials[specials_ind]
-        if self in self.B.get_all(self.loc):
-            self.B.remove(self)
-        self.loc = loc
-        B.put(self)
-        self.B = B
-        self.update_refs()
-        return B
-
     def update_refs(self):
         """Update references in `objects` in case there was a game load from a save"""
-        for loc, cell in self.B:
-            for obj in self.B.get_all_obj_and_player(loc):
-                if obj.id in objects:
-                    objects[obj.id] = obj
-
-                for obj in obj.inv:
-                    if obj.id in objects:
-                        objects[obj.id] = obj
 
     @property
     def fight_stance(self):
@@ -1318,6 +1328,21 @@ class Being(BeingItemMixin):
             Windows.win2.clear()
             Windows.win2.refresh()
 
+    def move_to_board(self, _map, specials_ind=None, loc=None):
+        to_B = map_to_board(_map)
+        if specials_ind is not None:
+            loc = to_B.specials[specials_ind]
+        if self.id in self.B.get_all(self.loc):
+            self.B.remove(self)
+        self.loc = loc
+        to_B.put(self)
+        self.board_map = to_B._map
+        self.update_refs()
+        for c in to_B.containers:
+            if not c.inv and random()>0.6:
+                c.add1(ID.coin)
+        return to_B
+
     def _move(self, dir, fly=False):
         m = dict(h=(0,-1), l=(0,1), j=(1,0), k=(-1,0))[dir]
         if chk_oob(self.loc, *m):
@@ -1346,6 +1371,7 @@ class Being(BeingItemMixin):
             d = B[new]
             if d.id == ID.door1:
                 triggered_events.append(AlarmEvent1)
+
             B.remove(B[new])    # TODO will not work if something is on top of door
             self.remove1(ID.key1)
             status('You open the door with your key')
@@ -1455,12 +1481,16 @@ class Being(BeingItemMixin):
         pick_up = [ID.key1, ID.key2, ID.key3, ID.magic_ball, ID.pirate_flag, ID.gawley_horn, ID.sendell_medallion, ID.coin]
         top_obj = B.get_top_obj(new)
         items = B.get_all_obj(new)
-        if top_obj and top_obj.type == Type.event_trigger:
-            triggered_events.append(top_obj.evt)
+        if top_obj:
+            if isinstance(top_obj, int):
+                top_obj = objects[top_id]
+            if top_obj.type == Type.event_trigger:
+                triggered_events.append(top_obj.evt)
 
         for x in reversed(items):
             if x.id == ID.coin:
                 self.kashes += 1
+                B.remove(x, new)
             elif x.id == ID.grn_heart:
                 self.health = min(15, self.health+1)
                 B.remove(x)
@@ -1469,10 +1499,10 @@ class Being(BeingItemMixin):
                     status('You have found the Sendell Medallion')
                 if x.id==ID.gawley_horn:
                     status("You have found Gawley's Horn")
-                self.inv[x] += 1
-                B.remove(x)
+                self.inv[x.id] += 1
+                B.remove(x, new)
 
-        names = [i.name for i in B.get_all_obj(new) if i.name]
+        names = [o.name for o in B.get_all_obj(new) if o.name]
         plural = len(names)>1
         names = ', '.join(names)
         if names:
@@ -1482,7 +1512,7 @@ class Being(BeingItemMixin):
     def fall(self, new):
         fly = False
         B=self.B
-        if not fly and not B.found_type_at(Type.ladder, new):
+        if not B.found_type_at(Type.ladder, new):
             new2 = new
             while 1:
                 # TODO: these may overdraw non-blocking items; it's an ugly hack but creates a nice fall animation
@@ -1545,10 +1575,10 @@ class Being(BeingItemMixin):
                 elif random()>0.6:
                     Item(B, Blocks.grn_heart, 'heart', obj.loc, id=ID.grn_heart)
 
-                for it, qty in obj.inv.items():
+                for id, qty in obj.inv.items():
                     # TODO note item will not have a `loc` (ok for now)
-                    it.loc = obj.loc
-                    B.put(it, obj.loc)
+                    # it.loc = obj.loc
+                    B.put(id, obj.loc)
 
                 # Special kills
                 if B._map=='f_island2':
@@ -1587,14 +1617,15 @@ class Being(BeingItemMixin):
         items = {k:v for k,v in cont.inv.items() if v}
         lst = []
         for x in items:
-            if x.id==ID.golden_key:
+            if x==ID.golden_key:
                 status('You have found the Golden Key that the runes at cave under your home spoke of!')
-            if x.id==ID.coin:
+            if x==ID.coin:
                 self.kashes+=1
             else:
                 self.inv[x] += cont.inv[x]
             cont.inv[x] = 0
-            lst.append(str(x))
+            # pdb(objects, x)
+            lst.append(str(objects[x]))
         status('You found {}'.format(', '.join(lst)))
         if not items:
             status(f'{cont.name} is empty')
@@ -1616,13 +1647,13 @@ class Being(BeingItemMixin):
                 self.remove1(ID.hair_dryer)
                 self.kashes+=10
                 obj.baldino.state = 3
-                pp = Item(None, Blocks.proto_pack, 'Proto-pack', id=ID.proto_pack)
-                self.inv[pp] = 1
+                # pp = Item(None, Blocks.proto_pack, 'Proto-pack', id=ID.proto_pack)
+                self.inv[ID.proto_pack] = 1
 
     def action(self):
         B=self.B
-        cont = last( [x for x in B.get_all(self.loc) if x.type==Type.container] )
-        objs = B.get_all_obj(self.loc)
+        cont = last( [x for x in B.get_all_obj(self.loc) if x.type==Type.container] )
+        ids = B.get_all_obj(self.loc)
 
         r,l = self.loc.mod_r(), self.loc.mod_l()
         rd, ld = r.mod_d(), l.mod_d()
@@ -1639,9 +1670,18 @@ class Being(BeingItemMixin):
 
         if cont:
             self.loot(B, cont)
-        elif len(objs)>1 and objs[-2].id == ID.crate1:
-            objs[-2].move('l')
-            Item(B, Blocks.grill, 'grill', self.loc, id=ID.grill3)
+
+        # elif len(ids)>1 and ids[-2] == ID.crate1:
+        elif is_near('crate1'):
+            print('here')
+            c = B.get_top_obj(self.loc)
+            print("c", c)
+            print("c.id,ID.crate1", c.id,ID.crate1)
+            if c.id == ID.crate1:
+                c.move('l')
+                # obj[ids[-2]].move('l')
+                Item(B, Blocks.grill, 'grill', self.loc, id=ID.grill3)
+                print('moved and created grill')
 
         elif is_near('anthony'):
             BuyADrinkAnthony(B).go()
@@ -1663,7 +1703,7 @@ class Being(BeingItemMixin):
 
         elif is_near('tartas'):
             self.talk(obj.tartas)
-            brundle = map_to_loc['brundle'][1]
+            brundle = map_to_board('brundle')
             if brundle.state==1:
                 self.talk(obj.tartas, "Ah, you've done that? Follow me then! You will also need to defeat the soldiers, only then I'll be able to dig the way for you...")
                 triggered_events.append(FollowTartasEvent)
@@ -1681,26 +1721,29 @@ class Being(BeingItemMixin):
         elif is_near('candanchu'):
             self.talk(obj.candanchu)
             status('Candanchu gives you a fancy-looking key..')
-            self.inv[Item(None, Blocks.key, 'fancy key', id=ID.safe_key)] = 1
+            # self.inv[Item(None, Blocks.key, 'fancy key', id=ID.safe_key)] = 1
+            self.inv[ID.safe_key] = 1
 
         elif is_near('robobunny1'):
             self.talk(obj.robobunny1)
 
         elif is_near('safe') and self.has(ID.safe_key):
             status("You discover Dr.FunFrock's saber!!")
-            self.inv[Item(None, Blocks.saber, "Saber", id=ID.saber)] = 1
+            # self.inv[Item(None, Blocks.saber, "Saber", id=ID.saber)] = 1
+            self.inv[ID.saber] = 1
             self.talk(self,ID.safe_note)
             obj.graus.state = 1
 
         elif is_near('graus') and obj.graus.state==1:
             self.talk(obj.graus)
-            self.inv[Item(None, Blocks.card, "Architect's pass", id=ID.architect_pass)] = 1
+            # self.inv[Item(None, Blocks.card, "Architect's pass", id=ID.architect_pass)] = 1
+            self.inv[ID.architect_pass] = 1
 
         elif is_near('sever'):
             self.talk(obj.sever)
             if self.has(ID.guitar):
                 self.talk(obj.sever, 'Oh you do have a guitar? May I have it? I am so happy! I will open the way for you at once.')
-                self.inv[obj.guitar] = 0
+                self.inv[ID.guitar] = 0
                 B.remove(B[B.specials[2]])
 
         elif is_near('red_door') and self.has(ID.red_card):
@@ -1726,7 +1769,8 @@ class Being(BeingItemMixin):
             resp = self.talk(self, ['To free the Marked stone, speak the word ODOS', 'Which word will free me?'], resp=True)
             if resp.lower()=='dax':
                 status('You see the mighty stone disappear and a magic flute floats into your hand!')
-                self.inv[Item(None, Blocks.flute, 'Magic Flute', id=ID.magic_flute)] = 1
+                # self.inv[Item(None, Blocks.flute, 'Magic Flute', id=ID.magic_flute)] = 1
+                self.inv[ID.magic_flute] = 1
 
         elif is_near('alarm_tech'):
             self.talk(obj.alarm_tech)
@@ -1774,7 +1818,8 @@ class Being(BeingItemMixin):
 
         elif is_near('elf'):
             self.talk(obj.elf)
-            self.inv[Item(None, 'B', 'blue card', id=ID.blue_card)] = 1
+            # self.inv[Item(None, 'B', 'blue card', id=ID.blue_card)] = 1
+            self.inv[ID.blue_card] = 1
             status('The elf gives you the blue magnetic card!')
 
         elif is_near('legend1'):
@@ -1805,16 +1850,16 @@ class Being(BeingItemMixin):
             self.talk(obj.fenioux)
             if obj.fenioux.state==1:
                 self.talk(obj.fenioux, ID.fenioux2)
-                rc = Item(None, 'R', 'red magnetic card', id=ID.red_card)
-                self.inv[rc] = 1
+                # rc = Item(None, 'R', 'red magnetic card', id=ID.red_card)
+                self.inv[ID.red_card] = 1
 
         elif is_near('salesman') and obj.salesman.state==1:
             y = self.talk(obj.salesman, "Would you like to buy a hair dryer? It's only 20 kashes!", yesno=1)
             if y:
                 if self.kashes>=20:
                     self.kashes-=20
-                    hd = Item(None, Blocks.hair_dryer, 'Hair dryer', id=ID.hair_dryer)
-                    self.inv[hd] = 1
+                    # hd = Item(None, Blocks.hair_dryer, 'Hair dryer', id=ID.hair_dryer)
+                    self.inv[ID.hair_dryer] = 1
                 else:
                     status('You do not have enough kashes!')
 
@@ -1837,7 +1882,7 @@ class Being(BeingItemMixin):
             y = self.talk(obj.aubigny, 'Would you like to buy some fuel for 5 kashes?', yesno=1)
             if y:
                 if self.kashes>=5:
-                    self.inv[obj.fuel] += 5
+                    self.inv[ID.fuel] += 5
                     self.kashes -= 5
                 else:
                     status("Looks like you don't have enough kashes!")
@@ -1846,7 +1891,7 @@ class Being(BeingItemMixin):
             self.talk_to_olivet()
 
         elif is_near('book_of_bu'):
-            self.inv[obj.book_of_bu] = 1
+            self.inv[ID.book_of_bu] = 1
             B.remove(obj.book_of_bu)
             status('You have found the Book of Bu.')
 
@@ -1916,9 +1961,12 @@ class Being(BeingItemMixin):
         elif is_near('julien'):
             self.talk_to_julien()
 
-        elif is_near('ferry') and self.has(ID.ferry_ticket):
-            dest = 8 if B._map==7 else 7
-            triggered_events.append((TravelByFerry, dict(dest=dest)))
+        elif is_near('ferry'):
+            if self.has(ID.ferry_ticket):
+                dest = '8' if B._map=='7' else '7'
+                triggered_events.append((TravelByFerry, dict(dest=dest)))
+            else:
+                self.talk(self, "You turn up your pockets but there's not ferry ticket to be found!")
 
         else:
             loc = self.loc.mod(1,0)
@@ -1969,13 +2017,14 @@ class Being(BeingItemMixin):
         if self.has(ID.magic_flute):
             y = self.talk(obj.olivet, ID.olivet3, yesno=1)
             if y:
-                self.inv[obj.magic_flute] = 0
-                self.inv[Item(None, 'g', 'guitar', id=ID.guitar)] = 1
+                self.inv[ID.magic_flute] = 0
+                # self.inv[Item(None, 'g', 'guitar', id=ID.guitar)] = 1
+                self.inv[ID.guitar] = 1
         elif self.has(ID.guitar):
             y = self.talk(obj.olivet, "Would you like to return the guitar and get your flute back?", yesno=1)
             if y:
-                self.inv[obj.magic_flute] = 1
-                self.inv[obj.guitar] = 0
+                self.inv[ID.magic_flute] = 1
+                self.inv[ID.guitar] = 0
 
     def use_sailboat(self):
         dests = [('White Leaf Desert', 'desert1'), ('Port Beluga', 'beluga')]
@@ -1999,7 +2048,8 @@ class Being(BeingItemMixin):
         B=self.B
         win = newwin(len(self.inv), 40, 2, 10)
         ascii_letters = string.ascii_letters
-        for n, (item,qty) in enumerate(self.inv.items()):
+        for n, (id,qty) in enumerate(self.inv.items()):
+            item = objects[id]
             win.addstr(n,0, f'{ascii_letters[n]}) {item.name:4} - {qty}')
         ch = win.getkey()
         item = None
@@ -2024,8 +2074,9 @@ class Being(BeingItemMixin):
                 if B[loc] == rock:
                     B.remove(rock, loc)
                 B.put(Blocks.water, loc)
-            self.inv[obj.empty_bottle] = 0
-            self.inv[Item(None, Blocks.bottle, 'Bottle of clear water', id=ID.bottle_clear_water)] = 1
+            self.inv[ID.empty_bottle] = 0
+            # self.inv[Item(None, Blocks.bottle, 'Bottle of clear water', id=ID.bottle_clear_water)] = 1
+            self.inv[ID.bottle_clear_water] = 1
 
         elif item.id == ID.gawley_horn and is_near('stone2'):
             self.B.remove(obj.stone2)
@@ -2044,9 +2095,9 @@ class Being(BeingItemMixin):
 
         elif is_near('water_supply') and item.id == ID.jar_syrup:
             status('You add raspberry syrup to the water supply')
-            self.inv[item] -=1
-            empty_bottle = Item(None, Blocks.bottle, 'empty bottle', id=ID.empty_bottle)
-            self.inv[empty_bottle] += 1
+            self.inv[item.id] -=1
+            # empty_bottle = Item(None, Blocks.bottle, 'empty bottle', id=ID.empty_bottle)
+            self.inv[ID.empty_bottle] += 1
             # a little hacky, would be better to add a water supply obj and update its state
             obj.clermont_ferrand.state = 2
         else:
@@ -2121,7 +2172,9 @@ class Event:
                     carry_item.move(dir, fly=1)
                 B.draw(Windows.win)
                 sleep(sleep_time)
-                if item.loc.x in (0, 78):
+                if item.loc.x==0:
+                    print("item,item.loc", item,item.loc)
+                    print("B.B[14]", B.B[14])
                     B.remove(item)
                     if carry_item:
                         B.remove(carry_item)
@@ -2133,10 +2186,10 @@ class JailEvent(Event):
         if self.player.state==1:
             B=self.B
             self.player.tele(B.spawn_locations[8])
-            c = Clone(B, B.spawn_locations[4])
+            c = Clone(B, B.spawn_locations[4], id=ID.clone1)
             B.soldiers.append(c)
             Guard(B, B.spawn_locations[6], id=ID.guard2)
-            status('Suddenly a Groboclone appears and leads you away...')
+            self.player.talk(self.player, 'Suddenly a Groboclone appears and leads you away...')
             # TODO: this is an ugly hack, instead an event should only be triggered when player is in state=1, and make
             # this a once=True event
             JailEvent.once = True
@@ -2183,7 +2236,7 @@ class DrFunfrockTrapEvent(Event):
         Item(B, Blocks.bars, 'bars', pl.loc.mod_r())
         Windows.win.refresh()
         pl.talk(pl, conversations[ID.funfrock])
-        bloc,B = map_to_loc['1']
+        B = map_to_board('1')
         B.containers[0].inv = pl.inv
         pl.inv = defaultdict(int)
         B.state = 1
@@ -2203,7 +2256,6 @@ class TartasDigsEvent(Event):
 class FollowTartasEvent(Event):
     once=1
     def go(self):
-        bloc, B = map_to_loc['f_island2']
         obj_by_attr.tartas.move_to_board('f_island2', 8)
         return self.player.move_to_board('f_island2', 9)
 
@@ -2243,14 +2295,14 @@ class TravelByFerry(Event):
     def go(self):
         dest = self.kwargs.get('dest')
         player = objects[ID.player]
-        B = map_to_loc['sea1'][1]
+        B = map_to_board('sea1')
         f = obj_by_attr.ferry
         B.put(f, Loc(78,GROUND))
         self.animate(f, 'h', B=B)
         status('The ferry took you to ' + ('Principal Island' if dest=='8' else 'Citadel Island'))
-        if dest == 8:
+        if dest == '8':
             return player.move_to_board('8', loc=Loc(7, GROUND))
-        elif dest == 7:
+        elif dest == '7':
             return player.move_to_board('7', loc=Loc(7, GROUND))
 
 class TravelByCarEvent(Event):
@@ -2263,7 +2315,7 @@ class TravelByCarEvent(Event):
         self.animate(car, 'h')
 
         # switch to landscape map
-        B = map_to_loc['landscape1'][1]
+        B = map_to_board('landscape1')
         self.B = B
         B.put(car, Loc(77,GROUND))
         self.animate(car, 'h')
@@ -2289,7 +2341,7 @@ class TravelBySailboat(Event):
         dests = self.kwargs.get('dests')
         lname = first([ln for ln,m in dests if m==dest])
         player = objects[ID.player]
-        B = map_to_loc['sea1'][1]
+        B = map_to_board('sea1')
         s = objects[ID.sailboat]
         B.put(s, Loc(78,GROUND))
         self.animate(s, 'h', B=B)
@@ -2369,19 +2421,16 @@ class PlatformEvent2(Event):
 class ClimbThroughGrillEvent1(Event):
     once = False
     def go(self):
-        B=self.B
-        x = 25 if B._map=='1' else 36
-        loc = Loc(x, GROUND)
-        _map = '1' if B._map=='3' else '3'
+        _map = '1' if self.B._map=='3' else '3'
         status('You climb through the grill into an open area outside the building')
-        return self.player.move_to_board(_map, loc=loc)
+        return self.player.move_to_board(_map, 2)
 
 class ClimbThroughGrillEvent2(Event):
     """Twinsen Home / Cave."""
     once = False
     def go(self):
         B=self.B
-        dest = 'und1' if B._map==6 else '6'
+        dest = 'und1' if B._map=='6' else '6'
         status('You climb through the grill ' +
                             ('into a strange underground area' if dest=='und1' else 'back into your home'))
         return self.player.move_to_board(dest, loc=Loc(62,10))
@@ -2399,7 +2448,7 @@ class ClimbThroughGrillEvent3(Event):
             player.state = 1
         elif player.state == 1:
             player.state = 2
-        return player.move_to_board('6' if B._map=='7' else '7', Loc(72, GROUND))
+        return player.move_to_board('6' if B._map=='7' else '7', loc=Loc(72, GROUND))
 
 class AlarmEvent1(Event):
     once=True
@@ -2469,7 +2518,7 @@ class BuyADrinkAnthony(Event):
         if y:
             if pl.kashes>=2:
                 pl.kashes -= 2
-                pl.add1(Item(None, Blocks.wine, 'glass of wine', id=ID.wine))
+                pl.add1(ID.wine)
                 status('You bought a glass of wine.')
             else:
                 status("OH NO! You don't have enough kashes.. ..")
@@ -2554,14 +2603,11 @@ class Saves:
         s = {}
         s['boards'] = deepcopy(boards)
         s['cur_brd'] = cur_brd
-        print("save: cur_brd", cur_brd)
         player = objects[ID.player]
         s['player'] = deepcopy(objects[ID.player])
         s['objects'] = deepcopy(objects)
         bl = cur_brd
         B = boards[bl.y][bl.x]
-        print("B.get_all(player.loc)", B.get_all(player.loc))
-        print("in save s['player'].loc", s['player'].loc)
         sh['saves'] = self.saves
         sh.close()
         return B.get_all(player.loc), n
@@ -2583,32 +2629,31 @@ class Saves:
 
         sh = shelve.open(fn, protocol=1)
         self.saves = sh['saves']
-        print("self.saves", self.saves)
+        # print("self.saves", self.saves)
         s = self.saves[name or n]
         boards[:] = s['boards']
-        for row in boards:
-            for b in row:
-                if b:
-                    map_to_loc[b._map] = b.loc, b
-        global objects
+        global objects, done_events
+
+        done_events = s.get('done_events') or set()
         objects = s['objects']
         player = objects[ID.player]
         loc = player.loc
-        print("load, player loc", loc)
+        # print("load, player loc", loc)
         bl = s['cur_brd']
-        print("load: cur_brd", bl)
+        # print("load: cur_brd", bl)
         B = boards[bl.y][bl.x]
-        print("B.get_all(loc)", B.get_all(loc))
+        # print("B.get_all(loc)", B.get_all(loc))
         # pdb(B, loc)
-        player = first([x for x in B.get_all(loc) if isinstance(x,Player)])
-        if not isinstance(player, Player):
-            print("loc", loc)
-            print("list(B)", list(B))
-            print("B._map", B._map)
-            print("B.loc", B.loc)
+        # player = first([x for x in B.get_all(loc) if isinstance(x,Player)])
+        # if not isinstance(player, Player):
+        #     print("loc", loc)
+        #     print("list(B)", list(B))
+        #     print("B._map", B._map)
+        #     print("B.loc", B.loc)
             # player = B[Loc(2,14)]
-        player.B = B
-        objects[ID.player] = player
+        # player.B = B
+        # objects[ID.player] = player
+        # return B
         return player, B
 
     def save(self, cur_brd):
@@ -2621,6 +2666,7 @@ class Saves:
         s['boards'] = boards
         s['cur_brd'] = cur_brd
         s['objects'] = objects
+        s['done_events'] = done_events
         player = obj_by_attr.player
         bl = cur_brd
         B = boards[bl.y][bl.x]
@@ -2768,17 +2814,17 @@ def main(stdscr, load_game):
     f_island2.board_f_island2()
 
     if DBG:
-        hd=Item(None, 'H', 'hair dryer', id=ID.hair_dryer)
-        pp=Item(None, 'P', 'proto pack', id=ID.proto_pack)
-        player.inv[pp] = 1
-        player.inv[hd] = 1
-        player.inv[Item(None,'g','gk',id=ID.golden_key)] = 1
-        player.inv[Item(None,'h','gawley_horn',id=ID.gawley_horn)] = 1
-        player.inv[Item(None, Blocks.bottle,'empty bottle', id=ID.empty_bottle)] = 1
-        player.inv[Item(None, 'f','magic flute', id=ID.magic_flute)] = 1
-        player.inv[Item(None, 'c','blue card', id=ID.blue_card)] = 1
-        player.inv[Item(None, 'p','architect_pass', id=ID.architect_pass)] = 1
-        player.inv[objects[ID.book_of_bu]] = 1
+        player.inv[ID.proto_pack] = 1
+        player.inv[ID.hair_dryer] = 1
+
+        player.inv[ID.golden_key] = 1
+        player.inv[ID.gawley_horn] = 1
+        player.inv[ID.empty_bottle] = 1
+        player.inv[ID.magic_flute] = 1
+        player.inv[ID.blue_card] = 1
+        player.inv[ID.architect_pass] = 1
+
+        player.inv[ID.book_of_bu] = 1
         objects[ID.sailboat].state=1
 
     last_row = MAIN_Y+8
@@ -2834,8 +2880,34 @@ def main(stdscr, load_game):
 
     if load_game:
         player, B = Saves().load(load_game)
-        player.update_refs()
+        # B = Saves().load(load_game)
+        # player.update_refs()
         B.draw(Windows.win)
+        player.kashes = 100
+
+    Item(None, 'H', 'hair dryer', id=ID.hair_dryer)
+    Item(None, 'P', 'proto pack', id=ID.proto_pack)
+    Item(None,'g','gk',id=ID.golden_key)
+    Item(None, Blocks.key,'special key', id=ID.key3)
+    Item(None,'h','gawley_horn',id=ID.gawley_horn)
+    Item(None, Blocks.bottle,'empty bottle', id=ID.empty_bottle)
+    Item(None, 'f','magic flute', id=ID.magic_flute)
+    Item(None, Blocks.magic_ball,'magic ball', id=ID.magic_ball)
+    Item(None, 'c','blue card', id=ID.blue_card)
+    Item(None, 'p','architect_pass', id=ID.architect_pass)
+    Item(None, Blocks.bottle, 'jar of strawberry syrup', id=ID.jar_syrup)
+    Item(None, Blocks.wine, 'half bottle of wine', id=ID.wine)
+    Item(None, Blocks.crate1, 'crate', id=ID.crate1)
+
+    # only to keep state to unlock Port Beluga
+    Being(None, None, name='Maurice', char=Blocks.rabbit, id=ID.maurice, put=0)
+
+    # if B._map=='6':
+    #     B.remove(B.crates[5])
+    #     B.put(ID.crate1, B.crates[5].loc)
+
+    print("triggered_events", triggered_events)
+
     while 1:
         rv = handle_ui(B, player)
         if not rv: return
@@ -2867,6 +2939,7 @@ def handle_ui(B, player):
                     break
         else:
             rv = player.move(k)
+
         if rv[0] == LOAD_BOARD:
             loc = rv[1]
             if loc==ID.fall:
@@ -2899,7 +2972,7 @@ def handle_ui(B, player):
 
     elif k == 's':
         x,n = Saves().save(B.loc)
-        if any(isinstance(a,Player) for a in x):
+        if any(a==ID.player for a in x):
             status(f'Saved game as "{n}"')
             Windows.win2.refresh()
             # sleep(1)
@@ -2978,7 +3051,8 @@ def handle_ui(B, player):
             MagicBallEvent(B).go(player, Misc.last_dir)
     elif k == 'i':
         txt = []
-        for item, n in player.inv.items():
+        for id, n in player.inv.items():
+            item = objects[id]
             if item and n:
                 # txt.append(f'{item} {id(item)} {item.name} {n}')
                 txt.append(f'{item.name} {n}')
@@ -2995,7 +3069,12 @@ def handle_ui(B, player):
         if g.hostile:
             g.attack(player)
     for s in B.soldiers:
-        if s.hostile or dist(s, player) <= (1 if player.sneaky_stance else 5):
+        attack =  s.hostile
+        if s.id == ID.clone1 and dist(s, player) <= 1:
+            attack = True
+        elif s.id!=ID.clone1 and dist(s, player) <= (1 if player.sneaky_stance else 5):
+            attack = True
+        if attack:
             s.hostile = 1
             s.attack(player)
 
