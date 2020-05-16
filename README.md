@@ -1,4 +1,4 @@
-Little-small adventure
+# Little adventure
 
 Little adventure is a turn based game with graphics / mechanics similar to games like Dwarf Fortress or Nethack.
 
