@@ -674,12 +674,12 @@ class Board:
     def board_top2(self): self.load_map(self._map)
 
     def board_top3(self):
-        self.colors = [(Loc(50,11), 1)]     # window
+        self.colors = [(Loc(50,11), Colors.blue_on_white)]     # window
         containers, crates, doors, specials = self.load_map(self._map)
         Item(self, Blocks.car, 'Car', specials[8], id=ID.car)
 
     def board_beluga(self):
-        self.colors = [(Loc(41,6), 1)]     # window
+        self.colors = [(Loc(41,6), Colors.blue_on_white)]     # window
         containers, crates, doors, specials = self.load_map(self._map)
         s=Item(self, Blocks.ferry, 'Sailboat', specials[8], id=ID.sailboat)
         s.state=1
@@ -690,7 +690,7 @@ class Board:
     def board_desert1(self):
         lrange = lambda *x: list(range(*x))
         for x in [8,15] + lrange(23,27) + lrange(35,79):
-            self.colors.append((Loc(x,GROUND+1), 2))
+            self.colors.append((Loc(x,GROUND+1), Colors.yellow_on_white))
         containers, crates, doors, specials = self.load_map(self._map)
         s=Soldier(self, specials[2])
         s.add1(ID.key1)
@@ -698,7 +698,7 @@ class Board:
     def board_desert2(self):
         lrange = lambda *x: list(range(*x))
         for x in [8,15] + lrange(23,27) + lrange(35,60):
-            self.colors.append((Loc(x,GROUND+1), 2))
+            self.colors.append((Loc(x,GROUND+1), Colors.yellow_on_white))
         specials = self.load_map(self._map)[3]
         Being(self, specials[1], id=ID.olivet, name='Olivet', char=Blocks.rabbit)
         Item(self, Blocks.seal, 'strange seal', specials[2], id=ID.seal_sendell)
@@ -742,7 +742,7 @@ class Board:
         return l
 
     def board_proxima1(self):
-        self.colors = self.color_line(Loc(61,7), Loc(67,7), 3)
+        self.colors = self.color_line(Loc(61,7), Loc(67,7), Colors.green_on_white)
 
         containers, crates, doors, specials = self.load_map(self._map)
         # Item(self, Blocks.ferry, 'Sailboat', specials[1], id=ID.sailboat)
@@ -802,7 +802,7 @@ class Board:
         Item(self, Blocks.special_stone, 'Strange Stone', specials[1], id=ID.eclipse_stone)
 
     def board_museum(self):
-        self.colors = [(Loc(60,8), 4)]
+        self.colors = [(Loc(60,8), Colors.yellow_on_black)]
         containers, crates, doors, specials = self.load_map(self._map)
         Item(self, Blocks.lever, 'Museum Alarm', specials[1], id=ID.museum_alarm)
         Item(self, Blocks.door, '', specials[5], id=ID.museum_door, type=Type.door1)
@@ -827,7 +827,7 @@ class Board:
 
     def board_himalaya2(self):
         containers, crates, doors, specials = self.load_map(self._map)
-        self.colors = self.color_line(specials[1], specials[2], 5)
+        self.colors = self.color_line(specials[1], specials[2], Colors.blue_on_black)
         Item(self, '', '', specials[3], id=ID.clear_water_lake)
 
     def board_bar(self):
@@ -861,7 +861,7 @@ class Board:
     def board_wtower(self):
         specials = self.load_map(self._map)[3]
         for loc in self.locs_rectangle(Loc(32,13), Loc(37,14)):
-            self.colors.append((loc,1))
+            self.colors.append((loc, Colors.blue_on_white))
         Item(self, '', '', specials[1], id=ID.water_supply)
 
     def load_map(self, map_num, for_editor=0):
@@ -1159,7 +1159,6 @@ class BeingItemMixin:
         to_B = map_to_board(_map)
         if specials_ind is not None:
             loc = to_B.specials[specials_ind]
-            print("loc", loc)
         if self.id in self.B.get_all(self.loc):
             self.B.remove(self)
         self.loc = loc
@@ -2178,19 +2177,14 @@ class Event:
         if not isinstance(items, SEQ_TYPES):
             items = [items]
         B = B or self.B
-        print("id(B)", id(B), B._map)
         for _ in range(n):
-            print("B.B[14]", B.B[14])
             for item in items:
-                print("id(item.B)", id(item.B), item.B._map)
                 item.move(dir)
                 if carry_item:
                     carry_item.move(dir, fly=1)
                 B.draw(Windows.win)
                 sleep(sleep_time)
                 if item.loc.x==0:
-                    print("item,item.loc", item,item.loc)
-                    print("B.B[14]", B.B[14])
                     B.remove(item)
                     if carry_item:
                         B.remove(carry_item)
@@ -2636,10 +2630,6 @@ class Saves:
         sh.close()
         return B.get_all(player.loc), n
 
-    # def save(self, name, cur_brd):
-    #     import pickle
-    #     with open('data', 'w') as fp:
-
     def load(self, name=None):
         for n in range(1,999):
             fn = f'saves/{n}.data'
@@ -2665,11 +2655,14 @@ class Saves:
         B = boards[bl.y][bl.x]
         return player, B
 
-    def save(self, cur_brd):
-        for n in range(1,999):
-            fn = f'saves/{n}.data'
-            if not os.path.exists(fn+'.db'):
-                break
+    def save(self, cur_brd, name=None):
+        if not name:
+            for n in range(1,999):
+                fn = f'saves/{n}.data'
+                name = str(n)
+                if not os.path.exists(fn+'.db'):
+                    break
+        fn = f'saves/{name}.data'
         sh = shelve.open(fn, protocol=1)
         s = {}
         s['boards'] = boards
@@ -2679,9 +2672,9 @@ class Saves:
         player = obj_by_attr.player
         bl = cur_brd
         B = boards[bl.y][bl.x]
-        sh['saves'] = {str(n): s}
+        sh['saves'] = {name: s}
         sh.close()
-        return B.get_all(player.loc), n
+        return B.get_all(player.loc), name
 
 def dist(a,b):
     return max(abs(a.loc.x - b.loc.x),
@@ -2834,6 +2827,7 @@ def main(stdscr, load_game):
         player.inv[ID.architect_pass] = 1
 
         player.inv[ID.book_of_bu] = 1
+        Item(None, Blocks.ferry, 'sailboat', id=ID.sailboat)
         objects[ID.sailboat].state=1
 
     last_row = MAIN_Y+8
@@ -2909,16 +2903,7 @@ def main(stdscr, load_game):
     Item(None, Blocks.crate1, 'crate', id=ID.crate1)
     Item(None, Blocks.bottle, 'Bottle of clear water', id=ID.bottle_clear_water)
 
-    # Item(None, 'c', 'red card', id=ID.red_card)
     f = obj_by_attr.ferry
-    # print("f", B._map, f, f.loc, f.B)
-
-    # f.move_to_board('8', loc=Loc(7,15))
-    # if B._map=='8' and f.loc.x==6:
-    #     f.move('l')
-    # if B._map in 'top3 beluga'.split():
-    #     obj_by_attr.car.board_map = B._map
-    #     obj_by_attr.car.loc = Loc(6,14)
     player.health = 40
     player.add1(ID.key1)
     player.kashes = 50
@@ -2926,10 +2911,6 @@ def main(stdscr, load_game):
     # only to keep state to unlock Port Beluga
     m = Being(None, None, name='Maurice', char=Blocks.rabbit, id=ID.maurice, put=0)
     m.state=1
-
-    # if B._map=='6':
-    #     B.remove(B.crates[5])
-    #     B.put(ID.crate1, B.crates[5].loc)
 
     while 1:
         rv = handle_ui(B, player)
@@ -2992,16 +2973,14 @@ def handle_ui(B, player):
         if Misc.wait_count >= 5 and ID.rubbish1 in B.get_ids(player.loc):
             triggered_events.append(GarbageTruckEvent)
         debug(str(triggered_events))
-
+    elif k == 'o':
+        name = prompt(win2)
+        player, B = Saves().load(name)
     elif k == 's':
-        x,n = Saves().save(B.loc)
-        if any(a==ID.player for a in x):
-            status(f'Saved game as "{n}"')
-            Windows.win2.refresh()
-            # sleep(1)
-        else:
-            status(f'Error saving game: {x}, {n}')
-
+        name = prompt(win2)
+        Saves().save(B.loc, name)
+        status(f'Saved game as "{name}"')
+        Windows.win2.refresh()
     elif k == 'S':
         player.stance = Stance.sneaky
         win2.addstr(1, 0, 'stance: sneaky')
@@ -3011,7 +2990,7 @@ def handle_ui(B, player):
         # objects[ID.player] = player
     elif k == ' ':
         player.action()
-    elif k == '4':
+    elif k == '4' and DBG:
         mp = ''
         status('> ')
         win2.refresh()
@@ -3026,7 +3005,7 @@ def handle_ui(B, player):
                 if B._map=='des_und2': player.tele(Loc(70,7))
             if not any(m.startswith(mp) for m in map_to_loc):
                 break
-    elif k == '5':
+    elif k == '5' and DBG:
         k = win.getkey()
         k+= win.getkey()
         try:
@@ -3034,16 +3013,7 @@ def handle_ui(B, player):
             status(f'printed row {k} to debug')
         except:
             status('try again')
-    elif k == '6':
-        B = player.move_to_board('f_island2', loc=Loc(25, 12))
-    elif k == '7':
-        B = player.move_to_board('7', loc=Loc(72, GROUND))
-    elif k == '8':
-        B = player.move_to_board('8', loc=Loc(7, GROUND))
-    elif k == '9':
-        B = player.move_to_board('9', loc=Loc(59, 5))
-
-    elif k == 't':
+    elif k == 't' and DBG:
         # debug teleport
         k = ''
         while 1:
@@ -3058,8 +3028,6 @@ def handle_ui(B, player):
                     print(e)
                 break
 
-    elif k == '0':
-        B = player.move_to_board( 'desert1', loc=Loc(7, GROUND) )
     # -----------------------------------------------------------------------------------------------
 
     elif k == 'u':
@@ -3067,8 +3035,6 @@ def handle_ui(B, player):
 
     elif k == 'E':
         B.display(str(B.get_all(player.loc)))
-    elif k == 'b':
-        status('has bu? ' + str(player.has(ID.book_of_bu)))
     elif k == 'm':
         if player.has(ID.magic_ball):
             MagicBallEvent(B).go(player, Misc.last_dir)
@@ -3077,9 +3043,7 @@ def handle_ui(B, player):
         for id, n in player.inv.items():
             item = objects[id]
             if item and n:
-                # txt.append(f'{item} {id(item)} {item.name} {n}')
                 txt.append(f'{item.name} {n}')
-        # txt.append(f'obj bb: {id(objects[ID.book_of_bu])}')
         B.display(txt)
 
     if k != '.':
@@ -3134,6 +3098,18 @@ def handle_ui(B, player):
     win2.addstr(0,0, f'[{STANCES[player.stance]}] [H{player.health}] [{player.kashes} Kashes] {key}')
     win2.refresh()
     return B, player
+
+def prompt(win2):
+    mp = ''
+    status('> ')
+    win2.refresh()
+    while 1:
+        k = win2.getkey()
+        if k=='\n':
+            return mp
+        mp += k
+        status('> '+mp)
+        win2.refresh()
 
 
 def debug(*args):
