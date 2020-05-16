@@ -2986,8 +2986,6 @@ def handle_ui(B, player):
         win2.addstr(1, 0, 'stance: sneaky')
     elif k == 'v':
         status(str(player.loc))
-        # player, B = Saves().load('start')
-        # objects[ID.player] = player
     elif k == ' ':
         player.action()
     elif k == '4' and DBG:
