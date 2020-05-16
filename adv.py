@@ -32,6 +32,7 @@ LOAD_BOARD = 999
 MAIN_Y = 3          # starting row of game boards
 SLP = 0.01
 SEQ_TYPES = (list, tuple)
+MAX_HEALTH = 50
 debug_log = open('debug', 'w')
 triggered_events = []
 done_events = set()
@@ -606,6 +607,7 @@ class Board:
         doors[0].type = Type.door3
         Item(self, Blocks.grill, 'grill', specials[1], id=ID.grill4)
         Item(self, Blocks.ticket_seller, 'Ticket seller booth', specials[2], id=ID.ticket_seller1)
+        Item(self, Blocks.ferry, 'Ferry', specials[8], id=ID.ferry)
         # invisible, with ferry id to be able to take the ferry near this tile
         # Item(self, '', '', specials[3], id=ID.ferry)
 
@@ -674,12 +676,12 @@ class Board:
     def board_top3(self):
         self.colors = [(Loc(50,11), 1)]     # window
         containers, crates, doors, specials = self.load_map(self._map)
-        Item(self, Blocks.car, 'Car', specials[1], id=ID.car)
+        Item(self, Blocks.car, 'Car', specials[8], id=ID.car)
 
     def board_beluga(self):
         self.colors = [(Loc(41,6), 1)]     # window
         containers, crates, doors, specials = self.load_map(self._map)
-        s=Item(self, Blocks.ferry, 'Sailboat', specials[1], id=ID.sailboat)
+        s=Item(self, Blocks.ferry, 'Sailboat', specials[8], id=ID.sailboat)
         s.state=1
         Being(self, specials[3], id=ID.buzancais, name='Buzancais', char=Blocks.cow)
 
@@ -690,7 +692,6 @@ class Board:
         for x in [8,15] + lrange(23,27) + lrange(35,79):
             self.colors.append((Loc(x,GROUND+1), 2))
         containers, crates, doors, specials = self.load_map(self._map)
-        Item(self, Blocks.ferry, 'Sailboat', specials[1], id=ID.sailboat)
         s=Soldier(self, specials[2])
         s.add1(ID.key1)
 
@@ -744,7 +745,7 @@ class Board:
         self.colors = self.color_line(Loc(61,7), Loc(67,7), 3)
 
         containers, crates, doors, specials = self.load_map(self._map)
-        Item(self, Blocks.ferry, 'Sailboat', specials[1], id=ID.sailboat)
+        # Item(self, Blocks.ferry, 'Sailboat', specials[1], id=ID.sailboat)
         Being(self, specials[2], id=ID.ruffec, name='Ruffec', char=Blocks.cow)
 
     def board_proxima2(self):
@@ -1158,6 +1159,7 @@ class BeingItemMixin:
         to_B = map_to_board(_map)
         if specials_ind is not None:
             loc = to_B.specials[specials_ind]
+            print("loc", loc)
         if self.id in self.B.get_all(self.loc):
             self.B.remove(self)
         self.loc = loc
@@ -1501,7 +1503,7 @@ class Being(BeingItemMixin):
                 self.kashes += 1
                 B.remove(x, new)
             elif x.id == ID.grn_heart:
-                self.health = min(15, self.health+1)
+                self.health = min(MAX_HEALTH, self.health+1)
                 B.remove(x)
             elif x.id in pick_up:
                 if x.id==ID.sendell_medallion:
@@ -2029,7 +2031,7 @@ class Being(BeingItemMixin):
             y = self.talk(obj.olivet, ID.olivet3, yesno=1)
             if y:
                 self.inv[ID.magic_flute] = 0
-                # self.inv[Item(None, 'g', 'guitar', id=ID.guitar)] = 1
+                Item(None, 'g', 'guitar', id=ID.guitar)
                 self.inv[ID.guitar] = 1
         elif self.has(ID.guitar):
             y = self.talk(obj.olivet, "Would you like to return the guitar and get your flute back?", yesno=1)
@@ -2086,7 +2088,7 @@ class Being(BeingItemMixin):
                     B.remove(rock, loc)
                 B.put(Blocks.water, loc)
             self.inv[ID.empty_bottle] = 0
-            # self.inv[Item(None, Blocks.bottle, 'Bottle of clear water', id=ID.bottle_clear_water)] = 1
+            Item(None, Blocks.bottle, 'Bottle of clear water', id=ID.bottle_clear_water)
             self.inv[ID.bottle_clear_water] = 1
 
         elif item_id == ID.gawley_horn and is_near('stone2'):
@@ -2310,14 +2312,16 @@ class TravelByFerry(Event):
         dest = self.kwargs.get('dest')
         player = objects[ID.player]
         B = map_to_board('sea1')
-        f = obj_by_attr.ferry
-        B.put(f, Loc(78,GROUND))
-        self.animate(f, 'h', B=B)
+        ferry = obj_by_attr.ferry
+        B.put(ferry, Loc(78,GROUND))
+        self.animate(ferry, 'h', B=B)
         status('The ferry took you to ' + ('Principal Island' if dest=='8' else 'Citadel Island'))
         if dest == '8':
-            return player.move_to_board('8', loc=Loc(7, GROUND))
+            ferry.move_to_board(dest, 0)
+            return player.move_to_board('8', 9)
         elif dest == '7':
-            return player.move_to_board('7', loc=Loc(7, GROUND))
+            ferry.move_to_board(dest, 8)
+            return player.move_to_board('7', 9)
 
 class TravelByCarEvent(Event):
     once = False
@@ -2336,16 +2340,16 @@ class TravelByCarEvent(Event):
 
         if dest == 'wtower':
             status('You have driven the car to the Water tower')
-            car.move_to_board(dest, loc=Loc(6, GROUND))
-            B = self.player.move_to_board(dest, loc=Loc(7, GROUND))
+            car.move_to_board(dest, 8)
+            B = self.player.move_to_board(dest, 9)
         elif dest == 'top3':
             status('You have driven the car to Old Town')
-            car.move_to_board(dest, loc=Loc(6, GROUND))
-            B = self.player.move_to_board(dest, loc=Loc(7, GROUND))
+            car.move_to_board(dest, 8)
+            B = self.player.move_to_board(dest, 9)
         elif dest == 'beluga':
             status('You have driven the car to Port Beluga')
-            car.move_to_board(dest, loc=Loc(6, GROUND))
-            B = self.player.move_to_board(dest, loc=Loc(7, GROUND))
+            car.move_to_board(dest, 1)
+            B = self.player.move_to_board(dest, 2)
         return B
 
 class TravelBySailboat(Event):
@@ -2356,24 +2360,24 @@ class TravelBySailboat(Event):
         lname = first([ln for ln,m in dests if m==dest])
         player = objects[ID.player]
         B = map_to_board('sea1')
-        s = objects[ID.sailboat]
-        B.put(s, Loc(78,GROUND))
-        self.animate(s, 'h', B=B)
+        sailboat = objects[ID.sailboat]
+        B.put(sailboat, Loc(78,GROUND))
+        self.animate(sailboat, 'h', B=B)
         status(f'The sailboat took you to {lname}')
         obj = obj_by_attr
         dest_B = map_to_board(dest)
 
         if dest == 'desert1':
-            obj.sailboat.move_to_board(dest, loc=Loc(6,GROUND))
-            return player.move_to_board(dest, loc=Loc(7, GROUND))
+            sailboat.move_to_board(dest, 8)
+            return player.move_to_board(dest, 9)
         elif dest == 'beluga':
-            obj.sailboat.move_to_board(dest, loc=dest_B.specials[9].mod_l())
+            sailboat.move_to_board(dest, 8)
             return player.move_to_board(dest, 9)
         elif dest == 'proxima1':
-            obj.sailboat.move_to_board(dest, loc=dest_B.specials[9].mod_l())
+            sailboat.move_to_board(dest, 8)
             return player.move_to_board(dest, 9)
         elif dest == 'himalaya1':
-            obj.sailboat.move_to_board(dest, loc=dest_B.specials[9].mod_l().mod_l())
+            sailboat.move_to_board(dest, 8)
             return player.move_to_board(dest, 9)
 
 
@@ -2903,21 +2907,24 @@ def main(stdscr, load_game):
     Item(None, Blocks.bottle, 'jar of strawberry syrup', id=ID.jar_syrup)
     Item(None, Blocks.wine, 'half bottle of wine', id=ID.wine)
     Item(None, Blocks.crate1, 'crate', id=ID.crate1)
+    Item(None, Blocks.bottle, 'Bottle of clear water', id=ID.bottle_clear_water)
+
     # Item(None, 'c', 'red card', id=ID.red_card)
     f = obj_by_attr.ferry
     # print("f", B._map, f, f.loc, f.B)
 
-    f.move_to_board('8', loc=Loc(7,15))
-    if B._map=='8' and f.loc.x==6:
-        f.move('l')
-    if B._map in 'top3 beluga'.split():
-        obj_by_attr.car.board_map = B._map
-        obj_by_attr.car.loc = Loc(6,14)
+    # f.move_to_board('8', loc=Loc(7,15))
+    # if B._map=='8' and f.loc.x==6:
+    #     f.move('l')
+    # if B._map in 'top3 beluga'.split():
+    #     obj_by_attr.car.board_map = B._map
+    #     obj_by_attr.car.loc = Loc(6,14)
     player.health = 40
     player.add1(ID.key1)
+    player.kashes = 50
 
     # only to keep state to unlock Port Beluga
-    m=Being(None, None, name='Maurice', char=Blocks.rabbit, id=ID.maurice, put=0)
+    m = Being(None, None, name='Maurice', char=Blocks.rabbit, id=ID.maurice, put=0)
     m.state=1
 
     # if B._map=='6':
