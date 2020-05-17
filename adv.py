@@ -2472,7 +2472,7 @@ class AlarmEvent1(Event):
     once=True
     def go(self):
         self.animate(obj_by_attr.technician1, 'l', n=4)
-        self.player.talk(self.player, '!ALARM!')
+        self.player.talk(self.player, ['!ALARM!', 'A few GroboClones attack you and take you back to Jail.'])
         return Saves().load('start')
 
 class GarbageTruckEvent(Event):
@@ -2498,6 +2498,7 @@ class ShopKeeperAlarmEvent(Event):
     def go(self):
         shk = objects[ID.shopkeeper1]
         if shk.health > 0:
+            self.player.talk(self.player, 'A few GroboClones attack you and take you back to Jail.')
             return Saves().load('start')
 
 class DieEvent(Event):
@@ -2688,7 +2689,8 @@ class Colors:
     blue_on_black = 5
 
 def main(stdscr, load_game):
-    # Misc.is_game = 1
+    if not os.path.exists('saves'):
+        os.mkdir('saves')
     Misc.is_game = 1
     curses.init_pair(Colors.blue_on_white, curses.COLOR_BLUE, curses.COLOR_WHITE)
     curses.init_pair(Colors.yellow_on_white, curses.COLOR_YELLOW, curses.COLOR_WHITE)
@@ -2876,15 +2878,13 @@ def main(stdscr, load_game):
     win2.addstr(0, 0, '-'*80)
     win2.refresh()
 
-    # Saves().save('start', B.loc)
+    Saves().save(B.loc, 'start')
     Misc.last_cmd = None
     Misc.wait_count = 0
     Misc.last_dir = 'l'
 
     if load_game:
         player, B = Saves().load(load_game)
-        # B = Saves().load(load_game)
-        # player.update_refs()
         B.draw(Windows.win)
         player.kashes = 100
 

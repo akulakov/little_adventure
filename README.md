@@ -9,6 +9,8 @@ Requirements
 - Python3  (On Mac OS run `brew install python3`)
 - tested in iTerm2 on Mac OS only (may work on other terminals) (https://www.iterm2.com/)
 
+To play, run `python3 adv.py`
+
 # Commands
 
 ## Move
