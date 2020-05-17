@@ -68,7 +68,7 @@ class Blocks:
     honey = '🍯'
     shelves = '☷'
     chair = '⑁'
-    fountain = '‿' # TODO find a new unicode; doesn't work
+    fountain = '‿'
     small_table = '▿'
     table2 = '⍡'
     stool = '⍑'
@@ -518,7 +518,6 @@ class Board:
         self.spawn_locations = {}
         self.trigger_locations = {}
         self.colors = []
-        self.labels = []
         self.misc = []
         self.loc = loc
         self._map = str(_map)
@@ -2175,7 +2174,7 @@ class Event:
         for _ in range(height):
             self.animate(item, 'j', n=height, carry_item=carry_item, sleep_time=sleep_time)
 
-    def animate(self, items, dir, B=None, n=999, carry_item=None, sleep_time=SLP):
+    def animate(self, items, dir, B=None, n=999, carry_item=None, sleep_time=SLP*4):
         if not isinstance(items, SEQ_TYPES):
             items = [items]
         B = B or self.B
