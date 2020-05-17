@@ -2906,7 +2906,7 @@ def main(stdscr, load_game):
     Item(None, Blocks.bottle, 'Bottle of clear water', id=ID.bottle_clear_water)
 
     f = obj_by_attr.ferry
-    player.health = 40
+    # player.health = 40
     player.add1(ID.key1)
     player.kashes = 50
 
