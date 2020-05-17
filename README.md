@@ -11,6 +11,10 @@ Requirements
 
 To play, run `python3 adv.py`
 
+## Gameplay hints
+
+Some hidden passages are so narrow that you have to sneak through them!
+
 # Commands
 
 ## Move
