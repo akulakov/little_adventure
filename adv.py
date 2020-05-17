@@ -24,6 +24,8 @@ from textwrap import wrap
 import string
 import shelve
 
+__version__ = (0,3,0)
+
 rock = '█'
 blank = ' '
 HEIGHT = 16
