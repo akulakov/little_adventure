@@ -873,7 +873,7 @@ class Board:
         self.specials = specials = defaultdict(list)
         BL=Blocks
 
-        for y in range(16):
+        for y in range(HEIGHT):
             for x in range(79):
                 char = _map[y][x]
                 loc = Loc(x,y)
@@ -1494,7 +1494,7 @@ class Being(BeingItemMixin):
         items = B.get_all_obj(new)
         if top_obj:
             if isinstance(top_obj, int):
-                top_obj = objects[top_id]
+                top_obj = objects[top_obj.id]
             if top_obj.type == Type.event_trigger:
                 triggered_events.append(top_obj.evt)
 
