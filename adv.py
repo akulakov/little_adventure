@@ -1049,7 +1049,7 @@ class Board:
 
     def draw(self, win):
         for y, row in enumerate(self.B):
-            for x, cell in enumerate(row):
+            for x, cell in reversed([*enumerate(row)]):
                 # tricky bug: if an 'invisible' item put somewhere, then a being moves on top of it, it's drawn, but
                 # when it's moved out, the invisible item is drawn, but being an empty string, it doesn't draw over the
                 # being's char, so the 'image' of the being remains there, even after being moved away.
