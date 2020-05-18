@@ -2612,26 +2612,6 @@ class Saves:
     saves = {}
     loaded = 0
 
-    def UNUSEDsave(self, name, cur_brd):
-        for n in range(1,999):
-            fn = f'saves/{n}.data'
-            if not os.path.exists(fn):
-                break
-        sh = shelve.open(fn, protocol=1)
-        if 'saves' in sh:
-            self.saves = sh['saves']
-        s = {}
-        s['boards'] = deepcopy(boards)
-        s['cur_brd'] = cur_brd
-        player = objects[ID.player]
-        s['player'] = deepcopy(objects[ID.player])
-        s['objects'] = deepcopy(objects)
-        bl = cur_brd
-        B = boards[bl.y][bl.x]
-        sh['saves'] = self.saves
-        sh.close()
-        return B.get_all(player.loc), n
-
     def load(self, name=None):
         for n in range(1,999):
             fn = f'saves/{n}.data'
@@ -2887,7 +2867,6 @@ def main(stdscr, load_game):
     if load_game:
         player, B = Saves().load(load_game)
         B.draw(Windows.win)
-        player.kashes = 100
 
     Item(None, 'H', 'hair dryer', id=ID.hair_dryer)
     Item(None, 'P', 'proto pack', id=ID.proto_pack)
@@ -2906,8 +2885,8 @@ def main(stdscr, load_game):
 
     f = obj_by_attr.ferry
     # player.health = 40
+    # player.kashes = 50
     player.add1(ID.key1)
-    player.kashes = 50
 
     # only to keep state to unlock Port Beluga
     m = Being(None, None, name='Maurice', char=Blocks.rabbit, id=ID.maurice, put=0)
