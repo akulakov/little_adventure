@@ -2065,7 +2065,7 @@ class Being(BeingItemMixin):
             item = objects[id]
             win.addstr(n,0, f' {ascii_letters[n]}) {item.name:4} - {qty} ')
         ch = win.getkey()
-        item = None
+        item_id = None
         if ch in ascii_letters:
             try:
                 item_id = list(self.inv.keys())[string.ascii_letters.index(ch)]
