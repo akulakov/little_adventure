@@ -68,7 +68,7 @@ class Blocks:
     honey = '🍯'
     shelves = '☷'
     chair = '⑁'
-    fountain = '‿' # TODO find a new unicode; doesn't work
+    fountain = '‿'
     small_table = '▿'
     table2 = '⍡'
     stool = '⍑'
@@ -518,7 +518,6 @@ class Board:
         self.spawn_locations = {}
         self.trigger_locations = {}
         self.colors = []
-        self.labels = []
         self.misc = []
         self.loc = loc
         self._map = str(_map)
@@ -874,7 +873,7 @@ class Board:
         self.specials = specials = defaultdict(list)
         BL=Blocks
 
-        for y in range(16):
+        for y in range(HEIGHT):
             for x in range(79):
                 char = _map[y][x]
                 loc = Loc(x,y)
@@ -1495,7 +1494,7 @@ class Being(BeingItemMixin):
         items = B.get_all_obj(new)
         if top_obj:
             if isinstance(top_obj, int):
-                top_obj = objects[top_id]
+                top_obj = objects[top_obj.id]
             if top_obj.type == Type.event_trigger:
                 triggered_events.append(top_obj.evt)
 
@@ -2066,7 +2065,7 @@ class Being(BeingItemMixin):
             item = objects[id]
             win.addstr(n,0, f' {ascii_letters[n]}) {item.name:4} - {qty} ')
         ch = win.getkey()
-        item = None
+        item_id = None
         if ch in ascii_letters:
             try:
                 item_id = list(self.inv.keys())[string.ascii_letters.index(ch)]
@@ -2175,7 +2174,7 @@ class Event:
         for _ in range(height):
             self.animate(item, 'j', n=height, carry_item=carry_item, sleep_time=sleep_time)
 
-    def animate(self, items, dir, B=None, n=999, carry_item=None, sleep_time=SLP):
+    def animate(self, items, dir, B=None, n=999, carry_item=None, sleep_time=SLP*4):
         if not isinstance(items, SEQ_TYPES):
             items = [items]
         B = B or self.B
@@ -2613,26 +2612,6 @@ class Saves:
     saves = {}
     loaded = 0
 
-    def UNUSEDsave(self, name, cur_brd):
-        for n in range(1,999):
-            fn = f'saves/{n}.data'
-            if not os.path.exists(fn):
-                break
-        sh = shelve.open(fn, protocol=1)
-        if 'saves' in sh:
-            self.saves = sh['saves']
-        s = {}
-        s['boards'] = deepcopy(boards)
-        s['cur_brd'] = cur_brd
-        player = objects[ID.player]
-        s['player'] = deepcopy(objects[ID.player])
-        s['objects'] = deepcopy(objects)
-        bl = cur_brd
-        B = boards[bl.y][bl.x]
-        sh['saves'] = self.saves
-        sh.close()
-        return B.get_all(player.loc), n
-
     def load(self, name=None):
         for n in range(1,999):
             fn = f'saves/{n}.data'
@@ -2888,7 +2867,6 @@ def main(stdscr, load_game):
     if load_game:
         player, B = Saves().load(load_game)
         B.draw(Windows.win)
-        player.kashes = 100
 
     Item(None, 'H', 'hair dryer', id=ID.hair_dryer)
     Item(None, 'P', 'proto pack', id=ID.proto_pack)
@@ -2907,8 +2885,8 @@ def main(stdscr, load_game):
 
     f = obj_by_attr.ferry
     # player.health = 40
+    # player.kashes = 50
     player.add1(ID.key1)
-    player.kashes = 50
 
     # only to keep state to unlock Port Beluga
     m = Being(None, None, name='Maurice', char=Blocks.rabbit, id=ID.maurice, put=0)
