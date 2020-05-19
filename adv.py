@@ -2058,6 +2058,7 @@ class Being(BeingItemMixin):
                 status("Looks like you don't have enough kashes!")
 
     def use(self):
+        if not self.inv: return
         B=self.B
         win = newwin(len(self.inv), 40, 2, 10)
         ascii_letters = string.ascii_letters
